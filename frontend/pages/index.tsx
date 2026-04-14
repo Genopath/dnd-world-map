@@ -627,7 +627,7 @@ export default function Home() {
           <MapView
             locations={levelLocations} allLocations={locations}
             selectedId={selectedId}
-            playerPath={playerPath} isAddingPin={isAddingPin && isDMMode}
+            playerPath={playerPath} quests={visibleQuests} isAddingPin={isAddingPin && isDMMode}
             mapImageUrl={currentMapUrl} isDMMode={isDMMode}
             fogData={fogData}
             fogPaintMode={fogPaint}

@@ -346,6 +346,23 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-temple     .pin-dot { background: var(--pin-temple); }
 .pin-port       .pin-dot { background: var(--pin-port); }
 
+.pin-quest-dot {
+  position: absolute;
+  top: -7px; left: -7px;
+  min-width: 14px; height: 14px;
+  border-radius: 7px;
+  background: #e05c30;
+  color: #fff;
+  font-size: 8px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+  border: 1px solid rgba(0,0,0,0.35);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  pointer-events: none;
+  z-index: 1;
+  letter-spacing: 0;
+}
+
 .pin-path-num {
   position: absolute;
   top: -9px; right: -9px;

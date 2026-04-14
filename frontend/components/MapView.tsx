@@ -1,10 +1,11 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
-import type { CharacterPathEntry, Location, PartyMember, PathEntry } from '../types';
+import type { CharacterPathEntry, Location, PartyMember, PathEntry, Quest } from '../types';
 import { API_BASE } from '../lib/api';
 import FogCanvas from './FogCanvas';
 
@@ -50,6 +51,7 @@ interface Props {
   allLocations:     Location[];   // full list — used for path resolution
   selectedId:       number | null;
   playerPath:       PathEntry[];
+  quests:           Quest[];
   isAddingPin:      boolean;
   mapImageUrl:      string | null;
   isDMMode:         boolean;
@@ -74,6 +76,7 @@ export default function MapView({
   allLocations,
   selectedId,
   playerPath,
+  quests,
   isAddingPin,
   mapImageUrl,
   isDMMode,
@@ -93,6 +96,17 @@ export default function MapView({
   onExitSubmap,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Count active quests per location for the indicator dot
+  const activeQuestCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const q of quests) {
+      if (q.status === 'active' && q.location_id != null) {
+        counts.set(q.location_id, (counts.get(q.location_id) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [quests]);
   const imgRef       = useRef<HTMLImageElement | null>(null);
   const placeholderRef = useRef<HTMLDivElement | null>(null);
 
@@ -396,6 +410,14 @@ export default function MapView({
                 )}
                 {pathNum !== undefined && (
                   <div className="pin-path-num">{pathNum}</div>
+                )}
+                {activeQuestCounts.has(loc.id) && (
+                  <div
+                    className="pin-quest-dot"
+                    title={`${activeQuestCounts.get(loc.id)} active quest${activeQuestCounts.get(loc.id)! > 1 ? 's' : ''}`}
+                  >
+                    {activeQuestCounts.get(loc.id)! > 1 ? activeQuestCounts.get(loc.id) : '!'}
+                  </div>
                 )}
                 <div className="pin-label">{loc.name}</div>
               </div>
