@@ -1,0 +1,671 @@
+import Head from 'next/head';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import CampaignSelector from '../components/CampaignSelector';
+import MapView from '../components/MapView';
+import Sidebar from '../components/Sidebar';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { api, API_BASE, setCurrentCampaign } from '../lib/api';
+import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, MapConfig, NPC, PartyMember, PathEntry, Quest, SearchResults, SessionEntry, SidebarTab } from '../types';
+
+export default function Home() {
+  // ── Campaign selection ──────────────────────────────────────────────────────
+  const [campaignSlug,         setCampaignSlug]         = useState<string | null>(null);
+  const [campaignName,         setCampaignName]         = useState<string>('');
+  const [showCampaignSelector, setShowCampaignSelector] = useState(false);
+
+  // ── Core state ──────────────────────────────────────────────────────────────
+  const [locations,   setLocations]   = useState<Location[]>([]);
+  const [playerPath,  setPlayerPath]  = useState<PathEntry[]>([]);
+  const [mapConfig,   setMapConfig]   = useState<MapConfig>({ image_url: null });
+  const [selectedId,  setSelectedId]  = useState<number | null>(null);
+  const [isDMMode,    setIsDMMode]    = useState(true);
+  const [isAddingPin, setIsAddingPin] = useState(false);
+  const [sidebarTab,  setSidebarTab]  = useState<SidebarTab>('location');
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
+
+  // ── Phase-1 state ───────────────────────────────────────────────────────────
+  const [npcs,     setNpcs]     = useState<NPC[]>([]);
+  const [quests,   setQuests]   = useState<Quest[]>([]);
+  const [sessions, setSessions] = useState<SessionEntry[]>([]);
+
+  // ── Phase-2 state ───────────────────────────────────────────────────────────
+  const [party,    setParty]    = useState<PartyMember[]>([]);
+  const [factions, setFactions] = useState<Faction[]>([]);
+  const [campaign, setCampaign] = useState<CampaignSettings | null>(null);
+  const [fogData,  setFogData]  = useState<string>('1'.repeat(10000));
+  const [fogPaint, setFogPaint] = useState(false);
+  const [fogBrush, setFogBrush] = useState<'reveal' | 'hide'>('reveal');
+  const [fogSize,  setFogSize]  = useState(3);
+
+  // ── Phase-3 state ───────────────────────────────────────────────────────────
+  const [calendarConfig,  setCalendarConfig]  = useState<CalendarConfig | null>(null);
+  const [mapStack,        setMapStack]        = useState<number[]>([]);
+  const [characterPaths,  setCharacterPaths]  = useState<CharacterPathEntry[]>([]);
+
+  // ── Navigation jump state ────────────────────────────────────────────────────
+  const [npcJumpId,   setNpcJumpId]   = useState<number | null>(null);
+  const [questJumpId, setQuestJumpId] = useState<number | null>(null);
+
+  // ── Path visibility state ────────────────────────────────────────────────────
+  // hiddenCharIds: Set of party_member IDs whose individual paths are hidden
+  // showPartyPath: whether the shared party path line is shown
+  const [hiddenCharIds, setHiddenCharIds] = useState<Set<number>>(new Set());
+  const [showPartyPath,  setShowPartyPath]  = useState(true);
+
+  // ── Passcode state ──────────────────────────────────────────────────────────
+  const [passcodeModal, setPasscodeModal] = useState<'enter' | 'set' | null>(null);
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
+
+  // ── Lightbox state ──────────────────────────────────────────────────────────
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // ── Search state ────────────────────────────────────────────────────────────
+  const [searchOpen,    setSearchOpen]    = useState(false);
+  const [searchQuery,   setSearchQuery]   = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Campaign bootstrap ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('campaign_slug') : null;
+    api.campaigns.list()
+      .then(list => {
+        if (saved && list.find((c: CampaignMeta) => c.slug === saved)) {
+          const c = list.find((c: CampaignMeta) => c.slug === saved)!;
+          handleSelectCampaign(c.slug, c.name);
+        } else if (list.length === 1) {
+          handleSelectCampaign(list[0].slug, list[0].name);
+        } else if (list.length > 1) {
+          setShowCampaignSelector(true);
+          setLoading(false);
+        } else {
+          // No campaigns at all — show selector to create the first one
+          setShowCampaignSelector(true);
+          setLoading(false);
+        }
+      })
+      .catch(e => { setError(String(e)); setLoading(false); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSelectCampaign = useCallback((slug: string, name: string) => {
+    setCurrentCampaign(slug);
+    if (typeof window !== 'undefined') localStorage.setItem('campaign_slug', slug);
+    setCampaignSlug(slug);
+    setCampaignName(name);
+    setShowCampaignSelector(false);
+  }, []);
+
+  // ── Initial load (runs once campaign is selected) ────────────────────────────
+  useEffect(() => {
+    if (!campaignSlug) return;
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      api.locations.list(),
+      api.path.get(),
+      api.map.config(),
+      api.npcs.list(),
+      api.quests.list(),
+      api.sessions.list(),
+      api.party.list(),
+      api.factions.list(),
+      api.campaign.get(),
+      api.fog.get(),
+      api.calendar.get(),
+      api.characterPaths.listAll(),
+    ])
+      .then(([locs, path, cfg, npcList, questList, sessionList, partyList, factionList, campaignData, fogResult, calConfig, charPaths]) => {
+        setLocations(locs);
+        setPlayerPath(path);
+        setMapConfig(cfg);
+        setNpcs(npcList);
+        setQuests(questList);
+        setSessions(sessionList);
+        setParty(partyList);
+        setFactions(factionList);
+        setCampaign(campaignData);
+        setFogData(fogResult.data || '1'.repeat(10000));
+        setCalendarConfig(calConfig);
+        setCharacterPaths(charPaths);
+      })
+      .catch(e => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [campaignSlug]);
+
+  // ── Search debounce ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (!searchQuery.trim()) { setSearchResults(null); return; }
+    searchTimer.current = setTimeout(async () => {
+      try { setSearchResults(await api.search(searchQuery)); }
+      catch { /* ignore */ }
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [searchQuery]);
+
+  // ── Player-mode visibility filtering ────────────────────────────────────────
+  const visibleNpcs     = isDMMode ? npcs     : npcs.filter(n => n.is_visible !== false);
+  const visibleQuests   = isDMMode ? quests   : quests.filter(q => q.is_visible !== false);
+  const visibleFactions = isDMMode ? factions : factions.filter(f => f.is_visible !== false);
+  const visibleSessions = isDMMode ? sessions : sessions.filter(s => s.is_visible !== false);
+
+  // ── Derived state ───────────────────────────────────────────────────────────
+  const currentMapId  = mapStack.length > 0 ? mapStack[mapStack.length - 1] : null;
+  const currentMapUrl = currentMapId != null
+    ? (locations.find(l => l.id === currentMapId)?.submap_image_url ?? null)
+    : mapConfig.image_url;
+  const levelLocations = isDMMode
+    ? locations.filter(l => (l.parent_id ?? null) === currentMapId)
+    : locations.filter(l => (l.parent_id ?? null) === currentMapId && l.discovered);
+  const selectedLocation = locations.find(l => l.id === selectedId) ?? null;
+
+  // ── Location handlers ───────────────────────────────────────────────────────
+  const handleAddPin = useCallback(async (x: number, y: number) => {
+    setIsAddingPin(false);
+    try {
+      const newLoc = await api.locations.create({ name: 'New Location', type: 'city', subtitle: '', description: '', quest_hooks: [], handouts: [], dm_notes: '', discovered: false, x, y });
+      setLocations(prev => [...prev, newLoc]);
+      setSelectedId(newLoc.id);
+      setSidebarTab('location');
+    } catch (e) { console.error(e); }
+  }, []);
+
+  const handleUpdateLocation = useCallback(async (id: number, data: Partial<Location>) => {
+    const updated = await api.locations.update(id, data);
+    setLocations(prev => prev.map(l => (l.id === id ? updated : l)));
+  }, []);
+
+  const handleDeleteLocation = useCallback(async (id: number) => {
+    await api.locations.remove(id);
+    setLocations(prev => prev.filter(l => l.id !== id));
+    setPlayerPath(prev => prev.filter(e => e.location_id !== id));
+    if (selectedId === id) setSelectedId(null);
+  }, [selectedId]);
+
+  // ── Path handlers ────────────────────────────────────────────────────────────
+  const handleAddToPath           = useCallback(async (locationId: number) => { const e = await api.path.add(locationId); setPlayerPath(prev => [...prev, e]); }, []);
+  const handleRemoveFromPath      = useCallback(async (entryId: number) => { await api.path.remove(entryId); setPlayerPath(prev => prev.filter(e => e.id !== entryId)); }, []);
+  const handleReorderPath         = useCallback(async (order: number[]) => { setPlayerPath(await api.path.reorder(order)); }, []);
+  const handleUpdatePathTravelType = useCallback(async (entryId: number, travelType: string) => {
+    await api.path.updateTravelType(entryId, travelType);
+    setPlayerPath(prev => prev.map(e => e.id === entryId ? { ...e, travel_type: travelType } : e));
+  }, []);
+  const handleUpdateCharPathTravelType = useCallback(async (entryId: number, travelType: string) => {
+    await api.characterPaths.updateTravelType(entryId, travelType);
+    setCharacterPaths(prev => prev.map(e => e.id === entryId ? { ...e, travel_type: travelType } : e));
+  }, []);
+
+  // ── NPC handlers ─────────────────────────────────────────────────────────────
+  const handleCreateNPC = useCallback(async (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => {
+    const npc = await api.npcs.create(data); setNpcs(prev => [...prev, npc]);
+  }, []);
+  const handleUpdateNPC = useCallback(async (id: number, data: Partial<NPC>) => {
+    const updated = await api.npcs.update(id, data); setNpcs(prev => prev.map(n => (n.id === id ? updated : n)));
+  }, []);
+  const handleDeleteNPC = useCallback(async (id: number) => {
+    await api.npcs.remove(id); setNpcs(prev => prev.filter(n => n.id !== id));
+  }, []);
+  const handleUploadPortrait = useCallback(async (id: number, file: File) => {
+    const { portrait_url } = await api.npcs.uploadPortrait(id, file);
+    setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url } : n)));
+  }, []);
+
+  // ── Quest handlers ────────────────────────────────────────────────────────────
+  const handleCreateQuest = useCallback(async (data: Omit<Quest, 'id' | 'created_at'>) => {
+    const quest = await api.quests.create(data); setQuests(prev => [...prev, quest]);
+  }, []);
+  const handleUpdateQuest = useCallback(async (id: number, data: Partial<Quest>) => {
+    const updated = await api.quests.update(id, data); setQuests(prev => prev.map(q => (q.id === id ? updated : q)));
+  }, []);
+  const handleDeleteQuest = useCallback(async (id: number) => {
+    await api.quests.remove(id); setQuests(prev => prev.filter(q => q.id !== id));
+  }, []);
+
+  // ── Session handlers ──────────────────────────────────────────────────────────
+  const handleCreateSession = useCallback(async (data: Omit<SessionEntry, 'id' | 'created_at'>) => {
+    const session = await api.sessions.create(data); setSessions(prev => [...prev, session]);
+  }, []);
+  const handleUpdateSession = useCallback(async (id: number, data: Partial<SessionEntry>) => {
+    const updated = await api.sessions.update(id, data); setSessions(prev => prev.map(s => (s.id === id ? updated : s)));
+  }, []);
+  const handleDeleteSession = useCallback(async (id: number) => {
+    await api.sessions.remove(id); setSessions(prev => prev.filter(s => s.id !== id));
+  }, []);
+
+  // ── Party handlers ────────────────────────────────────────────────────────────
+  const handleCreateParty = useCallback(async (data: Omit<PartyMember, 'id' | 'created_at'>) => {
+    const member = await api.party.create(data); setParty(prev => [...prev, member]);
+  }, []);
+  const handleUpdateParty = useCallback(async (id: number, data: Partial<PartyMember>) => {
+    const updated = await api.party.update(id, data); setParty(prev => prev.map(m => (m.id === id ? updated : m)));
+  }, []);
+  const handleDeleteParty = useCallback(async (id: number) => {
+    await api.party.remove(id); setParty(prev => prev.filter(m => m.id !== id));
+  }, []);
+
+  // ── Faction handlers ──────────────────────────────────────────────────────────
+  const handleCreateFaction = useCallback(async (data: Omit<Faction, 'id' | 'created_at'>) => {
+    const faction = await api.factions.create(data); setFactions(prev => [...prev, faction]);
+  }, []);
+  const handleUpdateFaction = useCallback(async (id: number, data: Partial<Faction>) => {
+    const updated = await api.factions.update(id, data); setFactions(prev => prev.map(f => (f.id === id ? updated : f)));
+  }, []);
+  const handleDeleteFaction = useCallback(async (id: number) => {
+    await api.factions.remove(id); setFactions(prev => prev.filter(f => f.id !== id));
+  }, []);
+
+  // ── Campaign handler ──────────────────────────────────────────────────────────
+  const handleUpdateCampaign = useCallback(async (data: Partial<Omit<CampaignSettings, 'id'>>) => {
+    const updated = await api.campaign.update(data); setCampaign(updated);
+  }, []);
+
+  // ── Phase-3 handlers ─────────────────────────────────────────────────────────
+  const handleEnterSubmap    = useCallback((id: number) => setMapStack(prev => [...prev, id]), []);
+  const handleExitSubmap     = useCallback(() => setMapStack(prev => prev.slice(0, -1)), []);
+  const handleUpdateCalendar = useCallback(async (data: Partial<Omit<CalendarConfig, 'id'>>) => {
+    const updated = await api.calendar.update(data);
+    setCalendarConfig(updated);
+  }, []);
+
+  // ── Character path handlers ───────────────────────────────────────────────────
+  const handleAddToCharPath    = useCallback(async (memberId: number, locationId: number) => {
+    const entry = await api.characterPaths.add(memberId, locationId);
+    setCharacterPaths(prev => [...prev, entry]);
+  }, []);
+  const handleRemoveFromCharPath = useCallback(async (entryId: number) => {
+    await api.characterPaths.remove(entryId);
+    setCharacterPaths(prev => prev.filter(e => e.id !== entryId));
+  }, []);
+  const handleReorderCharPath  = useCallback(async (memberId: number, order: number[]) => {
+    const updated = await api.characterPaths.reorder(memberId, order);
+    setCharacterPaths(prev => [...prev.filter(e => e.party_member_id !== memberId), ...updated]);
+  }, []);
+  const handleClearCharPath    = useCallback(async (memberId: number) => {
+    await api.characterPaths.clear(memberId);
+    setCharacterPaths(prev => prev.filter(e => e.party_member_id !== memberId));
+  }, []);
+
+  // ── Path visibility handlers ─────────────────────────────────────────────────
+  const handleToggleCharPath = useCallback((memberId: number) => {
+    setHiddenCharIds(prev => {
+      const next = new Set(prev);
+      next.has(memberId) ? next.delete(memberId) : next.add(memberId);
+      return next;
+    });
+  }, []);
+  const handleTogglePartyPath = useCallback(() => setShowPartyPath(p => !p), []);
+
+  // ── NPC ↔ Quest link handlers ─────────────────────────────────────────────────
+  const handleLinkNpc = useCallback(async (questId: number, npcId: number) => {
+    const [updatedQuests, updatedNpcs] = await Promise.all([
+      api.quests.linkNpc(questId, npcId).then(() => api.quests.list()),
+      api.npcs.list(),
+    ]);
+    setQuests(updatedQuests);
+    setNpcs(updatedNpcs);
+  }, []);
+  const handleUnlinkNpc = useCallback(async (questId: number, npcId: number) => {
+    const [updatedQuests, updatedNpcs] = await Promise.all([
+      api.quests.unlinkNpc(questId, npcId).then(() => api.quests.list()),
+      api.npcs.list(),
+    ]);
+    setQuests(updatedQuests);
+    setNpcs(updatedNpcs);
+  }, []);
+
+  // ── Cross-navigation ──────────────────────────────────────────────────────────
+  const handleNavigateToNpc = useCallback((id: number) => {
+    setSidebarTab('npcs');
+    setNpcJumpId(id);
+  }, []);
+  const handleNavigateToQuest = useCallback((id: number) => {
+    setSidebarTab('quests');
+    setQuestJumpId(id);
+  }, []);
+
+  // ── WebSocket (player mode) ───────────────────────────────────────────────────
+  const handleWSRefresh = useCallback(async () => {
+    const [locs, path, fogResult, partyData, factionData, campaignData, calConfig, charPaths, updatedNpcs, updatedQuests] = await Promise.all([
+      api.locations.list(), api.path.get(), api.fog.get(),
+      api.party.list(), api.factions.list(), api.campaign.get(), api.calendar.get(),
+      api.characterPaths.listAll(), api.npcs.list(), api.quests.list(),
+    ]);
+    setLocations(locs);
+    setPlayerPath(path);
+    setFogData(fogResult.data || '1'.repeat(10000));
+    setParty(partyData);
+    setFactions(factionData);
+    setCampaign(campaignData);
+    setCalendarConfig(calConfig);
+    setCharacterPaths(charPaths);
+    setNpcs(updatedNpcs);
+    setQuests(updatedQuests);
+  }, []);
+  useWebSocket(handleWSRefresh, !isDMMode);
+
+  // ── Fog handler ───────────────────────────────────────────────────────────────
+  const handleFogChange = useCallback(async (data: string) => {
+    setFogData(data);
+    try { await api.fog.update(data); } catch (e) { console.error('Fog save failed:', e); }
+  }, []);
+
+  // ── Map upload ───────────────────────────────────────────────────────────────
+  const handleMapUpload = useCallback(async (file: File) => { setMapConfig(await api.map.upload(file)); }, []);
+
+  // ── Export / Import ───────────────────────────────────────────────────────────
+  const handleExport = useCallback(async () => {
+    const data = await api.data.export();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'world-map-backup.json'; a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImport = useCallback(async (file: File) => {
+    const text = await file.text();
+    await api.data.import(JSON.parse(text));
+    const [locs, path] = await Promise.all([api.locations.list(), api.path.get()]);
+    setLocations(locs); setPlayerPath(path); setSelectedId(null);
+  }, []);
+
+  // ── DM Passcode ──────────────────────────────────────────────────────────────
+  const handleDMModeClick = useCallback(() => {
+    if (isDMMode) return;
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('dm_passcode') : null;
+    if (stored) { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('enter'); }
+    else { setIsDMMode(true); }
+  }, [isDMMode]);
+
+  const handlePasscodeSubmit = useCallback(() => {
+    if (passcodeModal === 'enter') {
+      if (passcodeInput === (localStorage.getItem('dm_passcode') ?? '')) { setIsDMMode(true); setPasscodeModal(null); }
+      else { setPasscodeError('Incorrect passcode'); }
+    } else if (passcodeModal === 'set') {
+      if (passcodeInput.trim()) localStorage.setItem('dm_passcode', passcodeInput);
+      else localStorage.removeItem('dm_passcode');
+      setPasscodeModal(null);
+    }
+  }, [passcodeModal, passcodeInput]);
+
+  // ── Loading / error ───────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#07070d', color: '#c9a84c', fontSize: 17, gap: 10 }}>
+        <span>⚔</span> Loading…
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#07070d', color: '#e07070', gap: 12, textAlign: 'center', padding: 24 }}>
+        <div style={{ fontSize: 32 }}>⚠</div>
+        <div style={{ fontWeight: 700, fontSize: 16 }}>Cannot connect to backend</div>
+        <div style={{ color: '#888', fontSize: 13, maxWidth: 380 }}>Make sure the FastAPI server is running on <code style={{ color: '#c9a84c' }}>http://localhost:8000</code></div>
+        <code style={{ color: '#666', fontSize: 12 }}>{error}</code>
+        <button className="btn" onClick={() => window.location.reload()} style={{ marginTop: 8 }}>Retry</button>
+      </div>
+    );
+  }
+
+  if (showCampaignSelector || !campaignSlug) {
+    return (
+      <>
+        <Head><title>D&amp;D World Map</title></Head>
+        <CampaignSelector
+          currentSlug={campaignSlug}
+          onSelect={handleSelectCampaign}
+          onRename={(slug, name) => { if (slug === campaignSlug) setCampaignName(name); }}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Head>
+        <title>D&amp;D World Map</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+
+      <div className="app">
+        {/* ── Header ───────────────────────────────────────────────────── */}
+        <header className="header">
+          <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>⚔</span>
+            <span>{campaignName || 'World Map'}</span>
+            <button
+              className="btn btn-sm btn-ghost"
+              style={{ fontSize: 11, padding: '2px 8px' }}
+              onClick={() => setShowCampaignSelector(true)}
+              title="Switch campaign"
+            >⇄</button>
+          </div>
+
+          <div className="mode-toggle">
+            <button className={`mode-btn ${isDMMode ? 'active' : ''}`} onClick={handleDMModeClick}>DM Mode</button>
+            <button className={`mode-btn ${!isDMMode ? 'active' : ''}`} onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); }}>Player View</button>
+          </div>
+
+          {isDMMode && (
+            <>
+              <button className="btn btn-sm btn-icon" title="Set / change DM passcode" onClick={() => { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('set'); }}>🔒</button>
+
+              {/* Fog toolbar */}
+              <div className="fog-toolbar">
+                <button
+                  className={`btn btn-sm ${fogPaint ? 'btn-active' : ''}`}
+                  onClick={() => setFogPaint(p => !p)}
+                  title="Toggle fog of war painting tool"
+                >
+                  {fogPaint ? '✕ Fog Off' : '☁ Fog'}
+                </button>
+                {fogPaint && (
+                  <>
+                    <button className={`btn btn-sm ${fogBrush === 'reveal' ? 'btn-active' : ''}`} onClick={() => setFogBrush('reveal')}>Reveal</button>
+                    <button className={`btn btn-sm ${fogBrush === 'hide' ? 'btn-active' : ''}`} onClick={() => setFogBrush('hide')}>Hide</button>
+                    <select
+                      value={fogSize}
+                      onChange={e => setFogSize(Number(e.target.value))}
+                      style={{ width: 'auto', padding: '4px 8px' }}
+                      title="Brush size"
+                    >
+                      <option value={1}>Brush S</option>
+                      <option value={2}>Brush M</option>
+                      <option value={3}>Brush L</option>
+                      <option value={5}>Brush XL</option>
+                    </select>
+                    <button className="btn btn-sm" onClick={async () => { await api.fog.revealAll(); setFogData('1'.repeat(10000)); }} title="Reveal entire map">Reveal All</button>
+                    <button className="btn btn-sm" onClick={async () => { await api.fog.hideAll(); setFogData('0'.repeat(10000)); }} title="Hide entire map">Hide All</button>
+                  </>
+                )}
+              </div>
+
+              <button className={`btn ${isAddingPin ? 'btn-active' : ''}`} onClick={() => setIsAddingPin(p => !p)}>
+                {isAddingPin ? '✕ Cancel Placing' : '+ Add Location'}
+              </button>
+              <label className="btn" style={{ cursor: 'pointer' }}>
+                Upload Map
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
+              </label>
+              <button className="btn" onClick={handleExport} title="Export JSON backup">Export</button>
+              <label className="btn" style={{ cursor: 'pointer' }} title="Import JSON backup">
+                Import
+                <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ''; }} />
+              </label>
+            </>
+          )}
+
+          {/* Search button */}
+          <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); }}>🔍</button>
+        </header>
+
+        {/* ── Main ─────────────────────────────────────────────────────── */}
+        <div className="main">
+          <MapView
+            locations={levelLocations} allLocations={locations}
+            selectedId={selectedId}
+            playerPath={playerPath} isAddingPin={isAddingPin && isDMMode}
+            mapImageUrl={currentMapUrl} isDMMode={isDMMode}
+            fogData={fogData}
+            fogPaintMode={fogPaint}
+            fogBrushMode={fogBrush}
+            fogBrushSize={fogSize}
+            mapStack={mapStack}
+            characterPaths={characterPaths}
+            party={party}
+            hiddenCharIds={hiddenCharIds}
+            showPartyPath={showPartyPath}
+            onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
+            onDeselect={() => setSelectedId(null)}
+            onAddPin={handleAddPin}
+            onFogChange={handleFogChange}
+            onExitSubmap={handleExitSubmap}
+          />
+          <Sidebar
+            location={selectedLocation} isDMMode={isDMMode}
+            playerPath={playerPath} locations={locations}
+            npcs={visibleNpcs} quests={visibleQuests} sessions={visibleSessions}
+            party={party} factions={visibleFactions} campaign={campaign}
+            calendarConfig={calendarConfig}
+            characterPaths={characterPaths}
+            activeTab={sidebarTab} selectedLocationId={selectedId}
+            onTabChange={setSidebarTab}
+            onUpdate={handleUpdateLocation} onDelete={handleDeleteLocation}
+            onAddToPath={handleAddToPath} onRemoveFromPath={handleRemoveFromPath} onReorderPath={handleReorderPath}
+            onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
+            onCreateNPC={handleCreateNPC} onUpdateNPC={handleUpdateNPC} onDeleteNPC={handleDeleteNPC}
+            onUploadPortrait={handleUploadPortrait}
+            onCreateQuest={handleCreateQuest} onUpdateQuest={handleUpdateQuest} onDeleteQuest={handleDeleteQuest}
+            onCreateSession={handleCreateSession} onUpdateSession={handleUpdateSession} onDeleteSession={handleDeleteSession}
+            onCreateParty={handleCreateParty} onUpdateParty={handleUpdateParty} onDeleteParty={handleDeleteParty}
+            onCreateFaction={handleCreateFaction} onUpdateFaction={handleUpdateFaction} onDeleteFaction={handleDeleteFaction}
+            onUpdateCampaign={handleUpdateCampaign}
+            onUpdateCalendar={handleUpdateCalendar}
+            onEnterSubmap={handleEnterSubmap}
+            onLightbox={setLightboxUrl}
+            onAddToCharPath={handleAddToCharPath}
+            onRemoveFromCharPath={handleRemoveFromCharPath}
+            onReorderCharPath={handleReorderCharPath}
+            onClearCharPath={handleClearCharPath}
+            onLinkNpc={handleLinkNpc}
+            onUnlinkNpc={handleUnlinkNpc}
+            onNavigateToNpc={handleNavigateToNpc}
+            onNavigateToQuest={handleNavigateToQuest}
+            npcJumpId={npcJumpId}
+            questJumpId={questJumpId}
+            hiddenCharIds={hiddenCharIds}
+            showPartyPath={showPartyPath}
+            onToggleCharPath={handleToggleCharPath}
+            onTogglePartyPath={handleTogglePartyPath}
+            onUpdatePathTravelType={handleUpdatePathTravelType}
+            onUpdateCharPathTravelType={handleUpdateCharPathTravelType}
+          />
+        </div>
+      </div>
+
+      {/* ── Lightbox ─────────────────────────────────────────────────── */}
+      {lightboxUrl && (
+        <div className="lightbox-overlay" onClick={() => setLightboxUrl(null)}>
+          <img src={lightboxUrl} alt="Handout" className="lightbox-img" onClick={e => e.stopPropagation()} />
+          <button className="lightbox-close" onClick={() => setLightboxUrl(null)}>✕</button>
+        </div>
+      )}
+
+      {/* ── Search modal ─────────────────────────────────────────────── */}
+      {searchOpen && (
+        <div className="modal-overlay" onClick={() => setSearchOpen(false)}>
+          <div className="modal-box search-modal" onClick={e => e.stopPropagation()}>
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search locations, NPCs, quests…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') setSearchOpen(false); }}
+              autoFocus
+            />
+            {searchResults && (
+              <div className="search-results">
+                {searchResults.locations.length > 0 && (
+                  <div className="search-group">
+                    <div className="search-group-label">Locations</div>
+                    {searchResults.locations.map(l => (
+                      <button key={l.id} className="search-result" onClick={() => { setSelectedId(l.id); setSidebarTab('location'); setSearchOpen(false); }}>
+                        <span className="search-result-name">{l.name}</span>
+                        <span className="search-result-type">{l.type}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {searchResults.npcs.length > 0 && (
+                  <div className="search-group">
+                    <div className="search-group-label">NPCs</div>
+                    {searchResults.npcs.map(n => (
+                      <button key={n.id} className="search-result" onClick={() => { setSidebarTab('npcs'); setSearchOpen(false); }}>
+                        <span className="search-result-name">{n.name}</span>
+                        <span className="search-result-type">{n.role || n.status}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {searchResults.quests.length > 0 && (
+                  <div className="search-group">
+                    <div className="search-group-label">Quests</div>
+                    {searchResults.quests.map(q => (
+                      <button key={q.id} className="search-result" onClick={() => { setSidebarTab('quests'); setSearchOpen(false); }}>
+                        <span className="search-result-name">{q.title}</span>
+                        <span className="search-result-type">{q.status}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {searchResults.locations.length === 0 && searchResults.npcs.length === 0 && searchResults.quests.length === 0 && (
+                  <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>No results for "{searchQuery}"</div>
+                )}
+              </div>
+            )}
+            {!searchResults && searchQuery.trim() && (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Searching…</div>
+            )}
+            {!searchQuery.trim() && (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Type to search across all locations, NPCs, and quests</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Passcode modal ───────────────────────────────────────────── */}
+      {passcodeModal && (
+        <div className="modal-overlay" onClick={() => setPasscodeModal(null)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>
+              {passcodeModal === 'enter' ? '🔒 Enter DM Passcode' : '🔒 Set DM Passcode'}
+            </div>
+            {passcodeModal === 'set' && (
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
+                Protects DM Mode with a passcode. Leave blank to remove the passcode.
+              </div>
+            )}
+            <input
+              type="password"
+              value={passcodeInput}
+              onChange={e => { setPasscodeInput(e.target.value); setPasscodeError(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') handlePasscodeSubmit(); if (e.key === 'Escape') setPasscodeModal(null); }}
+              placeholder={passcodeModal === 'enter' ? 'Passcode' : 'New passcode (blank to remove)'}
+              autoFocus
+            />
+            {passcodeError && <div style={{ fontSize: 12, color: 'var(--danger-text)', marginTop: 6 }}>{passcodeError}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn btn-sm" onClick={() => setPasscodeModal(null)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={handlePasscodeSubmit}>{passcodeModal === 'enter' ? 'Unlock' : 'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
