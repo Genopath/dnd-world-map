@@ -170,11 +170,11 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
               {isDMMode && editingId === null && (
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                   <button
-                    className="btn btn-sm btn-ghost btn-icon"
+                    className={`btn btn-sm btn-ghost btn-icon${f.is_visible !== false ? '' : ' vis-off'}`}
                     title={f.is_visible !== false ? 'Visible to players — click to hide' : 'Hidden from players — click to reveal'}
                     onClick={async () => await onUpdate(f.id, { is_visible: !(f.is_visible !== false) })}
                   >
-                    {f.is_visible !== false ? '👁' : '🚫'}
+                    {f.is_visible !== false ? '👁' : '🔒'}
                   </button>
                   <button className="btn btn-sm btn-ghost btn-icon" onClick={() => startEdit(f)} title="Edit">✏</button>
                   <button className="btn btn-sm btn-ghost btn-icon" onClick={() => handleDelete(f)} title="Delete">✕</button>

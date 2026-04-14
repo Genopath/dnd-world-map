@@ -161,6 +161,8 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .btn-danger:hover { background: var(--danger); border-color: var(--danger-text); color: var(--text); }
 .btn-ghost  { background: transparent; border-color: transparent; color: var(--text-muted); }
 .btn-ghost:hover  { background: var(--surface3); border-color: var(--border); color: var(--text); }
+/* Visibility toggle — shared class applied to btn-ghost on every entity card */
+.vis-off { color: var(--accent) !important; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 .btn-icon { padding: 5px 9px; font-size: 14px; }
 

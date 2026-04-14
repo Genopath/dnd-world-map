@@ -252,12 +252,7 @@ export default function QuestPanel({
                 </span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{q.title}</div>
-                  {isDMMode && q.is_visible === false && (
-                    <span title="Hidden from players" style={{ fontSize: 10, color: 'var(--text-dim)' }}>🔒</span>
-                  )}
-                </div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{q.title}</div>
                 {q.location_id != null && (
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{locations.find(l => l.id === q.location_id)?.name ?? ''}</div>
                 )}
@@ -279,6 +274,15 @@ export default function QuestPanel({
                   </div>
                 )}
               </div>
+              {isDMMode && (
+                <button
+                  className={`btn btn-sm btn-ghost btn-icon${q.is_visible !== false ? '' : ' vis-off'}`}
+                  title={q.is_visible !== false ? 'Visible to players — click to hide' : 'Hidden from players — click to reveal'}
+                  onClick={async e => { e.stopPropagation(); await onUpdate(q.id, { is_visible: !(q.is_visible !== false) }); }}
+                >
+                  {q.is_visible !== false ? '👁' : '🔒'}
+                </button>
+              )}
               <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>{expandedId === q.id ? '▲' : '▼'}</span>
             </div>
 
@@ -501,10 +505,6 @@ function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode,
           {q.image_url && (
             <button className="btn btn-sm" onClick={async e => { e.stopPropagation(); await api.quests.deleteImage(q.id); await onUpdate(q.id, {}); }}>🗑 Image</button>
           )}
-          {q.is_visible === false
-            ? <button className="btn btn-sm" onClick={async () => onUpdate(q.id, { is_visible: true })}>👁 Show Players</button>
-            : <button className="btn btn-sm" onClick={async () => onUpdate(q.id, { is_visible: false })}>🔒 Hide Players</button>
-          }
           {q.status !== 'completed' && <button className="btn btn-sm" style={{ color: STATUS_COLOR.completed }} onClick={async e => { e.stopPropagation(); await onUpdate(q.id, { status: 'completed' }); }}>✓ Complete</button>}
           {q.status !== 'failed'    && <button className="btn btn-sm" style={{ color: STATUS_COLOR.failed }}    onClick={async e => { e.stopPropagation(); await onUpdate(q.id, { status: 'failed' }); }}>✗ Fail</button>}
           {q.status !== 'active'    && <button className="btn btn-sm" style={{ color: STATUS_COLOR.active }}    onClick={async e => { e.stopPropagation(); await onUpdate(q.id, { status: 'active' }); }}>↺ Reactivate</button>}

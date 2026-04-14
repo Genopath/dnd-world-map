@@ -93,12 +93,11 @@ export default function SessionPanel({ sessions, isDMMode, onCreate, onUpdate, o
             </div>
             {isDMMode && (
               <button
-                className="btn btn-sm btn-ghost btn-icon"
-                style={{ fontSize: 12, padding: '0 3px', flexShrink: 0 }}
+                className={`btn btn-sm btn-ghost btn-icon${s.is_visible !== false ? '' : ' vis-off'}`}
                 title={s.is_visible !== false ? 'Visible to players — click to hide' : 'Hidden from players — click to reveal'}
                 onClick={async e => { e.stopPropagation(); await onUpdate(s.id, { is_visible: !(s.is_visible !== false) }); }}
               >
-                {s.is_visible !== false ? '👁' : '🚫'}
+                {s.is_visible !== false ? '👁' : '🔒'}
               </button>
             )}
             <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>{expandedId === s.id ? '▲' : '▼'}</span>

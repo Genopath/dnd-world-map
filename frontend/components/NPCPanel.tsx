@@ -153,12 +153,11 @@ export default function NPCPanel({
             </span>
             {isDMMode && (
               <button
-                className="btn btn-sm btn-ghost btn-icon"
-                style={{ fontSize: 12, padding: '0 3px', flexShrink: 0 }}
+                className={`btn btn-sm btn-ghost btn-icon${npc.is_visible !== false ? '' : ' vis-off'}`}
                 title={npc.is_visible !== false ? 'Visible to players — click to hide' : 'Hidden from players — click to reveal'}
                 onClick={async e => { e.stopPropagation(); await onUpdate(npc.id, { is_visible: !(npc.is_visible !== false) }); }}
               >
-                {npc.is_visible !== false ? '👁' : '🚫'}
+                {npc.is_visible !== false ? '👁' : '🔒'}
               </button>
             )}
             <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 4 }}>{expandedId === npc.id ? '▲' : '▼'}</span>
