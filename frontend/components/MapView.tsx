@@ -13,6 +13,23 @@ const TYPE_COLORS: Record<string, string> = {
   dungeon:    'var(--pin-dungeon)',
   wilderness: 'var(--pin-wilderness)',
   landmark:   'var(--pin-landmark)',
+  hazard:     'var(--pin-hazard)',
+  shop:       'var(--pin-shop)',
+  inn:        'var(--pin-inn)',
+  temple:     'var(--pin-temple)',
+  port:       'var(--pin-port)',
+};
+
+const TYPE_DEFAULT_ICONS: Record<string, string> = {
+  city:       '/game-icons/city.svg',
+  dungeon:    '/game-icons/dungeon.svg',
+  wilderness: '/game-icons/wilderness.svg',
+  landmark:   '/game-icons/landmark.svg',
+  hazard:     '/game-icons/hazard.svg',
+  shop:       '/game-icons/shop.svg',
+  inn:        '/game-icons/inn.svg',
+  temple:     '/game-icons/temple.svg',
+  port:       '/game-icons/port.svg',
 };
 
 const CHAR_COLORS = ['#e05c5c', '#5c9fe0', '#60cc78', '#c05ce0', '#e0a040', '#40d4c8', '#e07840', '#a0c840'];
@@ -364,6 +381,13 @@ export default function MapView({
                     alt={loc.name}
                     draggable={false}
                   />
+                ) : TYPE_DEFAULT_ICONS[loc.type] ? (
+                  <div
+                    className="pin-icon-default"
+                    style={{ background: TYPE_COLORS[loc.type] ?? TYPE_COLORS.city }}
+                  >
+                    <img src={TYPE_DEFAULT_ICONS[loc.type]} className="pin-icon-svg" alt={loc.type} draggable={false} />
+                  </div>
                 ) : (
                   <div
                     className="pin-dot"

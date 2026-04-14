@@ -20,9 +20,18 @@ function nextTravelType(current?: string): TravelType {
 }
 
 // ── Type metadata ─────────────────────────────────────────────────────────────
-const TYPE_LABELS: Record<LocationType, string> = { city: 'City', dungeon: 'Dungeon', wilderness: 'Wilderness', landmark: 'Landmark' };
-const TYPE_ICONS:  Record<LocationType, string> = { city: '🏰', dungeon: '💀', wilderness: '🌲', landmark: '◈' };
-const BADGE_CLASS: Record<LocationType, string> = { city: 'badge-city', dungeon: 'badge-dungeon', wilderness: 'badge-wilderness', landmark: 'badge-landmark' };
+const TYPE_LABELS: Record<LocationType, string> = {
+  city: 'City', dungeon: 'Dungeon', wilderness: 'Wilderness', landmark: 'Landmark',
+  hazard: 'Hazard', shop: 'Shop', inn: 'Inn', temple: 'Temple', port: 'Port',
+};
+const TYPE_ICONS: Record<LocationType, string> = {
+  city: '🏰', dungeon: '💀', wilderness: '🌲', landmark: '◈',
+  hazard: '⚠', shop: '🪙', inn: '🍺', temple: '⛩', port: '⚓',
+};
+const BADGE_CLASS: Record<LocationType, string> = {
+  city: 'badge-city', dungeon: 'badge-dungeon', wilderness: 'badge-wilderness', landmark: 'badge-landmark',
+  hazard: 'badge-hazard', shop: 'badge-shop', inn: 'badge-inn', temple: 'badge-temple', port: 'badge-port',
+};
 
 const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
 const isImageUrl = (url: string) => IMAGE_EXTS.some(ext => url.toLowerCase().endsWith(ext));
@@ -446,7 +455,21 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
         <div className="form-group">
           <label className="form-label">Type</label>
           <select value={state.type} onChange={set('type')}>
-            <option value="city">City</option><option value="dungeon">Dungeon</option><option value="wilderness">Wilderness</option><option value="landmark">Landmark</option>
+            <optgroup label="Places">
+              <option value="city">City</option>
+              <option value="inn">Inn / Tavern</option>
+              <option value="shop">Shop / Market</option>
+              <option value="temple">Temple / Shrine</option>
+              <option value="port">Port / Harbor</option>
+            </optgroup>
+            <optgroup label="Wilderness">
+              <option value="wilderness">Wilderness</option>
+              <option value="dungeon">Dungeon</option>
+              <option value="hazard">Hazard</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option value="landmark">Landmark</option>
+            </optgroup>
           </select>
         </div>
         <div className="form-group">
