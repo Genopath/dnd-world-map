@@ -7,6 +7,60 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { api, API_BASE, setCurrentCampaign } from '../lib/api';
 import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, MapConfig, NPC, PartyMember, PathEntry, Quest, SearchResults, SessionEntry, SidebarTab } from '../types';
 
+// ── Browser backup helpers ────────────────────────────────────────────────────
+// Builds an import-compatible payload from frontend state (no binary file data).
+// Used for the automatic localStorage safety net.
+function _buildBrowserBackup(data: {
+  locations: Location[]; playerPath: PathEntry[]; npcs: NPC[]; quests: Quest[];
+  sessions: SessionEntry[]; party: PartyMember[]; factions: Faction[];
+  characterPaths: CharacterPathEntry[]; campaign: CampaignSettings | null;
+  calendarConfig: CalendarConfig | null; fogData: string;
+}) {
+  const links: Array<{ quest_id: number; npc_id: number }> = [];
+  for (const q of data.quests)
+    for (const npcId of (q.linked_npc_ids ?? []))
+      links.push({ quest_id: q.id, npc_id: npcId });
+
+  return {
+    _version: 2,
+    _browser_backup: true,
+    _saved_at: new Date().toISOString(),
+    campaign_settings: data.campaign ?? {},
+    calendar_config:   data.calendarConfig ?? {},
+    map_config:        { image_filename: '', _image_data: null },
+    fog_of_war:        data.fogData,
+    locations:         data.locations,
+    npcs:              data.npcs,
+    quests:            data.quests,
+    quest_npc_links:   links,
+    sessions:          data.sessions,
+    party_members:     data.party,
+    factions:          data.factions,
+    player_path: data.playerPath.map(e => ({
+      id: e.id, location_id: e.location_id,
+      position: e.position, travel_type: e.travel_type ?? 'foot',
+    })),
+    character_paths: data.characterPaths,
+  };
+}
+
+function _saveBrowserBackup(slug: string, backup: object) {
+  try {
+    localStorage.setItem(`campaign_backup_${slug}`, JSON.stringify(backup));
+  } catch {
+    // localStorage quota exceeded — silently skip
+  }
+}
+
+function _loadBrowserBackup(slug: string): { _saved_at?: string; [k: string]: unknown } | null {
+  try {
+    const raw = localStorage.getItem(`campaign_backup_${slug}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Home() {
   // ── Campaign selection ──────────────────────────────────────────────────────
   const [campaignSlug,         setCampaignSlug]         = useState<string | null>(null);
@@ -117,7 +171,37 @@ export default function Home() {
       api.calendar.get(),
       api.characterPaths.listAll(),
     ])
-      .then(([locs, path, cfg, npcList, questList, sessionList, partyList, factionList, campaignData, fogResult, calConfig, charPaths]) => {
+      .then(async ([locs, path, cfg, npcList, questList, sessionList, partyList, factionList, campaignData, fogResult, calConfig, charPaths]) => {
+        const fog = fogResult.data || '1'.repeat(10000);
+        const isEmpty = locs.length === 0 && npcList.length === 0 && questList.length === 0;
+
+        // ── Offer restore from browser backup if server data is gone ──────────
+        if (isEmpty) {
+          const cached = _loadBrowserBackup(campaignSlug);
+          if (cached) {
+            const savedAt = cached._saved_at ? new Date(cached._saved_at as string).toLocaleString() : 'unknown';
+            const restore = typeof window !== 'undefined'
+              && window.confirm(`Campaign data appears empty (server may have been redeployed).\n\nRestore from browser backup saved on ${savedAt}?`);
+            if (restore) {
+              await api.data.import(cached as object);
+              // Re-fetch everything after restore
+              const [rLocs, rPath, rCfg, rNpcs, rQuests, rSessions, rParty, rFactions, rCamp, rFog, rCal, rCharPaths] =
+                await Promise.all([
+                  api.locations.list(), api.path.get(), api.map.config(),
+                  api.npcs.list(), api.quests.list(), api.sessions.list(),
+                  api.party.list(), api.factions.list(), api.campaign.get(),
+                  api.fog.get(), api.calendar.get(), api.characterPaths.listAll(),
+                ]);
+              setLocations(rLocs); setPlayerPath(rPath); setMapConfig(rCfg);
+              setNpcs(rNpcs); setQuests(rQuests); setSessions(rSessions);
+              setParty(rParty); setFactions(rFactions); setCampaign(rCamp);
+              setFogData(rFog.data || '1'.repeat(10000));
+              setCalendarConfig(rCal); setCharacterPaths(rCharPaths);
+              return;
+            }
+          }
+        }
+
         setLocations(locs);
         setPlayerPath(path);
         setMapConfig(cfg);
@@ -127,9 +211,20 @@ export default function Home() {
         setParty(partyList);
         setFactions(factionList);
         setCampaign(campaignData);
-        setFogData(fogResult.data || '1'.repeat(10000));
+        setFogData(fog);
         setCalendarConfig(calConfig);
         setCharacterPaths(charPaths);
+
+        // ── Save browser backup whenever we have real data ────────────────────
+        if (!isEmpty) {
+          const backup = _buildBrowserBackup({
+            locations: locs, playerPath: path, npcs: npcList, quests: questList,
+            sessions: sessionList, party: partyList, factions: factionList,
+            characterPaths: charPaths, campaign: campaignData, calendarConfig: calConfig,
+            fogData: fog,
+          });
+          _saveBrowserBackup(campaignSlug, backup);
+        }
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
