@@ -361,15 +361,39 @@ export default function Home() {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = 'world-map-backup.json'; a.click();
+    const slug = (data as any)?.campaign_settings?.world_name || campaignName || 'campaign';
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `${slug.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-backup-${date}.json`;
+    a.click();
     URL.revokeObjectURL(url);
-  }, []);
+  }, [campaignName]);
 
   const handleImport = useCallback(async (file: File) => {
+    if (!confirm(`Import "${file.name}"? This will overwrite ALL data in the current campaign.`)) return;
     const text = await file.text();
     await api.data.import(JSON.parse(text));
-    const [locs, path] = await Promise.all([api.locations.list(), api.path.get()]);
-    setLocations(locs); setPlayerPath(path); setSelectedId(null);
+    // Reload everything
+    const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg] =
+      await Promise.all([
+        api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
+        api.sessions.list(), api.party.list(), api.factions.list(),
+        api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
+        api.fog.get(), api.map.config(),
+      ]);
+    setLocations(locs);
+    setPlayerPath(path);
+    setNpcs(npcList);
+    setQuests(questList);
+    setSessions(sessionList);
+    setParty(partyList);
+    setFactions(factionList);
+    setCampaign(campData);
+    setCalendarConfig(calCfg);
+    setCharacterPaths(charPaths);
+    setFogData(fogResult.data ?? '');
+    setMapConfig(mapCfg);
+    setSelectedId(null);
   }, []);
 
   // ── DM Passcode ──────────────────────────────────────────────────────────────

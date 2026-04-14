@@ -4,6 +4,7 @@ SQLite persistence via SQLAlchemy
 """
 
 import asyncio
+import base64
 import json
 import os
 import re
@@ -1034,45 +1035,326 @@ async def upload_handout(file: UploadFile = File(...)):
 
 @app.get("/export")
 def export_data(db: Session = Depends(get_db)):
-    locs = db.query(models.Location).all()
-    path = (
-        db.query(models.PlayerPathEntry)
-        .order_by(models.PlayerPathEntry.position)
-        .all()
-    )
+    from datetime import datetime as _dt
+
+    def _enc(url: str | None) -> str | None:
+        """Read a file from the uploads directory and return it as base64."""
+        if not url:
+            return None
+        path = _DATA_DIR / url.lstrip("/")
+        try:
+            return base64.b64encode(path.read_bytes()).decode()
+        except Exception:
+            return None
+
+    def _row(obj, model) -> dict:
+        return {col.name: getattr(obj, col.name) for col in model.__table__.columns}
+
+    # Locations
+    locations_out = []
+    for l in db.query(models.Location).all():
+        d = _row(l, models.Location)
+        d['quest_hooks'] = json.loads(d.get('quest_hooks') or '[]')
+        d['handouts']    = json.loads(d.get('handouts')    or '[]')
+        d['created_at']  = l.created_at.isoformat() if l.created_at else None
+        d['_icon_data']   = _enc(l.icon_url)
+        d['_image_data']  = _enc(l.image_url)
+        d['_submap_data'] = _enc(l.submap_image_url)
+        locations_out.append(d)
+
+    # Player path
+    player_path_out = []
+    for e in db.query(models.PlayerPathEntry).order_by(models.PlayerPathEntry.position).all():
+        d = _row(e, models.PlayerPathEntry)
+        d['visited_at'] = e.visited_at.isoformat() if e.visited_at else None
+        player_path_out.append(d)
+
+    # NPCs
+    npcs_out = []
+    for n in db.query(models.NPC).all():
+        d = _row(n, models.NPC)
+        d['created_at']     = n.created_at.isoformat() if n.created_at else None
+        d['_portrait_data'] = _enc(n.portrait_url)
+        npcs_out.append(d)
+
+    # Quests
+    quests_out = []
+    for q in db.query(models.Quest).all():
+        d = _row(q, models.Quest)
+        d['objectives'] = json.loads(d.get('objectives') or '[]')
+        d['tags']       = json.loads(d.get('tags')       or '[]')
+        d['created_at'] = q.created_at.isoformat() if q.created_at else None
+        d['_image_data'] = _enc(q.image_url)
+        quests_out.append(d)
+
+    # Quest↔NPC links
+    links_out = [
+        {'quest_id': l.quest_id, 'npc_id': l.npc_id}
+        for l in db.query(models.QuestNPCLink).all()
+    ]
+
+    # Sessions
+    sessions_out = []
+    for s in db.query(models.SessionLog).all():
+        d = _row(s, models.SessionLog)
+        d['created_at']  = s.created_at.isoformat() if s.created_at else None
+        d['_image_data'] = _enc(s.image_url)
+        sessions_out.append(d)
+
+    # Party members
+    party_out = []
+    for p in db.query(models.PartyMember).all():
+        d = _row(p, models.PartyMember)
+        d['conditions']     = json.loads(d.get('conditions') or '[]')
+        d['created_at']     = p.created_at.isoformat() if p.created_at else None
+        d['_portrait_data'] = _enc(p.portrait_url)
+        party_out.append(d)
+
+    # Factions
+    factions_out = []
+    for f in db.query(models.Faction).all():
+        d = _row(f, models.Faction)
+        d['created_at']  = f.created_at.isoformat() if f.created_at else None
+        d['_image_data'] = _enc(f.image_url)
+        factions_out.append(d)
+
+    # Character paths
+    char_paths_out = []
+    for c in db.query(models.CharacterPath).order_by(
+        models.CharacterPath.party_member_id, models.CharacterPath.position
+    ).all():
+        d = _row(c, models.CharacterPath)
+        d['visited_at'] = c.visited_at.isoformat() if c.visited_at else None
+        char_paths_out.append(d)
+
+    # Campaign settings
+    camp = db.query(models.CampaignSettings).first()
+    campaign_out = _row(camp, models.CampaignSettings) if camp else {}
+
+    # Calendar config
+    cal = db.query(models.CalendarConfig).first()
+    calendar_out = _row(cal, models.CalendarConfig) if cal else {}
+
+    # Fog of war
+    fog = db.query(models.FogOfWar).first()
+    fog_out = fog.data if fog else ""
+
+    # Map config + image file
+    map_cfg = db.query(models.MapConfig).first()
+    map_filename = (map_cfg.image_filename or "") if map_cfg else ""
+    map_out = {
+        "image_filename": map_filename,
+        "_image_data": _enc(f"/uploads/{map_filename}") if map_filename else None,
+    }
+
     return {
-        "locations": [_loc_out(l).model_dump() for l in locs],
-        "player_path": [
-            {"id": e.id, "location_id": e.location_id, "position": e.position}
-            for e in path
-        ],
+        "_version": 2,
+        "_exported_at": _dt.utcnow().isoformat() + "Z",
+        "campaign_settings": campaign_out,
+        "calendar_config":   calendar_out,
+        "map_config":        map_out,
+        "fog_of_war":        fog_out,
+        "locations":         locations_out,
+        "npcs":              npcs_out,
+        "quests":            quests_out,
+        "quest_npc_links":   links_out,
+        "sessions":          sessions_out,
+        "party_members":     party_out,
+        "factions":          factions_out,
+        "player_path":       player_path_out,
+        "character_paths":   char_paths_out,
     }
 
 
 @app.post("/import")
 def import_data(payload: dict, db: Session = Depends(get_db)):
+    def _restore(data_b64: str | None, url: str | None) -> None:
+        """Write embedded base64 file data back to disk."""
+        if not data_b64 or not url:
+            return
+        path = _DATA_DIR / url.lstrip("/")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            path.write_bytes(base64.b64decode(data_b64))
+        except Exception:
+            pass
+
+    # ── Wipe all tables (dependency-safe order) ────────────────────────────────
+    db.query(models.QuestNPCLink).delete()
+    db.query(models.CharacterPath).delete()
     db.query(models.PlayerPathEntry).delete()
+    db.query(models.Quest).delete()
+    db.query(models.NPC).delete()
+    db.query(models.SessionLog).delete()
+    db.query(models.Faction).delete()
     db.query(models.Location).delete()
+    db.query(models.PartyMember).delete()
+    db.query(models.FogOfWar).delete()
+    db.query(models.MapConfig).delete()
+    db.query(models.CampaignSettings).delete()
+    db.query(models.CalendarConfig).delete()
     db.commit()
 
-    id_map: dict[int, int] = {}
-    for raw in payload.get("locations", []):
-        old_id = raw.pop("id", None)
-        raw.pop("created_at", None)
-        loc = models.Location(
-            **{
-                k: json.dumps(v) if k in ("quest_hooks", "handouts") else v
-                for k, v in raw.items()
-            }
-        )
-        db.add(loc)
-        db.flush()
-        if old_id is not None:
-            id_map[old_id] = loc.id
+    # ── Campaign settings ──────────────────────────────────────────────────────
+    cs = payload.get("campaign_settings") or {}
+    if cs:
+        cols = {c.name for c in models.CampaignSettings.__table__.columns}
+        db.add(models.CampaignSettings(**{k: v for k, v in cs.items() if k in cols}))
 
-    for raw in payload.get("player_path", []):
-        new_loc_id = id_map.get(raw.get("location_id"), raw.get("location_id"))
-        db.add(models.PlayerPathEntry(location_id=new_loc_id, position=raw.get("position", 0)))
+    # ── Calendar config ────────────────────────────────────────────────────────
+    cal = payload.get("calendar_config") or {}
+    if cal:
+        cols = {c.name for c in models.CalendarConfig.__table__.columns}
+        db.add(models.CalendarConfig(**{k: v for k, v in cal.items() if k in cols}))
+
+    # ── Map config ─────────────────────────────────────────────────────────────
+    map_raw = payload.get("map_config") or {}
+    if map_raw.get("image_filename"):
+        fn = map_raw["image_filename"]
+        _restore(map_raw.get("_image_data"), f"/uploads/{fn}")
+        db.add(models.MapConfig(image_filename=fn))
+
+    # ── Fog of war ─────────────────────────────────────────────────────────────
+    fog_str = payload.get("fog_of_war") or ""
+    if fog_str:
+        db.add(models.FogOfWar(data=fog_str))
+
+    # ── Locations ─────────────────────────────────────────────────────────────
+    for d in payload.get("locations", []):
+        _restore(d.get("_icon_data"),   d.get("icon_url"))
+        _restore(d.get("_image_data"),  d.get("image_url"))
+        _restore(d.get("_submap_data"), d.get("submap_image_url"))
+        db.add(models.Location(
+            id=d["id"],
+            name=d["name"],
+            type=d.get("type", "city"),
+            subtitle=d.get("subtitle", ""),
+            description=d.get("description", ""),
+            quest_hooks=json.dumps(d.get("quest_hooks", [])),
+            handouts=json.dumps(d.get("handouts", [])),
+            dm_notes=d.get("dm_notes", ""),
+            discovered=d.get("discovered", False),
+            x=d["x"], y=d["y"],
+            icon_url=d.get("icon_url"),
+            image_url=d.get("image_url"),
+            parent_id=d.get("parent_id"),
+            submap_image_url=d.get("submap_image_url"),
+        ))
+
+    # ── Party members ──────────────────────────────────────────────────────────
+    for d in payload.get("party_members", []):
+        _restore(d.get("_portrait_data"), d.get("portrait_url"))
+        db.add(models.PartyMember(
+            id=d["id"],
+            name=d["name"],
+            player_name=d.get("player_name", ""),
+            class_name=d.get("class_name", ""),
+            race=d.get("race", ""),
+            level=d.get("level", 1),
+            hp_current=d.get("hp_current", 0),
+            hp_max=d.get("hp_max", 0),
+            ac=d.get("ac", 10),
+            conditions=json.dumps(d.get("conditions", [])),
+            notes=d.get("notes", ""),
+            portrait_url=d.get("portrait_url"),
+            path_color=d.get("path_color", "#c9a84c"),
+        ))
+
+    # ── NPCs ───────────────────────────────────────────────────────────────────
+    for d in payload.get("npcs", []):
+        _restore(d.get("_portrait_data"), d.get("portrait_url"))
+        db.add(models.NPC(
+            id=d["id"],
+            location_id=d.get("location_id"),
+            name=d["name"],
+            role=d.get("role", ""),
+            status=d.get("status", "alive"),
+            notes=d.get("notes", ""),
+            portrait_url=d.get("portrait_url"),
+            is_visible=d.get("is_visible", True),
+        ))
+
+    # ── Factions ───────────────────────────────────────────────────────────────
+    for d in payload.get("factions", []):
+        _restore(d.get("_image_data"), d.get("image_url"))
+        db.add(models.Faction(
+            id=d["id"],
+            name=d["name"],
+            description=d.get("description", ""),
+            reputation=d.get("reputation", 0),
+            notes=d.get("notes", ""),
+            color=d.get("color", "#888888"),
+            image_url=d.get("image_url"),
+            is_visible=d.get("is_visible", True),
+        ))
+
+    # ── Sessions ───────────────────────────────────────────────────────────────
+    for d in payload.get("sessions", []):
+        _restore(d.get("_image_data"), d.get("image_url"))
+        db.add(models.SessionLog(
+            id=d["id"],
+            session_number=d["session_number"],
+            title=d.get("title", ""),
+            in_world_date=d.get("in_world_date", ""),
+            real_date=d.get("real_date", ""),
+            summary=d.get("summary", ""),
+            xp_awarded=d.get("xp_awarded", 0),
+            loot_notes=d.get("loot_notes", ""),
+            image_url=d.get("image_url"),
+            is_visible=d.get("is_visible", True),
+        ))
+
+    db.flush()  # IDs must exist before quest foreign keys resolve
+
+    # ── Quests ─────────────────────────────────────────────────────────────────
+    for d in payload.get("quests", []):
+        _restore(d.get("_image_data"), d.get("image_url"))
+        db.add(models.Quest(
+            id=d["id"],
+            title=d["title"],
+            status=d.get("status", "active"),
+            tier=d.get("tier", "side"),
+            description=d.get("description", ""),
+            location_id=d.get("location_id"),
+            notes=d.get("notes", ""),
+            image_url=d.get("image_url"),
+            objectives=json.dumps(d.get("objectives", [])),
+            quest_giver_id=d.get("quest_giver_id"),
+            reward_gold=d.get("reward_gold", 0),
+            reward_notes=d.get("reward_notes", ""),
+            deadline=d.get("deadline", ""),
+            tags=json.dumps(d.get("tags", [])),
+            parent_quest_id=d.get("parent_quest_id"),
+            faction_id=d.get("faction_id"),
+            started_session_id=d.get("started_session_id"),
+            completed_session_id=d.get("completed_session_id"),
+            is_visible=d.get("is_visible", True),
+        ))
+
+    db.flush()
+
+    # ── Quest↔NPC links ────────────────────────────────────────────────────────
+    for d in payload.get("quest_npc_links", []):
+        db.add(models.QuestNPCLink(quest_id=d["quest_id"], npc_id=d["npc_id"]))
+
+    # ── Player path ────────────────────────────────────────────────────────────
+    for d in payload.get("player_path", []):
+        db.add(models.PlayerPathEntry(
+            id=d["id"],
+            location_id=d["location_id"],
+            position=d["position"],
+            travel_type=d.get("travel_type", "foot"),
+        ))
+
+    # ── Character paths ────────────────────────────────────────────────────────
+    for d in payload.get("character_paths", []):
+        db.add(models.CharacterPath(
+            id=d["id"],
+            party_member_id=d["party_member_id"],
+            location_id=d["location_id"],
+            position=d["position"],
+            travel_type=d.get("travel_type", "foot"),
+        ))
 
     db.commit()
     return {"imported": True}
