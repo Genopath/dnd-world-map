@@ -124,18 +124,72 @@ export default function Home() {
   // ── Campaign bootstrap ──────────────────────────────────────────────────────
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('campaign_slug') : null;
+
     api.campaigns.list()
-      .then(list => {
-        if (saved && list.find((c: CampaignMeta) => c.slug === saved)) {
-          const c = list.find((c: CampaignMeta) => c.slug === saved)!;
-          handleSelectCampaign(c.slug, c.name);
-        } else if (list.length === 1) {
-          handleSelectCampaign(list[0].slug, list[0].name);
-        } else if (list.length > 1) {
+      .then(async list => {
+        // Normal path — campaigns exist on server
+        if (list.length > 0) {
+          if (saved && list.find((c: CampaignMeta) => c.slug === saved)) {
+            const c = list.find((c: CampaignMeta) => c.slug === saved)!;
+            handleSelectCampaign(c.slug, c.name);
+          } else if (list.length === 1) {
+            handleSelectCampaign(list[0].slug, list[0].name);
+          } else {
+            setShowCampaignSelector(true);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // ── Server has no campaigns (wiped on redeploy) ──────────────────────
+        // Find all browser-cached backups and restore them automatically
+        const backupKeys = typeof window !== 'undefined'
+          ? Object.keys(localStorage).filter(k => k.startsWith('campaign_backup_'))
+          : [];
+
+        if (backupKeys.length === 0) {
+          // Genuinely fresh install — show the create screen
           setShowCampaignSelector(true);
           setLoading(false);
+          return;
+        }
+
+        // Sort so the last-used campaign is restored first
+        const sorted = backupKeys.sort((a, b) => {
+          if (a === `campaign_backup_${saved}`) return -1;
+          if (b === `campaign_backup_${saved}`) return 1;
+          return 0;
+        });
+
+        let firstSlug: string | null = null;
+        let firstName: string | null = null;
+
+        for (const key of sorted) {
+          const oldSlug = key.replace('campaign_backup_', '');
+          const backup  = _loadBrowserBackup(oldSlug);
+          if (!backup) continue;
+
+          const name = (backup.campaign_settings as any)?.world_name
+            || oldSlug.replace(/-/g, ' ');
+
+          // Recreate the campaign DB on the server
+          const newCamp = await api.campaigns.create(name);
+          // Point the API at this campaign before importing
+          setCurrentCampaign(newCamp.slug);
+          await api.data.import(backup as object);
+
+          // Re-key the backup under the new slug (in case it changed)
+          if (newCamp.slug !== oldSlug) {
+            _saveBrowserBackup(newCamp.slug, backup);
+            localStorage.removeItem(key);
+          }
+
+          if (!firstSlug) { firstSlug = newCamp.slug; firstName = newCamp.name; }
+        }
+
+        if (firstSlug && firstName) {
+          handleSelectCampaign(firstSlug, firstName);
         } else {
-          // No campaigns at all — show selector to create the first one
           setShowCampaignSelector(true);
           setLoading(false);
         }
