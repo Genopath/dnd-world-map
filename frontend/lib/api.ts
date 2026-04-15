@@ -56,8 +56,8 @@ export const api = {
       req<{ deleted: number }>(`/player-path/${id}`, { method: 'DELETE' }),
     reorder: (order: number[]) =>
       req<PathEntry[]>('/player-path/reorder', { method: 'PUT', body: JSON.stringify({ order }) }),
-    updateTravelType: (id: number, travelType: string) =>
-      req<PathEntry>(`/player-path/${id}`, { method: 'PATCH', body: JSON.stringify({ travel_type: travelType }) }),
+    updateEntry: (id: number, data: { travel_type?: string; distance?: number | null; distance_unit?: string | null }) =>
+      req<PathEntry>(`/player-path/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
   map: {
     config: () => req<MapConfig>('/map-config'),
@@ -151,8 +151,8 @@ export const api = {
       req<CharacterPathEntry[]>(`/character-paths/${memberId}/reorder`, { method: 'PUT', body: JSON.stringify({ order }) }),
     clear: (memberId: number) =>
       req<{ cleared: number }>(`/character-paths/${memberId}/clear`, { method: 'DELETE' }),
-    updateTravelType: (entryId: number, travelType: string) =>
-      req<CharacterPathEntry>(`/character-paths/entry/${entryId}`, { method: 'PATCH', body: JSON.stringify({ travel_type: travelType }) }),
+    updateEntry: (entryId: number, data: { travel_type?: string; distance?: number | null; distance_unit?: string | null }) =>
+      req<CharacterPathEntry>(`/character-paths/entry/${entryId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
   fog: {
     get: () => req<{ data: string }>('/fog'),

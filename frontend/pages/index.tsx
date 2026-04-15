@@ -313,6 +313,18 @@ export default function Home() {
     : locations.filter(l => (l.parent_id ?? null) === currentMapId && l.discovered);
   const selectedLocation = locations.find(l => l.id === selectedId) ?? null;
 
+  // ── Map-scoped paths ─────────────────────────────────────────────────────────
+  // Filter path entries so only entries whose location belongs to the current map
+  // level are shown — prevents world-map paths bleeding into submaps and vice versa.
+  const levelPlayerPath = playerPath.filter(e => {
+    const loc = locations.find(l => l.id === e.location_id);
+    return (loc?.parent_id ?? null) === currentMapId;
+  });
+  const levelCharPaths = characterPaths.filter(e => {
+    const loc = locations.find(l => l.id === e.location_id);
+    return (loc?.parent_id ?? null) === currentMapId;
+  });
+
   // ── Location handlers ───────────────────────────────────────────────────────
   const handleAddPin = useCallback(async (x: number, y: number) => {
     setIsAddingPin(false);
@@ -353,12 +365,20 @@ export default function Home() {
   const handleRemoveFromPath      = useCallback(async (entryId: number) => { await api.path.remove(entryId); setPlayerPath(prev => prev.filter(e => e.id !== entryId)); }, []);
   const handleReorderPath         = useCallback(async (order: number[]) => { setPlayerPath(await api.path.reorder(order)); }, []);
   const handleUpdatePathTravelType = useCallback(async (entryId: number, travelType: string) => {
-    await api.path.updateTravelType(entryId, travelType);
+    await api.path.updateEntry(entryId, { travel_type: travelType });
     setPlayerPath(prev => prev.map(e => e.id === entryId ? { ...e, travel_type: travelType } : e));
   }, []);
   const handleUpdateCharPathTravelType = useCallback(async (entryId: number, travelType: string) => {
-    await api.characterPaths.updateTravelType(entryId, travelType);
+    await api.characterPaths.updateEntry(entryId, { travel_type: travelType });
     setCharacterPaths(prev => prev.map(e => e.id === entryId ? { ...e, travel_type: travelType } : e));
+  }, []);
+  const handleUpdatePathDistance = useCallback(async (entryId: number, distance: number | null, unit: string) => {
+    await api.path.updateEntry(entryId, { distance, distance_unit: unit });
+    setPlayerPath(prev => prev.map(e => e.id === entryId ? { ...e, distance, distance_unit: unit } : e));
+  }, []);
+  const handleUpdateCharPathDistance = useCallback(async (entryId: number, distance: number | null, unit: string) => {
+    await api.characterPaths.updateEntry(entryId, { distance, distance_unit: unit });
+    setCharacterPaths(prev => prev.map(e => e.id === entryId ? { ...e, distance, distance_unit: unit } : e));
   }, []);
 
   // ── NPC handlers ─────────────────────────────────────────────────────────────
@@ -701,14 +721,14 @@ export default function Home() {
           <MapView
             locations={levelLocations} allLocations={locations}
             selectedId={selectedId}
-            playerPath={playerPath} quests={visibleQuests} isAddingPin={isAddingPin && isDMMode}
+            playerPath={levelPlayerPath} quests={visibleQuests} isAddingPin={isAddingPin && isDMMode}
             mapImageUrl={currentMapUrl} isDMMode={isDMMode}
             fogData={fogData}
             fogPaintMode={fogPaint}
             fogBrushMode={fogBrush}
             fogBrushSize={fogSize}
             mapStack={mapStack}
-            characterPaths={characterPaths}
+            characterPaths={levelCharPaths}
             party={party}
             hiddenCharIds={hiddenCharIds}
             showPartyPath={showPartyPath}
@@ -723,11 +743,11 @@ export default function Home() {
           />
           <Sidebar
             location={selectedLocation} isDMMode={isDMMode}
-            playerPath={playerPath} locations={locations}
+            playerPath={levelPlayerPath} locations={locations}
             npcs={visibleNpcs} quests={visibleQuests} sessions={visibleSessions}
             party={party} factions={visibleFactions} campaign={campaign}
             calendarConfig={calendarConfig}
-            characterPaths={characterPaths}
+            characterPaths={levelCharPaths}
             activeTab={sidebarTab} selectedLocationId={selectedId}
             onTabChange={setSidebarTab}
             onUpdate={handleUpdateLocation} onDelete={handleDeleteLocation} onDuplicateLocation={handleDuplicateLocation}
@@ -759,6 +779,8 @@ export default function Home() {
             onTogglePartyPath={handleTogglePartyPath}
             onUpdatePathTravelType={handleUpdatePathTravelType}
             onUpdateCharPathTravelType={handleUpdateCharPathTravelType}
+            onUpdatePathDistance={handleUpdatePathDistance}
+            onUpdateCharPathDistance={handleUpdateCharPathDistance}
           />
         </div>
       </div>

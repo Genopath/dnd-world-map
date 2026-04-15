@@ -24,6 +24,8 @@ export interface PathEntry {
   location_id: number;
   position: number;
   travel_type?: string;
+  distance?: number | null;
+  distance_unit?: string | null;
   visited_at?: string;
   location?: Location;
 }
@@ -83,6 +85,8 @@ export interface CharacterPathEntry {
   location_id: number;
   position: number;
   travel_type?: string;
+  distance?: number | null;
+  distance_unit?: string | null;
   visited_at?: string;
 }
 

@@ -113,6 +113,8 @@ interface Props {
   onTogglePartyPath:          () => void;
   onUpdatePathTravelType:     (entryId: number, type: string) => Promise<void>;
   onUpdateCharPathTravelType: (entryId: number, type: string) => Promise<void>;
+  onUpdatePathDistance?:      (entryId: number, distance: number | null, unit: string) => Promise<void>;
+  onUpdateCharPathDistance?:  (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onDuplicateLocation:        (loc: Location) => Promise<void>;
 }
 
@@ -148,6 +150,7 @@ export default function Sidebar({
   npcJumpId, questJumpId,
   hiddenCharIds, showPartyPath, onToggleCharPath, onTogglePartyPath,
   onUpdatePathTravelType, onUpdateCharPathTravelType,
+  onUpdatePathDistance, onUpdateCharPathDistance,
   onDuplicateLocation,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
@@ -324,6 +327,8 @@ export default function Sidebar({
             onTogglePartyPath={onTogglePartyPath}
             onUpdateTravelType={onUpdatePathTravelType}
             onUpdateCharTravelType={onUpdateCharPathTravelType}
+            onUpdateDistance={onUpdatePathDistance}
+            onUpdateCharDistance={onUpdateCharPathDistance}
           />
         )}
       </div>
@@ -665,7 +670,11 @@ interface PathPanelProps {
   onTogglePartyPath:       () => void;
   onUpdateTravelType:      (entryId: number, type: string) => Promise<void>;
   onUpdateCharTravelType:  (entryId: number, type: string) => Promise<void>;
+  onUpdateDistance?:       (entryId: number, distance: number | null, unit: string) => Promise<void>;
+  onUpdateCharDistance?:   (entryId: number, distance: number | null, unit: string) => Promise<void>;
 }
+
+const DISTANCE_UNITS = ['hours', 'days', 'weeks', 'months', 'years', 'miles', 'km', 'leagues'];
 
 function PathPanel({
   sortedPath, locations, party, characterPaths, isDMMode, selectedLocationId,
@@ -674,22 +683,24 @@ function PathPanel({
   onAddToCharPath, onRemoveFromCharPath, onReorderCharPath, onClearCharPath,
   onToggleCharPath, onTogglePartyPath,
   onUpdateTravelType, onUpdateCharTravelType,
+  onUpdateDistance, onUpdateCharDistance,
 }: PathPanelProps) {
   const [activeSection, setActiveSection] = useState<'party' | number>('party');
 
   const renderPathList = (
-    entries: { id: number; location_id: number; position: number; travel_type?: string; visited_at?: string }[],
+    entries: { id: number; location_id: number; position: number; travel_type?: string; distance?: number | null; distance_unit?: string | null; visited_at?: string }[],
     canEdit: boolean,
     onRem: (id: number) => void,
     onTravelType?: (id: number, type: string) => void,
     onMov?: (id: number, dir: -1 | 1) => void,
+    onDist?: (id: number, distance: number | null, unit: string) => void,
   ) => (
     <div className="path-list">
       {entries.map((entry, i) => {
         const loc = locations.find(l => l.id === entry.location_id);
         const tt = (entry.travel_type ?? 'foot') as TravelType;
         return (
-          <div key={entry.id} className="path-entry">
+          <div key={entry.id} className="path-entry" style={{ flexWrap: 'wrap', rowGap: 4 }}>
             <div className="path-num">{i + 1}</div>
             {canEdit && onTravelType && i > 0 && (
               <button
@@ -715,6 +726,40 @@ function PathPanel({
             )}
             {canEdit && (
               <button className="path-remove" onClick={() => onRem(entry.id)} title="Remove">✕</button>
+            )}
+            {canEdit && onDist && i > 0 && (
+              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 28, marginTop: 2 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>Distance:</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="—"
+                  defaultValue={entry.distance ?? ''}
+                  style={{ width: 60, fontSize: 11, padding: '1px 4px' }}
+                  onBlur={e => {
+                    const val = e.target.value.trim();
+                    const num = val === '' ? null : parseFloat(val);
+                    const unit = (entry.distance_unit ?? 'days');
+                    onDist(entry.id, isNaN(num as number) ? null : num, unit);
+                  }}
+                />
+                <select
+                  value={entry.distance_unit ?? 'days'}
+                  style={{ fontSize: 11, padding: '1px 2px' }}
+                  onChange={e => {
+                    const unit = e.target.value;
+                    onDist(entry.id, entry.distance ?? null, unit);
+                  }}
+                >
+                  {DISTANCE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+            )}
+            {!canEdit && i > 0 && entry.distance != null && (
+              <div style={{ width: '100%', paddingLeft: 28, fontSize: 11, color: 'var(--text-dim)' }}>
+                {entry.distance} {entry.distance_unit ?? 'days'}
+              </div>
             )}
           </div>
         );
@@ -791,7 +836,7 @@ function PathPanel({
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {sortedPath.length} waypoint{sortedPath.length !== 1 ? 's' : ''} — click the travel icon to change type
               </div>
-              {renderPathList(sortedPath, isDMMode, onRemove, onUpdateTravelType, onMove)}
+              {renderPathList(sortedPath, isDMMode, onRemove, onUpdateTravelType, onMove, onUpdateDistance)}
             </>
           )}
         </>
@@ -826,7 +871,7 @@ function PathPanel({
             {entries.length === 0 ? (
               <div className="path-empty">No waypoints for {m.name}.<br /><span style={{ fontSize: 12, marginTop: 4, display: 'block' }}>Click a pin on the map to select it, then "+ Add Selected".</span></div>
             ) : (
-              renderPathList(entries, isDMMode, onRemoveFromCharPath, onUpdateCharTravelType)
+              renderPathList(entries, isDMMode, onRemoveFromCharPath, onUpdateCharTravelType, undefined, onUpdateCharDistance)
             )}
           </div>
         );

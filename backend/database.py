@@ -50,6 +50,10 @@ _MIGRATIONS = [
     "ALTER TABLE npcs ADD COLUMN is_visible BOOLEAN DEFAULT 1",
     "ALTER TABLE factions ADD COLUMN is_visible BOOLEAN DEFAULT 1",
     "ALTER TABLE sessions ADD COLUMN is_visible BOOLEAN DEFAULT 1",
+    "ALTER TABLE player_path ADD COLUMN distance REAL",
+    "ALTER TABLE player_path ADD COLUMN distance_unit VARCHAR(50)",
+    "ALTER TABLE character_paths ADD COLUMN distance REAL",
+    "ALTER TABLE character_paths ADD COLUMN distance_unit VARCHAR(50)",
 ]
 
 

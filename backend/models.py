@@ -32,6 +32,8 @@ class PlayerPathEntry(Base):
     location_id = Column(Integer, nullable=False)
     position = Column(Integer, nullable=False, default=0)
     travel_type = Column(String(50), default="foot")
+    distance = Column(Float, nullable=True)
+    distance_unit = Column(String(50), nullable=True)
     visited_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -174,6 +176,8 @@ class CharacterPath(Base):
     location_id     = Column(Integer, nullable=False)
     position        = Column(Integer, nullable=False, default=0)
     travel_type     = Column(String(50), default="foot")
+    distance        = Column(Float, nullable=True)
+    distance_unit   = Column(String(50), nullable=True)
     visited_at      = Column(DateTime(timezone=True), server_default=func.now())
 
 

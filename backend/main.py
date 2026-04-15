@@ -146,6 +146,8 @@ def _path_out(entry: models.PlayerPathEntry, db: Session) -> schemas.PathEntryOu
         location_id=entry.location_id,
         position=entry.position,
         travel_type=getattr(entry, "travel_type", None) or "foot",
+        distance=getattr(entry, "distance", None),
+        distance_unit=getattr(entry, "distance_unit", None),
         visited_at=entry.visited_at,
         location=_loc_out(loc) if loc else None,
     )
@@ -414,15 +416,13 @@ def remove_from_path(entry_id: int, db: Session = Depends(get_db)):
     return {"deleted": entry_id}
 
 
-class _TravelTypeUpdate(_BaseModel):
-    travel_type: str
-
 @app.patch("/player-path/{entry_id}", response_model=schemas.PathEntryOut)
-def update_path_travel_type(entry_id: int, data: _TravelTypeUpdate, db: Session = Depends(get_db)):
+def update_path_entry(entry_id: int, data: schemas.PathEntryUpdate, db: Session = Depends(get_db)):
     entry = db.query(models.PlayerPathEntry).filter(models.PlayerPathEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Path entry not found")
-    entry.travel_type = data.travel_type
+    for field in data.model_fields_set:
+        setattr(entry, field, getattr(data, field))
     db.commit()
     db.refresh(entry)
     return _path_out(entry, db)
@@ -475,11 +475,12 @@ def add_to_character_path(member_id: int, data: schemas.CharacterPathEntryCreate
 
 
 @app.patch("/character-paths/entry/{entry_id}", response_model=schemas.CharacterPathEntryOut)
-def update_char_path_travel_type(entry_id: int, data: _TravelTypeUpdate, db: Session = Depends(get_db)):
+def update_char_path_entry(entry_id: int, data: schemas.CharacterPathEntryUpdate, db: Session = Depends(get_db)):
     entry = db.query(models.CharacterPath).filter(models.CharacterPath.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    entry.travel_type = data.travel_type
+    for field in data.model_fields_set:
+        setattr(entry, field, getattr(data, field))
     db.commit()
     db.refresh(entry)
     return entry

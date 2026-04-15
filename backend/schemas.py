@@ -61,11 +61,19 @@ class PathEntryCreate(BaseModel):
     travel_type: str = "foot"
 
 
+class PathEntryUpdate(BaseModel):
+    travel_type:   Optional[str]   = None
+    distance:      Optional[float] = None
+    distance_unit: Optional[str]   = None
+
+
 class PathEntryOut(BaseModel):
     id: int
     location_id: int
     position: int
     travel_type: str = "foot"
+    distance: Optional[float] = None
+    distance_unit: Optional[str] = None
     visited_at: Optional[datetime] = None
     location: Optional[LocationOut] = None
 
@@ -331,12 +339,19 @@ class CharacterPathEntryCreate(BaseModel):
 class CharacterPathReorder(BaseModel):
     order: List[int]
 
+class CharacterPathEntryUpdate(BaseModel):
+    travel_type:   Optional[str]   = None
+    distance:      Optional[float] = None
+    distance_unit: Optional[str]   = None
+
 class CharacterPathEntryOut(BaseModel):
     id: int
     party_member_id: int
     location_id: int
     position: int
     travel_type: str = "foot"
+    distance: Optional[float] = None
+    distance_unit: Optional[str] = None
     visited_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 

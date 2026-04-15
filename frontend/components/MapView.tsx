@@ -282,8 +282,8 @@ export default function MapView({
   // Use allLocations so path lines draw even when some waypoints are undiscovered
   const orderedSegments = [...playerPath]
     .sort((a, b) => a.position - b.position)
-    .map(e => ({ loc: allLocations.find(l => l.id === e.location_id), travelType: e.travel_type }))
-    .filter((s): s is { loc: Location; travelType: string | undefined } => s.loc !== undefined);
+    .map(e => ({ loc: allLocations.find(l => l.id === e.location_id), travelType: e.travel_type, distance: e.distance, distance_unit: e.distance_unit }))
+    .filter((s): s is { loc: Location; travelType: string | undefined; distance: number | null | undefined; distance_unit: string | null | undefined } => s.loc !== undefined);
 
   // Keep a flat ordered-path array for the pin position numbers (existing usage)
   const orderedPath = orderedSegments.map(s => s.loc);
@@ -431,6 +431,7 @@ export default function MapView({
             const style = travelStyle(seg.travelType);
             const mx = (prev.loc.x + seg.loc.x) / 2;
             const my = (prev.loc.y + seg.loc.y) / 2;
+            const distLabel = seg.distance != null ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
             return (
               <g key={`path-line-${i}`}>
                 <line
@@ -448,6 +449,7 @@ export default function MapView({
                   fontSize="12" style={{ userSelect: 'none', pointerEvents: 'none' }}
                   filter="url(#glow)">
                   {style.symbol}
+                  {distLabel && <tspan x={`${mx}%`} dy="13" fontSize="9" fill="#e8d9a0">{distLabel}</tspan>}
                 </text>
               </g>
             );
