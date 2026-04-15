@@ -553,7 +553,7 @@ export default function Home() {
     if (activeSubmap != null) fetches.push(api.locations.getFog(activeSubmap));
 
     const [locs, path, fogResult, partyData, factionData, campaignData, calConfig, charPaths, updatedNpcs, updatedQuests, submapFog] =
-      await Promise.all(fetches) as [Location[], typeof path, {data:string}, PartyMember[], Faction[], CampaignSettings, CalendarConfig, CharacterPathEntry[], NPC[], Quest[], {data:string}|undefined];
+      await Promise.all(fetches) as [Location[], PathEntry[], {data:string}, PartyMember[], Faction[], CampaignSettings, CalendarConfig, CharacterPathEntry[], NPC[], Quest[], {data:string}|undefined];
 
     setLocations(locs);
     setPlayerPath(path);
