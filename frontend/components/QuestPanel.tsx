@@ -127,7 +127,6 @@ export default function QuestPanel({
   const [addState,      setAddState]      = useState<EditState>(blank());
   const [saving,        setSaving]        = useState(false);
   const [boardView,     setBoardView]     = useState(false);
-  const [libraryQuestId, setLibraryQuestId] = useState<number | null>(null);
 
   const jumpProcessed = useRef<number | null>(null);
   useEffect(() => {
@@ -305,18 +304,13 @@ export default function QuestPanel({
                     onLinkNpc={onLinkNpc} onUnlinkNpc={onUnlinkNpc} onNavigateToNpc={onNavigateToNpc}
                     onStartEdit={() => startEdit(q)}
                     onToggleObjective={toggleObjective}
+                    onCreate={onCreate}
                   />
                 )}
               </div>
             )}
           </div>
         ))
-      )}
-      {libraryQuestId !== null && (
-        <LibraryPicker
-          onSelect={async url => { await onUpdate(libraryQuestId, { image_url: url }); setLibraryQuestId(null); }}
-          onClose={() => setLibraryQuestId(null)}
-        />
       )}
     </div>
   );
@@ -359,9 +353,11 @@ interface DetailProps {
   onNavigateToNpc:    (id: number) => void;
   onStartEdit:        () => void;
   onToggleObjective:  (q: Quest, id: number) => Promise<void>;
+  onCreate:           (data: Omit<Quest, 'id' | 'created_at'>) => Promise<void>;
 }
 
-function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode, onUpdate, onDelete, onLightbox, onLinkNpc, onUnlinkNpc, onNavigateToNpc, onStartEdit, onToggleObjective }: DetailProps) {
+function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode, onUpdate, onDelete, onLightbox, onLinkNpc, onUnlinkNpc, onNavigateToNpc, onStartEdit, onToggleObjective, onCreate }: DetailProps) {
+  const [showLibrary, setShowLibrary] = useState(false);
   const giver        = q.quest_giver_id ? npcs.find(n => n.id === q.quest_giver_id) : null;
   const faction      = q.faction_id     ? factions.find(f => f.id === q.faction_id) : null;
   const parentQuest  = q.parent_quest_id ? quests.find(oq => oq.id === q.parent_quest_id) : null;
@@ -510,7 +506,7 @@ function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode,
               e.target.value = '';
             }} />
           </label>
-          <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setLibraryQuestId(q.id); }}>📚 Library</button>
+          <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setShowLibrary(true); }}>📚 Library</button>
           {q.image_url && (
             <button className="btn btn-sm" onClick={async e => { e.stopPropagation(); await api.quests.deleteImage(q.id); await onUpdate(q.id, {}); }}>🗑 Image</button>
           )}
@@ -523,6 +519,12 @@ function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode,
           }}>⧉ Copy</button>
           <button className="btn btn-sm btn-danger" onClick={async e => { e.stopPropagation(); if (confirm(`Delete "${q.title}"?`)) await onDelete(q.id); }}>Delete</button>
         </div>
+      )}
+      {showLibrary && (
+        <LibraryPicker
+          onSelect={async url => { await onUpdate(q.id, { image_url: url }); setShowLibrary(false); }}
+          onClose={() => setShowLibrary(false)}
+        />
       )}
     </>
   );
