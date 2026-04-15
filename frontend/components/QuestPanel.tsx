@@ -517,6 +517,10 @@ function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode,
           {q.status !== 'completed' && <button className="btn btn-sm" style={{ color: STATUS_COLOR.completed }} onClick={async e => { e.stopPropagation(); await onUpdate(q.id, { status: 'completed' }); }}>✓ Complete</button>}
           {q.status !== 'failed'    && <button className="btn btn-sm" style={{ color: STATUS_COLOR.failed }}    onClick={async e => { e.stopPropagation(); await onUpdate(q.id, { status: 'failed' }); }}>✗ Fail</button>}
           {q.status !== 'active'    && <button className="btn btn-sm" style={{ color: STATUS_COLOR.active }}    onClick={async e => { e.stopPropagation(); await onUpdate(q.id, { status: 'active' }); }}>↺ Reactivate</button>}
+          <button className="btn btn-sm" title="Duplicate quest" onClick={async e => {
+            e.stopPropagation();
+            await onCreate({ title: `${q.title} (copy)`, status: 'active', tier: q.tier, description: q.description, location_id: q.location_id ?? undefined, notes: q.notes, objectives: q.objectives.map(o => ({ ...o, done: false })), quest_giver_id: q.quest_giver_id ?? undefined, reward_gold: q.reward_gold, reward_notes: q.reward_notes, deadline: q.deadline, tags: q.tags, parent_quest_id: q.parent_quest_id ?? undefined, faction_id: q.faction_id ?? undefined, started_session_id: undefined, completed_session_id: undefined, is_visible: true });
+          }}>⧉ Copy</button>
           <button className="btn btn-sm btn-danger" onClick={async e => { e.stopPropagation(); if (confirm(`Delete "${q.title}"?`)) await onDelete(q.id); }}>Delete</button>
         </div>
       )}

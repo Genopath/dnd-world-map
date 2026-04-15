@@ -61,10 +61,14 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
   const [editState,   setEditState]   = useState<EditState | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [sortBy,      setSortBy]      = useState<'default' | 'rep-desc' | 'rep-asc'>('default');
 
   const startNew  = () => { setEditState(blankEdit()); setEditingId('new'); };
   const startEdit = (f: Faction) => { setEditState(toEdit(f)); setEditingId(f.id); };
   const cancel    = () => { setEditingId(null); setEditState(null); };
+
+  const sortedFactions = sortBy === 'default' ? factions
+    : [...factions].sort((a, b) => sortBy === 'rep-desc' ? b.reputation - a.reputation : a.reputation - b.reputation);
 
   const save = async () => {
     if (!editState) return;
@@ -87,9 +91,24 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {isDMMode && editingId === null && (
-        <button className="btn btn-primary btn-sm" onClick={startNew} style={{ alignSelf: 'flex-start' }}>+ Add Faction</button>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {isDMMode && editingId === null && (
+          <button className="btn btn-primary btn-sm" onClick={startNew}>+ Add Faction</button>
+        )}
+        {factions.length > 1 && (
+          <div style={{ display: 'flex', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginLeft: 'auto' }}>
+            {(['default', 'rep-desc', 'rep-asc'] as const).map(s => (
+              <button key={s}
+                style={{ padding: '3px 8px', fontSize: 11, border: 'none', cursor: 'pointer', background: sortBy === s ? 'var(--accent)' : 'transparent', color: sortBy === s ? '#15100a' : 'var(--text-muted)', fontWeight: sortBy === s ? 700 : 400 }}
+                onClick={() => setSortBy(s)}
+                title={s === 'default' ? 'Default order' : s === 'rep-desc' ? 'Highest rep first' : 'Lowest rep first'}
+              >
+                {s === 'default' ? '— ' : s === 'rep-desc' ? '↑ Rep' : '↓ Rep'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Edit / Create form */}
       {editState && (
@@ -154,7 +173,7 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
         <div className="no-sel"><div>No factions yet.</div>{isDMMode && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>Track organizations and their standing with the party.</div>}</div>
       )}
 
-      {factions.map(f => {
+      {sortedFactions.map(f => {
         const pct   = repBarPct(f.reputation);
         const color = repColor(f.reputation);
         const label = repLabel(f.reputation);

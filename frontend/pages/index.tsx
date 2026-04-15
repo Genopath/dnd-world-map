@@ -73,10 +73,12 @@ export default function Home() {
   const [mapConfig,   setMapConfig]   = useState<MapConfig>({ image_url: null });
   const [selectedId,  setSelectedId]  = useState<number | null>(null);
   const [isDMMode,    setIsDMMode]    = useState(true);
-  const [isAddingPin, setIsAddingPin] = useState(false);
-  const [sidebarTab,  setSidebarTab]  = useState<SidebarTab>('location');
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState<string | null>(null);
+  const [isAddingPin,   setIsAddingPin]   = useState(false);
+  const [sidebarTab,    setSidebarTab]    = useState<SidebarTab>('location');
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState<string | null>(null);
+  const [showPinLabels, setShowPinLabels] = useState(() => typeof window !== 'undefined' && localStorage.getItem('show_pin_labels') === '1');
+  const [fitTrigger,    setFitTrigger]    = useState(0);
 
   // ── Phase-1 state ───────────────────────────────────────────────────────────
   const [npcs,     setNpcs]     = useState<NPC[]>([]);
@@ -333,6 +335,18 @@ export default function Home() {
     setPlayerPath(prev => prev.filter(e => e.location_id !== id));
     if (selectedId === id) setSelectedId(null);
   }, [selectedId]);
+
+  const handleDuplicateLocation = useCallback(async (loc: Location) => {
+    const newLoc = await api.locations.create({
+      name: `${loc.name} (copy)`, type: loc.type, subtitle: loc.subtitle,
+      description: loc.description, quest_hooks: loc.quest_hooks, handouts: loc.handouts,
+      dm_notes: loc.dm_notes, discovered: false,
+      x: Math.min(98, loc.x + 3), y: Math.min(98, loc.y + 3),
+    });
+    setLocations(prev => [...prev, newLoc]);
+    setSelectedId(newLoc.id);
+    setSidebarTab('location');
+  }, []);
 
   // ── Path handlers ────────────────────────────────────────────────────────────
   const handleAddToPath           = useCallback(async (locationId: number) => { const e = await api.path.add(locationId); setPlayerPath(prev => [...prev, e]); }, []);
@@ -660,6 +674,11 @@ export default function Home() {
               <button className={`btn ${isAddingPin ? 'btn-active' : ''}`} onClick={() => setIsAddingPin(p => !p)}>
                 {isAddingPin ? '✕ Cancel Placing' : '+ Add Location'}
               </button>
+              <button
+                className={`btn btn-sm ${showPinLabels ? 'btn-active' : ''}`}
+                title="Toggle pin labels"
+                onClick={() => setShowPinLabels(v => { const next = !v; localStorage.setItem('show_pin_labels', next ? '1' : '0'); return next; })}
+              >🏷 Labels</button>
               <label className="btn" style={{ cursor: 'pointer' }}>
                 Upload Map
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
@@ -672,7 +691,8 @@ export default function Home() {
             </>
           )}
 
-          {/* Search button */}
+          {/* Fit-to-pins / search */}
+          <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
           <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); }}>🔍</button>
         </header>
 
@@ -692,11 +712,14 @@ export default function Home() {
             party={party}
             hiddenCharIds={hiddenCharIds}
             showPartyPath={showPartyPath}
+            showLabels={showPinLabels}
+            fitTrigger={fitTrigger}
             onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
             onDeselect={() => setSelectedId(null)}
             onAddPin={handleAddPin}
             onFogChange={handleFogChange}
             onExitSubmap={handleExitSubmap}
+            onUpdateLocation={handleUpdateLocation}
           />
           <Sidebar
             location={selectedLocation} isDMMode={isDMMode}
@@ -707,7 +730,7 @@ export default function Home() {
             characterPaths={characterPaths}
             activeTab={sidebarTab} selectedLocationId={selectedId}
             onTabChange={setSidebarTab}
-            onUpdate={handleUpdateLocation} onDelete={handleDeleteLocation}
+            onUpdate={handleUpdateLocation} onDelete={handleDeleteLocation} onDuplicateLocation={handleDuplicateLocation}
             onAddToPath={handleAddToPath} onRemoveFromPath={handleRemoveFromPath} onReorderPath={handleReorderPath}
             onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
             onCreateNPC={handleCreateNPC} onUpdateNPC={handleUpdateNPC} onDeleteNPC={handleDeleteNPC}

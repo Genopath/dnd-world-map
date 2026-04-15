@@ -113,6 +113,7 @@ interface Props {
   onTogglePartyPath:          () => void;
   onUpdatePathTravelType:     (entryId: number, type: string) => Promise<void>;
   onUpdateCharPathTravelType: (entryId: number, type: string) => Promise<void>;
+  onDuplicateLocation:        (loc: Location) => Promise<void>;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -147,6 +148,7 @@ export default function Sidebar({
   npcJumpId, questJumpId,
   hiddenCharIds, showPartyPath, onToggleCharPath, onTogglePartyPath,
   onUpdatePathTravelType, onUpdateCharPathTravelType,
+  onDuplicateLocation,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [editState,  setEditState]  = useState<EditState | null>(null);
@@ -230,12 +232,16 @@ export default function Sidebar({
           ) : (
             <LocationDetail
               location={location} isDMMode={isDMMode} isInPath={isInPath}
+              npcs={npcs} quests={quests}
               onEdit={startEdit} onDelete={handleDelete}
+              onDuplicate={() => onDuplicateLocation(location)}
               onAddToPath={() => onAddToPath(location.id)}
               onRemoveFromPath={() => { const e = playerPath.find(e => e.location_id === location.id); if (e) onRemoveFromPath(e.id); }}
               onLightbox={onLightbox}
               onEnterSubmap={onEnterSubmap}
               onUpdate={onUpdate}
+              onNavigateToNpc={id => { onNavigateToNpc(id); onTabChange('npcs'); }}
+              onNavigateToQuest={id => { onNavigateToQuest(id); onTabChange('quests'); }}
             />
           )
         )}
@@ -328,14 +334,19 @@ export default function Sidebar({
 // ── LocationDetail ────────────────────────────────────────────────────────────
 interface DetailProps {
   location: Location; isDMMode: boolean; isInPath: boolean;
-  onEdit: () => void; onDelete: () => void;
+  npcs: NPC[]; quests: Quest[];
+  onEdit: () => void; onDelete: () => void; onDuplicate: () => void;
   onAddToPath: () => void; onRemoveFromPath: () => void;
   onLightbox: (url: string) => void;
   onEnterSubmap: (id: number) => void;
   onUpdate: (id: number, data: Partial<Location>) => Promise<void>;
+  onNavigateToNpc: (id: number) => void;
+  onNavigateToQuest: (id: number) => void;
 }
 
-function LocationDetail({ location, isDMMode, isInPath, onEdit, onDelete, onAddToPath, onRemoveFromPath, onLightbox, onEnterSubmap, onUpdate }: DetailProps) {
+function LocationDetail({ location, isDMMode, isInPath, npcs, quests, onEdit, onDelete, onDuplicate, onAddToPath, onRemoveFromPath, onLightbox, onEnterSubmap, onUpdate, onNavigateToNpc, onNavigateToQuest }: DetailProps) {
+  const residents     = npcs.filter(n => n.location_id === location.id);
+  const linkedQuests  = quests.filter(q => q.location_id === location.id);
   const type = location.type as LocationType;
   return (
     <>
@@ -418,6 +429,52 @@ function LocationDetail({ location, isDMMode, isInPath, onEdit, onDelete, onAddT
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Custom pin icon</span>
         </div>
       )}
+      {/* Residents — NPCs whose home is this location */}
+      {residents.length > 0 && (
+        <div>
+          <div className="section-label">Residents</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {residents.map(npc => (
+              <button
+                key={npc.id}
+                className="btn btn-sm btn-ghost"
+                style={{ justifyContent: 'flex-start', gap: 6, textAlign: 'left' }}
+                onClick={() => onNavigateToNpc(npc.id)}
+              >
+                {npc.portrait_url
+                  ? <img src={`${API_BASE}${npc.portrait_url}`} alt="" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }} />
+                  : <span style={{ fontSize: 12 }}>👤</span>}
+                <span style={{ flex: 1 }}>{npc.name}</span>
+                {npc.role && <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{npc.role}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quests — quests linked to this location */}
+      {linkedQuests.length > 0 && (
+        <div>
+          <div className="section-label">Quests</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {linkedQuests.map(q => (
+              <button
+                key={q.id}
+                className="btn btn-sm btn-ghost"
+                style={{ justifyContent: 'flex-start', gap: 6, textAlign: 'left' }}
+                onClick={() => onNavigateToQuest(q.id)}
+              >
+                <span style={{ fontSize: 11, color: q.status === 'active' ? 'var(--accent)' : q.status === 'completed' ? 'var(--success-text)' : 'var(--danger-text)' }}>
+                  {q.status === 'active' ? '◉' : q.status === 'completed' ? '✓' : '✗'}
+                </span>
+                <span style={{ flex: 1 }}>{q.title}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0, textTransform: 'uppercase' }}>{q.tier}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {location.submap_image_url && (
           <button className="btn btn-sm btn-primary" onClick={() => onEnterSubmap(location.id)}>
@@ -426,6 +483,7 @@ function LocationDetail({ location, isDMMode, isInPath, onEdit, onDelete, onAddT
         )}
         <div className="loc-actions">
           {isDMMode && <button className="btn btn-sm" onClick={onEdit}>Edit</button>}
+          {isDMMode && <button className="btn btn-sm" onClick={onDuplicate} title="Duplicate this location">⧉ Copy</button>}
           {isInPath
             ? <button className="btn btn-sm" onClick={onRemoveFromPath}>Remove from Path</button>
             : <button className="btn btn-sm" onClick={onAddToPath}>Add to Path</button>}

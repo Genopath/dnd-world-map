@@ -47,28 +47,31 @@ function travelStyle(t?: string) {
 }
 
 interface Props {
-  locations:        Location[];   // visible pins (filtered by discovered in player mode)
-  allLocations:     Location[];   // full list — used for path resolution
-  selectedId:       number | null;
-  playerPath:       PathEntry[];
-  quests:           Quest[];
-  isAddingPin:      boolean;
-  mapImageUrl:      string | null;
-  isDMMode:         boolean;
-  fogData:          string;
-  fogPaintMode:     boolean;
-  fogBrushMode:     'reveal' | 'hide';
-  fogBrushSize:     number;
-  mapStack:         number[];
-  characterPaths:   CharacterPathEntry[];
-  party:            PartyMember[];
-  hiddenCharIds:    Set<number>;
-  showPartyPath:    boolean;
-  onSelectLocation: (id: number) => void;
-  onDeselect:       () => void;
-  onAddPin:         (x: number, y: number) => void;
-  onFogChange:      (data: string) => void;
-  onExitSubmap:     () => void;
+  locations:          Location[];   // visible pins (filtered by discovered in player mode)
+  allLocations:       Location[];   // full list — used for path resolution
+  selectedId:         number | null;
+  playerPath:         PathEntry[];
+  quests:             Quest[];
+  isAddingPin:        boolean;
+  mapImageUrl:        string | null;
+  isDMMode:           boolean;
+  fogData:            string;
+  fogPaintMode:       boolean;
+  fogBrushMode:       'reveal' | 'hide';
+  fogBrushSize:       number;
+  mapStack:           number[];
+  characterPaths:     CharacterPathEntry[];
+  party:              PartyMember[];
+  hiddenCharIds:      Set<number>;
+  showPartyPath:      boolean;
+  showLabels:         boolean;
+  fitTrigger:         number;
+  onSelectLocation:   (id: number) => void;
+  onDeselect:         () => void;
+  onAddPin:           (x: number, y: number) => void;
+  onFogChange:        (data: string) => void;
+  onExitSubmap:       () => void;
+  onUpdateLocation?:  (id: number, data: Partial<Location>) => Promise<void>;
 }
 
 export default function MapView({
@@ -89,11 +92,14 @@ export default function MapView({
   party,
   hiddenCharIds,
   showPartyPath,
+  showLabels,
+  fitTrigger,
   onSelectLocation,
   onDeselect,
   onAddPin,
   onFogChange,
   onExitSubmap,
+  onUpdateLocation,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -117,6 +123,47 @@ export default function MapView({
   // Keep a ref to transform for use in non-React event handlers
   const transformRef = useRef(transform);
   transformRef.current = transform;
+
+  // ── Pin drag state ────────────────────────────────────────────────────────
+  const pinDragRef     = useRef<{ id: number; startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
+  const pinJustDragged = useRef(false);
+  const [dragOverrides, setDragOverrides] = useState<Map<number, { x: number; y: number }>>(new Map());
+
+  // ── Fit-to-pins ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!fitTrigger) return;
+    const mapEl    = imgRef.current ?? placeholderRef.current;
+    const container = containerRef.current;
+    if (!mapEl || !container) return;
+
+    if (locations.length === 0) {
+      setTransform({ x: 0, y: 0, scale: 1 });
+      return;
+    }
+
+    const xs = locations.map(l => l.x);
+    const ys = locations.map(l => l.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const cw = container.offsetWidth;
+    const ch = container.offsetHeight;
+    const iw = mapEl.offsetWidth;
+    const ih = mapEl.offsetHeight;
+
+    const pad = 12; // extra padding in pct units around the bbox
+    const bboxW = Math.max(1, (maxX - minX + pad * 2) / 100 * iw);
+    const bboxH = Math.max(1, (maxY - minY + pad * 2) / 100 * ih);
+
+    const newScale = Math.min(10, Math.max(0.25, Math.min(cw / bboxW, ch / bboxH)));
+    const cx = ((minX + maxX) / 2) / 100 * iw;
+    const cy = ((minY + maxY) / 2) / 100 * ih;
+
+    setTransform({ x: cw / 2 - cx * newScale, y: ch / 2 - cy * newScale, scale: newScale });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitTrigger]);
 
   // ── Wheel zoom (non-passive) ──────────────────────────────────────────────
   useEffect(() => {
@@ -159,6 +206,24 @@ export default function MapView({
   }, [fogPaintMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // ── Pin drag takes priority ────────────────────────────────────────────
+    if (pinDragRef.current) {
+      const pd = pinDragRef.current;
+      const dx = e.clientX - pd.startX;
+      const dy = e.clientY - pd.startY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) {
+        pd.moved = true;
+        const mapEl = imgRef.current ?? placeholderRef.current;
+        if (mapEl) {
+          const scale = transformRef.current.scale;
+          const newX = Math.max(0, Math.min(100, pd.origX + (dx / (mapEl.offsetWidth  * scale)) * 100));
+          const newY = Math.max(0, Math.min(100, pd.origY + (dy / (mapEl.offsetHeight * scale)) * 100));
+          setDragOverrides(new Map([[pd.id, { x: newX, y: newY }]]));
+        }
+      }
+      return;
+    }
+    // ── Map pan ────────────────────────────────────────────────────────────
     if (!isDragging.current) return;
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
@@ -171,9 +236,24 @@ export default function MapView({
   }, []);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    // ── Finish pin drag ────────────────────────────────────────────────────
+    if (pinDragRef.current) {
+      const pd = pinDragRef.current;
+      if (pd.moved) {
+        pinJustDragged.current = true;
+        const override = dragOverrides.get(pd.id);
+        if (override && onUpdateLocation) {
+          onUpdateLocation(pd.id, { x: override.x, y: override.y });
+        }
+      }
+      pinDragRef.current = null;
+      setDragOverrides(new Map());
+      return;
+    }
     isDragging.current = false;
     (e.currentTarget as HTMLElement).classList.remove('is-dragging');
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragOverrides, onUpdateLocation]);
 
   // ── Click (add pin or deselect) ───────────────────────────────────────────
   const handleContainerClick = useCallback(
@@ -236,11 +316,16 @@ export default function MapView({
   return (
     <div
       ref={containerRef}
-      className={`map-container${isAddingPin ? ' adding-pin' : ''}${fogPaintMode ? ' fog-painting' : ''}`}
+      className={[
+        'map-container',
+        isAddingPin  ? 'adding-pin'   : '',
+        fogPaintMode ? 'fog-painting' : '',
+        showLabels   ? 'labels-on'    : '',
+      ].filter(Boolean).join(' ')}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={e => { handleMouseUp(e); pinDragRef.current = null; setDragOverrides(new Map()); }}
       onClick={handleContainerClick}
     >
       {mapStack.length > 0 && (
@@ -371,7 +456,10 @@ export default function MapView({
 
         {/* Pins */}
         {locations.map(loc => {
-          const pathNum = pathPositions[loc.id];
+          const pathNum  = pathPositions[loc.id];
+          const override = dragOverrides.get(loc.id);
+          const px = override?.x ?? loc.x;
+          const py = override?.y ?? loc.y;
           return (
             <div
               key={loc.id}
@@ -380,10 +468,16 @@ export default function MapView({
                 `pin-${loc.type}`,
                 loc.id === selectedId ? 'selected' : '',
                 !loc.discovered && !isDMMode ? 'undiscovered' : '',
+                override ? 'pin-dragging' : '',
               ].filter(Boolean).join(' ')}
-              style={{ left: `${loc.x}%`, top: `${loc.y}%` }}
+              style={{ left: `${px}%`, top: `${py}%` }}
+              onMouseDown={isDMMode && !isAddingPin && !fogPaintMode && onUpdateLocation ? e => {
+                e.stopPropagation();
+                pinDragRef.current = { id: loc.id, startX: e.clientX, startY: e.clientY, origX: loc.x, origY: loc.y, moved: false };
+              } : undefined}
               onClick={e => {
                 e.stopPropagation();
+                if (pinJustDragged.current) { pinJustDragged.current = false; return; }
                 if (!isAddingPin && !fogPaintMode) onSelectLocation(loc.id);
               }}
             >

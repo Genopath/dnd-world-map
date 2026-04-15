@@ -201,6 +201,10 @@ export default function NPCPanel({
                   {isDMMode && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-sm" onClick={() => startEdit(npc)}>Edit</button>
+                      <button className="btn btn-sm" title="Duplicate NPC" onClick={async e => {
+                        e.stopPropagation();
+                        await onCreate({ name: `${npc.name} (copy)`, role: npc.role, status: npc.status, notes: npc.notes, location_id: npc.location_id });
+                      }}>⧉ Copy</button>
                       <button className="btn btn-sm btn-danger" onClick={async e => {
                         e.stopPropagation();
                         if (confirm(`Delete "${npc.name}"?`)) await onDelete(npc.id);

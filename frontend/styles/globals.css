@@ -335,6 +335,13 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 .pin:hover .pin-label,
 .pin.selected .pin-label { opacity: 1; }
+/* When labels toggle is on, always show all labels */
+.labels-on .pin-label { opacity: 1; }
+/* Pin being dragged */
+.pin.pin-dragging { z-index: 20; cursor: grabbing; }
+.pin.pin-dragging .pin-icon-default,
+.pin.pin-dragging .pin-icon-img,
+.pin.pin-dragging .pin-dot { box-shadow: 0 0 0 3px var(--accent), 0 4px 20px rgba(0,0,0,0.8); }
 
 .pin-city       .pin-dot { background: var(--pin-city); }
 .pin-dungeon    .pin-dot { background: var(--pin-dungeon); }
