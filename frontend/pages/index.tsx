@@ -537,7 +537,16 @@ export default function Home() {
   }, []);
 
   // ── Map upload ───────────────────────────────────────────────────────────────
-  const handleMapUpload = useCallback(async (file: File) => { setMapConfig(await api.map.upload(file)); }, []);
+  const handleMapUpload = useCallback(async (file: File) => {
+    if (mapStack.length > 0) {
+      // Uploading while inside a submap — update the submap image for that location
+      const locId = mapStack[mapStack.length - 1];
+      const { submap_image_url } = await api.locations.uploadSubmap(locId, file);
+      setLocations(prev => prev.map(l => l.id === locId ? { ...l, submap_image_url } : l));
+    } else {
+      setMapConfig(await api.map.upload(file));
+    }
+  }, [mapStack]);
 
   // ── Export / Import ───────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
@@ -706,7 +715,7 @@ export default function Home() {
                 onClick={() => setShowDistLabels(v => { const next = !v; localStorage.setItem('show_dist_labels', next ? '1' : '0'); return next; })}
               >📏 Distance</button>
               <label className="btn" style={{ cursor: 'pointer' }}>
-                Upload Map
+                {mapStack.length > 0 ? 'Upload Submap' : 'Upload Map'}
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
               </label>
               <button className="btn" onClick={handleExport} title="Export JSON backup">Export</button>

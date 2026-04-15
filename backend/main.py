@@ -38,6 +38,12 @@ ICONS_DIR    = UPLOADS_DIR / "icons";     ICONS_DIR.mkdir(exist_ok=True)
 IMAGES_DIR   = UPLOADS_DIR / "images";    IMAGES_DIR.mkdir(exist_ok=True)
 SUBMAPS_DIR  = UPLOADS_DIR / "submaps";   SUBMAPS_DIR.mkdir(exist_ok=True)
 
+# Maps dir: lives alongside campaign DBs in DATA_DIR so it shares the same
+# persistence characteristics — survives redeployments when DATA_DIR is on
+# a persistent volume.
+MAPS_DIR = _DATA_DIR / "maps"
+MAPS_DIR.mkdir(parents=True, exist_ok=True)
+
 # Library: committed to git next to main.py — survives redeployments
 LIBRARY_DIR  = Path(__file__).parent / "library"
 LIBRARY_DIR.mkdir(exist_ok=True)
@@ -56,6 +62,7 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/map-files", StaticFiles(directory=str(MAPS_DIR)), name="map-files")
 app.mount("/library", StaticFiles(directory=str(LIBRARY_DIR)), name="library")
 
 
@@ -334,9 +341,9 @@ async def upload_location_submap(loc_id: int, file: UploadFile = File(...), db: 
         raise HTTPException(status_code=404, detail="Location not found")
     ext = Path(file.filename or "submap").suffix or ".png"
     filename = f"submap_{loc_id}{ext}"
-    with open(SUBMAPS_DIR / filename, "wb") as f:
+    with open(MAPS_DIR / filename, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    loc.submap_image_url = f"/uploads/submaps/{filename}"
+    loc.submap_image_url = f"/map-files/{filename}"
     db.commit()
     return {"submap_image_url": loc.submap_image_url}
 
@@ -529,24 +536,32 @@ def clear_character_path(member_id: int, db: Session = Depends(get_db)):
 # ── Map Config / Upload ───────────────────────────────────────────────────────
 
 @app.get("/map-config")
-def get_map_config(db: Session = Depends(get_db)):
+def get_map_config(slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     config = db.query(models.MapConfig).first()
     if not config:
         config = models.MapConfig()
         db.add(config)
         db.commit()
         db.refresh(config)
-    has_file = config.image_filename and (UPLOADS_DIR / config.image_filename).exists()
-    return {"image_url": f"/uploads/{config.image_filename}" if has_file else None}
+    if not config.image_filename:
+        return {"image_url": None}
+    # New location: DATA_DIR/maps/ (persistent alongside campaign DB)
+    if (MAPS_DIR / config.image_filename).exists():
+        return {"image_url": f"/map-files/{config.image_filename}"}
+    # Backward compat: old uploads/world_map.png location
+    if (UPLOADS_DIR / config.image_filename).exists():
+        return {"image_url": f"/uploads/{config.image_filename}"}
+    return {"image_url": None}
 
 
 @app.post("/map-config/upload")
-async def upload_map(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_map(file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
     ext = Path(file.filename or "map.png").suffix or ".png"
-    filename = f"world_map{ext}"
-    with open(UPLOADS_DIR / filename, "wb") as f:
+    # Include slug so multiple campaigns don't overwrite each other
+    filename = f"world_map_{slug}{ext}"
+    with open(MAPS_DIR / filename, "wb") as f:
         shutil.copyfileobj(file.file, f)
     config = db.query(models.MapConfig).first()
     if not config:
@@ -555,7 +570,7 @@ async def upload_map(file: UploadFile = File(...), db: Session = Depends(get_db)
     else:
         config.image_filename = filename
     db.commit()
-    return {"image_url": f"/uploads/{filename}"}
+    return {"image_url": f"/map-files/{filename}"}
 
 
 # ── NPCs ──────────────────────────────────────────────────────────────────────
@@ -1165,9 +1180,16 @@ def export_data(db: Session = Depends(get_db)):
     # Map config + image file
     map_cfg = db.query(models.MapConfig).first()
     map_filename = (map_cfg.image_filename or "") if map_cfg else ""
+    # Resolve URL for _enc (new MAPS_DIR takes priority, fall back to legacy UPLOADS_DIR)
+    map_url_for_enc = None
+    if map_filename:
+        if (MAPS_DIR / map_filename).exists():
+            map_url_for_enc = f"/maps/{map_filename}"
+        elif (UPLOADS_DIR / map_filename).exists():
+            map_url_for_enc = f"/uploads/{map_filename}"
     map_out = {
         "image_filename": map_filename,
-        "_image_data": _enc(f"/uploads/{map_filename}") if map_filename else None,
+        "_image_data": _enc(map_url_for_enc),
     }
 
     return {
@@ -1234,7 +1256,7 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
     map_raw = payload.get("map_config") or {}
     if map_raw.get("image_filename"):
         fn = map_raw["image_filename"]
-        _restore(map_raw.get("_image_data"), f"/uploads/{fn}")
+        _restore(map_raw.get("_image_data"), f"/maps/{fn}")
         db.add(models.MapConfig(image_filename=fn))
 
     # ── Fog of war ─────────────────────────────────────────────────────────────
