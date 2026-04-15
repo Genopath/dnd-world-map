@@ -649,6 +649,49 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
 
 const CHAR_PATH_COLORS = ['#e05c5c', '#5c9fe0', '#60cc78', '#c05ce0', '#e0a040', '#40d4c8', '#e07840', '#a0c840'];
 
+// ── Distance editor — needs local state so the controlled select works ────────
+
+const DISTANCE_UNITS_LIST = ['hours', 'days', 'weeks', 'months', 'years', 'miles', 'km', 'leagues'];
+
+function DistanceRow({ entryId, distance, distanceUnit, onSave }: {
+  entryId:      number;
+  distance:     number | null | undefined;
+  distanceUnit: string | null | undefined;
+  onSave:       (id: number, dist: number | null, unit: string) => void;
+}) {
+  const [dist, setDist] = React.useState<string>(distance != null ? String(distance) : '');
+  const [unit, setUnit] = React.useState<string>(distanceUnit ?? 'days');
+
+  // Sync if props change (e.g. initial data load or reorder)
+  React.useEffect(() => { setDist(distance != null ? String(distance) : ''); }, [distance]);
+  React.useEffect(() => { setUnit(distanceUnit ?? 'days'); }, [distanceUnit]);
+
+  const commit = (d: string, u: string) => {
+    const num = d.trim() === '' ? null : parseFloat(d);
+    onSave(entryId, isNaN(num as number) ? null : num, u);
+  };
+
+  return (
+    <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 28, marginTop: 2 }}>
+      <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>Distance:</span>
+      <input
+        type="number" min="0" step="0.5" placeholder="—"
+        value={dist}
+        style={{ width: 60, fontSize: 11, padding: '1px 4px' }}
+        onChange={e => setDist(e.target.value)}
+        onBlur={e => commit(e.target.value, unit)}
+      />
+      <select
+        value={unit}
+        style={{ fontSize: 11, padding: '1px 2px' }}
+        onChange={e => { const u = e.target.value; setUnit(u); commit(dist, u); }}
+      >
+        {DISTANCE_UNITS_LIST.map(u => <option key={u} value={u}>{u}</option>)}
+      </select>
+    </div>
+  );
+}
+
 // ── PathPanel ─────────────────────────────────────────────────────────────────
 interface PathPanelProps {
   sortedPath:              PathEntry[];
@@ -673,8 +716,6 @@ interface PathPanelProps {
   onUpdateDistance?:       (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onUpdateCharDistance?:   (entryId: number, distance: number | null, unit: string) => Promise<void>;
 }
-
-const DISTANCE_UNITS = ['hours', 'days', 'weeks', 'months', 'years', 'miles', 'km', 'leagues'];
 
 function PathPanel({
   sortedPath, locations, party, characterPaths, isDMMode, selectedLocationId,
@@ -728,33 +769,12 @@ function PathPanel({
               <button className="path-remove" onClick={() => onRem(entry.id)} title="Remove">✕</button>
             )}
             {canEdit && onDist && i > 0 && (
-              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 28, marginTop: 2 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>Distance:</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  placeholder="—"
-                  defaultValue={entry.distance ?? ''}
-                  style={{ width: 60, fontSize: 11, padding: '1px 4px' }}
-                  onBlur={e => {
-                    const val = e.target.value.trim();
-                    const num = val === '' ? null : parseFloat(val);
-                    const unit = (entry.distance_unit ?? 'days');
-                    onDist(entry.id, isNaN(num as number) ? null : num, unit);
-                  }}
-                />
-                <select
-                  value={entry.distance_unit ?? 'days'}
-                  style={{ fontSize: 11, padding: '1px 2px' }}
-                  onChange={e => {
-                    const unit = e.target.value;
-                    onDist(entry.id, entry.distance ?? null, unit);
-                  }}
-                >
-                  {DISTANCE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </div>
+              <DistanceRow
+                entryId={entry.id}
+                distance={entry.distance}
+                distanceUnit={entry.distance_unit}
+                onSave={onDist}
+              />
             )}
             {!canEdit && i > 0 && entry.distance != null && (
               <div style={{ width: '100%', paddingLeft: 28, fontSize: 11, color: 'var(--text-dim)' }}>

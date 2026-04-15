@@ -65,6 +65,7 @@ interface Props {
   hiddenCharIds:      Set<number>;
   showPartyPath:      boolean;
   showLabels:         boolean;
+  showDistLabels:     boolean;
   fitTrigger:         number;
   onSelectLocation:   (id: number) => void;
   onDeselect:         () => void;
@@ -93,6 +94,7 @@ export default function MapView({
   hiddenCharIds,
   showPartyPath,
   showLabels,
+  showDistLabels,
   fitTrigger,
   onSelectLocation,
   onDeselect,
@@ -431,7 +433,7 @@ export default function MapView({
             const style = travelStyle(seg.travelType);
             const mx = (prev.loc.x + seg.loc.x) / 2;
             const my = (prev.loc.y + seg.loc.y) / 2;
-            const distLabel = seg.distance != null ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
+            const distLabel = showDistLabels && seg.distance != null ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
             return (
               <g key={`path-line-${i}`}>
                 <line

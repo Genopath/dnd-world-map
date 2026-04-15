@@ -77,8 +77,9 @@ export default function Home() {
   const [sidebarTab,    setSidebarTab]    = useState<SidebarTab>('location');
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState<string | null>(null);
-  const [showPinLabels, setShowPinLabels] = useState(() => typeof window !== 'undefined' && localStorage.getItem('show_pin_labels') === '1');
-  const [fitTrigger,    setFitTrigger]    = useState(0);
+  const [showPinLabels,   setShowPinLabels]   = useState(() => typeof window !== 'undefined' && localStorage.getItem('show_pin_labels') === '1');
+  const [showDistLabels,  setShowDistLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_dist_labels') !== '0' : true);
+  const [fitTrigger,      setFitTrigger]      = useState(0);
 
   // ── Phase-1 state ───────────────────────────────────────────────────────────
   const [npcs,     setNpcs]     = useState<NPC[]>([]);
@@ -699,6 +700,11 @@ export default function Home() {
                 title="Toggle pin labels"
                 onClick={() => setShowPinLabels(v => { const next = !v; localStorage.setItem('show_pin_labels', next ? '1' : '0'); return next; })}
               >🏷 Labels</button>
+              <button
+                className={`btn btn-sm ${showDistLabels ? 'btn-active' : ''}`}
+                title="Toggle distance labels on paths"
+                onClick={() => setShowDistLabels(v => { const next = !v; localStorage.setItem('show_dist_labels', next ? '1' : '0'); return next; })}
+              >📏 Distance</button>
               <label className="btn" style={{ cursor: 'pointer' }}>
                 Upload Map
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
@@ -733,6 +739,7 @@ export default function Home() {
             hiddenCharIds={hiddenCharIds}
             showPartyPath={showPartyPath}
             showLabels={showPinLabels}
+            showDistLabels={showDistLabels}
             fitTrigger={fitTrigger}
             onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
             onDeselect={() => setSelectedId(null)}
