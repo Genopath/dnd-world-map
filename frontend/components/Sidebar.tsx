@@ -76,7 +76,7 @@ interface Props {
   onRemoveFromPath:   (entryId: number) => Promise<void>;
   onReorderPath:      (order: number[]) => Promise<void>;
   onSelectLocation:   (id: number) => void;
-  onCreateNPC:        (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => Promise<void>;
+  onCreateNPC:        (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => Promise<NPC>;
   onUpdateNPC:        (id: number, data: Partial<NPC>) => Promise<void>;
   onDeleteNPC:        (id: number) => Promise<void>;
   onUploadPortrait:   (id: number, file: File) => Promise<void>;
@@ -86,10 +86,10 @@ interface Props {
   onCreateSession:    (data: Omit<SessionEntry, 'id' | 'created_at'>) => Promise<void>;
   onUpdateSession:    (id: number, data: Partial<SessionEntry>) => Promise<void>;
   onDeleteSession:    (id: number) => Promise<void>;
-  onCreateParty:      (data: Omit<PartyMember, 'id' | 'created_at'>) => Promise<void>;
+  onCreateParty:      (data: Omit<PartyMember, 'id' | 'created_at'>) => Promise<PartyMember>;
   onUpdateParty:      (id: number, data: Partial<PartyMember>) => Promise<void>;
   onDeleteParty:      (id: number) => Promise<void>;
-  onCreateFaction:    (data: Omit<Faction, 'id' | 'created_at'>) => Promise<void>;
+  onCreateFaction:    (data: Omit<Faction, 'id' | 'created_at'>) => Promise<Faction>;
   onUpdateFaction:    (id: number, data: Partial<Faction>) => Promise<void>;
   onDeleteFaction:    (id: number) => Promise<void>;
   onUpdateCampaign:   (data: Partial<Omit<CampaignSettings, 'id'>>) => Promise<void>;

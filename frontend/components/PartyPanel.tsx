@@ -56,7 +56,7 @@ function fromEdit(e: EditState): Omit<PartyMember, 'id' | 'created_at'> {
 interface Props {
   party: PartyMember[];
   isDMMode: boolean;
-  onCreate: (data: Omit<PartyMember, 'id' | 'created_at'>) => Promise<void>;
+  onCreate: (data: Omit<PartyMember, 'id' | 'created_at'>) => Promise<PartyMember>;
   onUpdate: (id: number, data: Partial<PartyMember>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onLightbox: (url: string) => void;
@@ -67,19 +67,26 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
   const [editState,    setEditState]    = useState<EditState | null>(null);
   const [saving,       setSaving]       = useState(false);
   const [showLibrary,  setShowLibrary]  = useState(false);
+  const [pendingFile,  setPendingFile]  = useState<File | null>(null);
+  const [pendingUrl,   setPendingUrl]   = useState<string | null>(null);
   // Per-card HP input: memberId → raw input string
   const [hpInputs,  setHpInputs]   = useState<Record<number, string>>({});
 
-  const startNew  = () => { setEditState(blankEdit()); setEditingId('new'); };
+  const startNew  = () => { setEditState(blankEdit()); setEditingId('new'); setPendingFile(null); setPendingUrl(null); };
   const startEdit = (m: PartyMember) => { setEditState(toEdit(m)); setEditingId(m.id); };
-  const cancel    = () => { setEditingId(null); setEditState(null); };
+  const cancel    = () => { setEditingId(null); setEditState(null); setPendingFile(null); setPendingUrl(null); };
 
   const save = async () => {
     if (!editState) return;
     setSaving(true);
     try {
       if (editingId === 'new') {
-        await onCreate(fromEdit(editState));
+        const member = await onCreate(fromEdit(editState));
+        if (pendingFile) {
+          try { await api.party.uploadPortrait(member.id, pendingFile); await onUpdate(member.id, {}); } catch (e) { console.error(e); }
+        } else if (pendingUrl) {
+          try { await onUpdate(member.id, { portrait_url: pendingUrl }); } catch (e) { console.error(e); }
+        }
       } else if (typeof editingId === 'number') {
         await onUpdate(editingId, fromEdit(editState));
       }
@@ -163,30 +170,40 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Shown on the map as a dashed line</span>
             </div>
           </div>
-          {typeof editingId === 'number' && (
-            <div className="form-group">
-              <label className="form-label">Portrait</label>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
-                  📷 Upload
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
+          <div className="form-group">
+            <label className="form-label">Portrait</label>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+                📷 Upload
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (editingId === 'new') {
+                    setPendingFile(f); setPendingUrl(null);
+                  } else if (typeof editingId === 'number') {
                     try { await api.party.uploadPortrait(editingId, f); await onUpdate(editingId, {}); }
                     catch (err) { console.error('Portrait upload failed:', err); }
-                    e.target.value = '';
-                  }} />
-                </label>
-                <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
-                {party.find(m => m.id === editingId)?.portrait_url && (
-                  <button className="btn btn-sm" onClick={async () => {
-                    try { await api.party.deletePortrait(editingId); await onUpdate(editingId, {}); }
-                    catch (err) { console.error('Portrait delete failed:', err); }
-                  }}>🗑 Remove</button>
-                )}
-              </div>
+                  }
+                  e.target.value = '';
+                }} />
+              </label>
+              <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
+              {editingId === 'new' && (pendingFile || pendingUrl) && (
+                <>
+                  <span style={{ fontSize: 11, color: 'var(--success-text)' }}>
+                    {pendingFile ? `📎 ${pendingFile.name}` : '🖼 Library image selected'}
+                  </span>
+                  <button className="btn btn-sm btn-ghost" onClick={() => { setPendingFile(null); setPendingUrl(null); }}>✕</button>
+                </>
+              )}
+              {typeof editingId === 'number' && party.find(m => m.id === editingId)?.portrait_url && (
+                <button className="btn btn-sm" onClick={async () => {
+                  try { await api.party.deletePortrait(editingId); await onUpdate(editingId, {}); }
+                  catch (err) { console.error('Portrait delete failed:', err); }
+                }}>🗑 Remove</button>
+              )}
             </div>
-          )}
+          </div>
           <div className="form-actions">
             <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             <button className="btn btn-sm" onClick={cancel} disabled={saving}>Cancel</button>
@@ -194,6 +211,12 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
         </div>
       )}
 
+      {showLibrary && editingId === 'new' && (
+        <LibraryPicker
+          onSelect={url => { setPendingUrl(url); setPendingFile(null); setShowLibrary(false); }}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
       {showLibrary && typeof editingId === 'number' && (
         <LibraryPicker
           onSelect={async url => { await onUpdate(editingId, { portrait_url: url }); setShowLibrary(false); }}

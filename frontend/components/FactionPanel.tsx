@@ -50,7 +50,7 @@ function fromEdit(e: EditState): Omit<Faction, 'id' | 'created_at'> {
 interface Props {
   factions: Faction[];
   isDMMode: boolean;
-  onCreate: (data: Omit<Faction, 'id' | 'created_at'>) => Promise<void>;
+  onCreate: (data: Omit<Faction, 'id' | 'created_at'>) => Promise<Faction>;
   onUpdate: (id: number, data: Partial<Faction>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onLightbox: (url: string) => void;
@@ -61,11 +61,13 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
   const [editState,   setEditState]   = useState<EditState | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingUrl,  setPendingUrl]  = useState<string | null>(null);
   const [sortBy,      setSortBy]      = useState<'default' | 'rep-desc' | 'rep-asc'>('default');
 
-  const startNew  = () => { setEditState(blankEdit()); setEditingId('new'); };
+  const startNew  = () => { setEditState(blankEdit()); setEditingId('new'); setPendingFile(null); setPendingUrl(null); };
   const startEdit = (f: Faction) => { setEditState(toEdit(f)); setEditingId(f.id); };
-  const cancel    = () => { setEditingId(null); setEditState(null); };
+  const cancel    = () => { setEditingId(null); setEditState(null); setPendingFile(null); setPendingUrl(null); };
 
   const sortedFactions = sortBy === 'default' ? factions
     : [...factions].sort((a, b) => sortBy === 'rep-desc' ? b.reputation - a.reputation : a.reputation - b.reputation);
@@ -74,8 +76,16 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
     if (!editState) return;
     setSaving(true);
     try {
-      if (editingId === 'new') await onCreate(fromEdit(editState));
-      else if (typeof editingId === 'number') await onUpdate(editingId, fromEdit(editState));
+      if (editingId === 'new') {
+        const faction = await onCreate(fromEdit(editState));
+        if (pendingFile) {
+          try { await api.factions.uploadImage(faction.id, pendingFile); await onUpdate(faction.id, {}); } catch (e) { console.error(e); }
+        } else if (pendingUrl) {
+          try { await onUpdate(faction.id, { image_url: pendingUrl }); } catch (e) { console.error(e); }
+        }
+      } else if (typeof editingId === 'number') {
+        await onUpdate(editingId, fromEdit(editState));
+      }
       cancel();
     } finally { setSaving(false); }
   };
@@ -131,24 +141,36 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
             </div>
           </div>
           {isDMMode && <div className="form-group"><label className="form-label">Notes (DM only)</label><textarea value={editState.notes} onChange={set('notes')} rows={2} placeholder="Private notes…" /></div>}
-          {isDMMode && typeof editingId === 'number' && (
+          {isDMMode && (
             <div className="form-group">
               <label className="form-label">Crest / Banner Image</label>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
                   🖼 Upload
                   <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    try { await api.factions.uploadImage(editingId, f); await onUpdate(editingId, {}); }
-                    catch (err) { console.error('Image upload failed:', err); }
+                    if (editingId === 'new') {
+                      setPendingFile(f); setPendingUrl(null);
+                    } else if (typeof editingId === 'number') {
+                      try { await api.factions.uploadImage(editingId, f); await onUpdate(editingId, {}); }
+                      catch (err) { console.error('Image upload failed:', err); }
+                    }
                     e.target.value = '';
                   }} />
                 </label>
                 <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
-                {factions.find(fc => fc.id === editingId)?.image_url && (
+                {editingId === 'new' && (pendingFile || pendingUrl) && (
+                  <>
+                    <span style={{ fontSize: 11, color: 'var(--success-text)' }}>
+                      {pendingFile ? `📎 ${pendingFile.name}` : '🖼 Library image selected'}
+                    </span>
+                    <button className="btn btn-sm btn-ghost" onClick={() => { setPendingFile(null); setPendingUrl(null); }}>✕</button>
+                  </>
+                )}
+                {typeof editingId === 'number' && factions.find(fc => fc.id === editingId)?.image_url && (
                   <button className="btn btn-sm" onClick={async () => {
-                    try { await api.factions.deleteImage(editingId); await onUpdate(editingId, {}); }
+                    try { await api.factions.deleteImage(editingId as number); await onUpdate(editingId as number, {}); }
                     catch (err) { console.error('Image delete failed:', err); }
                   }}>🗑 Remove</button>
                 )}
@@ -162,6 +184,12 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
         </div>
       )}
 
+      {showLibrary && editingId === 'new' && (
+        <LibraryPicker
+          onSelect={url => { setPendingUrl(url); setPendingFile(null); setShowLibrary(false); }}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
       {showLibrary && typeof editingId === 'number' && (
         <LibraryPicker
           onSelect={async url => { await onUpdate(editingId, { image_url: url }); setShowLibrary(false); }}

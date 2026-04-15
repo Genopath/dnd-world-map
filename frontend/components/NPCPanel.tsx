@@ -34,7 +34,7 @@ interface Props {
   quests:             Quest[];
   isDMMode:           boolean;
   selectedLocationId: number | null;
-  onCreate:           (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => Promise<void>;
+  onCreate:           (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => Promise<NPC>;
   onUpdate:           (id: number, data: Partial<NPC>) => Promise<void>;
   onDelete:           (id: number) => Promise<void>;
   onUploadPortrait:   (id: number, file: File) => Promise<void>;
@@ -56,6 +56,8 @@ export default function NPCPanel({
   const [isAdding,   setIsAdding]   = useState(false);
   const [addState,   setAddState]   = useState<EditState>(blank());
   const [saving,     setSaving]     = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingUrl,  setPendingUrl]  = useState<string | null>(null);
 
   const jumpProcessed = useRef<number | null>(null);
   useEffect(() => {
@@ -84,9 +86,16 @@ export default function NPCPanel({
     if (!addState.name.trim()) return;
     setSaving(true);
     try {
-      await onCreate({ ...addState, location_id: addState.location_id === '' ? null : addState.location_id as number });
+      const npc = await onCreate({ ...addState, location_id: addState.location_id === '' ? null : addState.location_id as number });
+      if (pendingFile) {
+        try { await onUploadPortrait(npc.id, pendingFile); } catch (e) { console.error(e); }
+      } else if (pendingUrl) {
+        try { await onUpdate(npc.id, { portrait_url: pendingUrl }); } catch (e) { console.error(e); }
+      }
       setIsAdding(false);
       setAddState(blank());
+      setPendingFile(null);
+      setPendingUrl(null);
     } finally { setSaving(false); }
   };
 
@@ -115,7 +124,12 @@ export default function NPCPanel({
 
       {/* Add form */}
       {isAdding && isDMMode && (
-        <NPCForm state={addState} locations={locations} onChange={setAddState} onSave={saveAdd} onCancel={() => setIsAdding(false)} saving={saving} isNew />
+        <NPCForm state={addState} locations={locations} onChange={setAddState} onSave={saveAdd}
+          onCancel={() => { setIsAdding(false); setPendingFile(null); setPendingUrl(null); }}
+          saving={saving} isNew
+          pendingPortraitFile={pendingFile} pendingPortraitUrl={pendingUrl}
+          onPendingFile={setPendingFile} onPendingUrl={setPendingUrl}
+        />
       )}
 
       {/* Empty state */}
@@ -224,19 +238,24 @@ export default function NPCPanel({
 // ── NPC form ──────────────────────────────────────────────────────────────────
 
 interface FormProps {
-  state:             EditState;
-  locations:         Location[];
-  onChange:          (s: EditState) => void;
-  onSave:            () => void;
-  onCancel:          () => void;
-  saving:            boolean;
-  isNew?:            boolean;
-  npcId?:            number;
-  onUploadPortrait?: (id: number, file: File) => Promise<void>;
-  onSetPortrait?:    (id: number, url: string) => Promise<void>;
+  state:                EditState;
+  locations:            Location[];
+  onChange:             (s: EditState) => void;
+  onSave:               () => void;
+  onCancel:             () => void;
+  saving:               boolean;
+  isNew?:               boolean;
+  npcId?:               number;
+  onUploadPortrait?:    (id: number, file: File) => Promise<void>;
+  onSetPortrait?:       (id: number, url: string) => Promise<void>;
+  // For new NPCs — staged before creation
+  pendingPortraitFile?: File | null;
+  pendingPortraitUrl?:  string | null;
+  onPendingFile?:       (f: File | null) => void;
+  onPendingUrl?:        (url: string | null) => void;
 }
 
-function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, npcId, onUploadPortrait, onSetPortrait }: FormProps) {
+function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, npcId, onUploadPortrait, onSetPortrait, pendingPortraitFile, pendingPortraitUrl, onPendingFile, onPendingUrl }: FormProps) {
   const [showLibrary, setShowLibrary] = useState(false);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -273,6 +292,30 @@ function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, 
         <label className="form-label">Notes</label>
         <textarea value={state.notes} onChange={set('notes')} placeholder="Personality, history, secrets… (supports **bold**, *italic*, - lists)" rows={4} />
       </div>
+      {isNew && onPendingFile && onPendingUrl && (
+        <div className="form-group">
+          <label className="form-label">Portrait</label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+              📷 Upload
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) { onPendingFile(f); onPendingUrl(null); }
+                e.target.value = '';
+              }} />
+            </label>
+            <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
+            {(pendingPortraitFile || pendingPortraitUrl) && (
+              <>
+                <span style={{ fontSize: 11, color: 'var(--success-text)' }}>
+                  {pendingPortraitFile ? `📎 ${pendingPortraitFile.name}` : '🖼 Library image selected'}
+                </span>
+                <button className="btn btn-sm btn-ghost" onClick={() => { onPendingFile(null); onPendingUrl(null); }}>✕</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {!isNew && npcId != null && (onUploadPortrait || onSetPortrait) && (
         <div className="form-group">
           <label className="form-label">Portrait</label>
@@ -299,9 +342,15 @@ function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, 
         </button>
         <button className="btn btn-sm" onClick={onCancel} disabled={saving}>Cancel</button>
       </div>
-      {showLibrary && onSetPortrait && npcId != null && (
+      {showLibrary && isNew && onPendingUrl && (
         <LibraryPicker
-          onSelect={async url => { await onSetPortrait(npcId, url); }}
+          onSelect={url => { onPendingUrl(url); if (onPendingFile) onPendingFile(null); setShowLibrary(false); }}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
+      {showLibrary && !isNew && onSetPortrait && npcId != null && (
+        <LibraryPicker
+          onSelect={async url => { await onSetPortrait(npcId, url); setShowLibrary(false); }}
           onClose={() => setShowLibrary(false)}
         />
       )}

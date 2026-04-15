@@ -382,8 +382,8 @@ export default function Home() {
   }, []);
 
   // ── NPC handlers ─────────────────────────────────────────────────────────────
-  const handleCreateNPC = useCallback(async (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => {
-    const npc = await api.npcs.create(data); setNpcs(prev => [...prev, npc]);
+  const handleCreateNPC = useCallback(async (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>): Promise<NPC> => {
+    const npc = await api.npcs.create(data); setNpcs(prev => [...prev, npc]); return npc;
   }, []);
   const handleUpdateNPC = useCallback(async (id: number, data: Partial<NPC>) => {
     const updated = await api.npcs.update(id, data); setNpcs(prev => prev.map(n => (n.id === id ? updated : n)));
@@ -419,8 +419,8 @@ export default function Home() {
   }, []);
 
   // ── Party handlers ────────────────────────────────────────────────────────────
-  const handleCreateParty = useCallback(async (data: Omit<PartyMember, 'id' | 'created_at'>) => {
-    const member = await api.party.create(data); setParty(prev => [...prev, member]);
+  const handleCreateParty = useCallback(async (data: Omit<PartyMember, 'id' | 'created_at'>): Promise<PartyMember> => {
+    const member = await api.party.create(data); setParty(prev => [...prev, member]); return member;
   }, []);
   const handleUpdateParty = useCallback(async (id: number, data: Partial<PartyMember>) => {
     const updated = await api.party.update(id, data); setParty(prev => prev.map(m => (m.id === id ? updated : m)));
@@ -430,8 +430,8 @@ export default function Home() {
   }, []);
 
   // ── Faction handlers ──────────────────────────────────────────────────────────
-  const handleCreateFaction = useCallback(async (data: Omit<Faction, 'id' | 'created_at'>) => {
-    const faction = await api.factions.create(data); setFactions(prev => [...prev, faction]);
+  const handleCreateFaction = useCallback(async (data: Omit<Faction, 'id' | 'created_at'>): Promise<Faction> => {
+    const faction = await api.factions.create(data); setFactions(prev => [...prev, faction]); return faction;
   }, []);
   const handleUpdateFaction = useCallback(async (id: number, data: Partial<Faction>) => {
     const updated = await api.factions.update(id, data); setFactions(prev => prev.map(f => (f.id === id ? updated : f)));
