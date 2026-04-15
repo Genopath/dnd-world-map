@@ -1204,3 +1204,67 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   display: flex; gap: 8px;
 }
 .campaign-create input { flex: 1; }
+
+/* ── Image Library Picker ──────────────────────────────────────────────────── */
+.lib-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+}
+.lib-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  width: min(540px, 95vw);
+  max-height: 78vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+}
+.lib-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.lib-empty {
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.lib-empty code { color: var(--accent); font-size: 11px; }
+.lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+}
+.lib-thumb {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.lib-thumb:hover { border-color: var(--accent); background: var(--surface3); }
+.lib-thumb img {
+  width: 100%; aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 3px;
+}
+.lib-thumb-name {
+  font-size: 9px;
+  color: var(--text-muted);
+  word-break: break-all;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

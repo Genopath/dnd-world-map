@@ -3,6 +3,7 @@ import { api, API_BASE } from '../lib/api';
 import type { CalendarConfig, CharacterPathEntry, CampaignSettings, Faction, Location, LocationType, NPC, PartyMember, PathEntry, Quest, SessionEntry, SidebarTab } from '../types';
 import CalendarPanel from './CalendarPanel';
 import FactionPanel from './FactionPanel';
+import LibraryPicker from './LibraryPicker';
 import MarkdownText from './MarkdownText';
 import NPCPanel from './NPCPanel';
 import PartyPanel from './PartyPanel';
@@ -147,9 +148,9 @@ export default function Sidebar({
   hiddenCharIds, showPartyPath, onToggleCharPath, onTogglePartyPath,
   onUpdatePathTravelType, onUpdateCharPathTravelType,
 }: Props) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editState, setEditState] = useState<EditState | null>(null);
-  const [saving,    setSaving]    = useState(false);
+  const [isEditing,  setIsEditing]  = useState(false);
+  const [editState,  setEditState]  = useState<EditState | null>(null);
+  const [saving,     setSaving]     = useState(false);
 
   useEffect(() => { setIsEditing(false); setEditState(null); }, [location?.id]);
 
@@ -444,6 +445,7 @@ interface EditFormProps {
 }
 
 function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation }: EditFormProps) {
+  const [libraryFor, setLibraryFor] = useState<'icon' | 'image' | 'submap' | null>(null);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       onChange({ ...state, [key]: e.target.value });
@@ -509,48 +511,57 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
       {isDMMode && (
         <div className="form-group">
           <label className="form-label">📌 Custom Pin Icon</label>
-          <label className="btn btn-sm" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
-            Upload Icon
-            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try { await api.locations.uploadIcon(locationId, f); await onUpdateLocation(locationId, {}); }
-              catch (err) { console.error('Icon upload failed:', err); }
-              e.target.value = '';
-            }} />
-          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+              Upload Icon
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                try { await api.locations.uploadIcon(locationId, f); await onUpdateLocation(locationId, {}); }
+                catch (err) { console.error('Icon upload failed:', err); }
+                e.target.value = '';
+              }} />
+            </label>
+            <button className="btn btn-sm" onClick={() => setLibraryFor('icon')}>📚 Library</button>
+          </div>
           <span className="form-hint" style={{ marginTop: 4 }}>Replaces the colored dot on the map pin</span>
         </div>
       )}
       {isDMMode && (
         <div className="form-group">
           <label className="form-label">🖼 Location Image</label>
-          <label className="btn btn-sm" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
-            Upload Image
-            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try { await api.locations.uploadImage(locationId, f); await onUpdateLocation(locationId, {}); }
-              catch (err) { console.error('Image upload failed:', err); }
-              e.target.value = '';
-            }} />
-          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+              Upload Image
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                try { await api.locations.uploadImage(locationId, f); await onUpdateLocation(locationId, {}); }
+                catch (err) { console.error('Image upload failed:', err); }
+                e.target.value = '';
+              }} />
+            </label>
+            <button className="btn btn-sm" onClick={() => setLibraryFor('image')}>📚 Library</button>
+          </div>
           <span className="form-hint" style={{ marginTop: 4 }}>Hero image shown in location detail</span>
         </div>
       )}
       {isDMMode && (
         <div className="form-group">
           <label className="form-label">🗺 Sub-Map</label>
-          <label className="btn btn-sm" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
-            Upload Sub-Map
-            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try { await api.locations.uploadSubmap(locationId, f); await onUpdateLocation(locationId, {}); }
-              catch (err) { console.error('Sub-map upload failed:', err); }
-              e.target.value = '';
-            }} />
-          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+              Upload Sub-Map
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                try { await api.locations.uploadSubmap(locationId, f); await onUpdateLocation(locationId, {}); }
+                catch (err) { console.error('Sub-map upload failed:', err); }
+                e.target.value = '';
+              }} />
+            </label>
+            <button className="btn btn-sm" onClick={() => setLibraryFor('submap')}>📚 Library</button>
+          </div>
           <span className="form-hint" style={{ marginTop: 4 }}>Allows players to enter this location's interior map</span>
         </div>
       )}
@@ -558,6 +569,17 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
         <button className="btn btn-primary btn-sm" onClick={onSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
         <button className="btn btn-sm" onClick={onCancel} disabled={saving}>Cancel</button>
       </div>
+      {libraryFor && (
+        <LibraryPicker
+          onSelect={async url => {
+            if (libraryFor === 'icon')   await onUpdateLocation(locationId, { icon_url: url });
+            if (libraryFor === 'image')  await onUpdateLocation(locationId, { image_url: url });
+            if (libraryFor === 'submap') await onUpdateLocation(locationId, { submap_image_url: url });
+            setLibraryFor(null);
+          }}
+          onClose={() => setLibraryFor(null)}
+        />
+      )}
     </div>
   );
 }

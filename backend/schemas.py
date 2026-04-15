@@ -30,6 +30,9 @@ class LocationUpdate(BaseModel):
     x: Optional[float] = None
     y: Optional[float] = None
     parent_id: Optional[int] = None
+    icon_url: Optional[str] = None
+    image_url: Optional[str] = None
+    submap_image_url: Optional[str] = None
 
 
 class LocationOut(BaseModel):
@@ -89,6 +92,7 @@ class NPCUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     is_visible: Optional[bool] = None
+    portrait_url: Optional[str] = None
 
 class NPCOut(BaseModel):
     id: int
@@ -143,6 +147,7 @@ class QuestUpdate(BaseModel):
     started_session_id:   Optional[int] = None
     completed_session_id: Optional[int] = None
     is_visible:           Optional[bool] = None
+    image_url:            Optional[str] = None
 
 class QuestOut(BaseModel):
     id: int
@@ -189,6 +194,7 @@ class SessionUpdate(BaseModel):
     xp_awarded: Optional[int] = None
     loot_notes: Optional[str] = None
     is_visible: Optional[bool] = None
+    image_url: Optional[str] = None
 
 class SessionOut(BaseModel):
     id: int
@@ -259,6 +265,7 @@ class PartyMemberUpdate(BaseModel):
     conditions: Optional[List[str]] = None
     notes: Optional[str] = None
     path_color: Optional[str] = None
+    portrait_url: Optional[str] = None
 
 class PartyMemberOut(BaseModel):
     id: int
@@ -294,6 +301,7 @@ class FactionUpdate(BaseModel):
     notes: Optional[str] = None
     color: Optional[str] = None
     is_visible: Optional[bool] = None
+    image_url: Optional[str] = None
 
 class FactionOut(BaseModel):
     id: int

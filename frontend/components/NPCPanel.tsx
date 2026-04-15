@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { Location, NPC, Quest } from '../types';
 import MarkdownText from './MarkdownText';
+import LibraryPicker from './LibraryPicker';
 
 type NPCStatus = 'alive' | 'dead' | 'unknown';
 
@@ -170,6 +171,7 @@ export default function NPCPanel({
                   state={editState} locations={locations} onChange={setEditState}
                   onSave={saveEdit} onCancel={() => setEditingId(null)} saving={saving}
                   npcId={npc.id} onUploadPortrait={onUploadPortrait}
+                  onSetPortrait={async (id, url) => { await onUpdate(id, { portrait_url: url }); }}
                 />
               ) : (
                 <>
@@ -218,18 +220,20 @@ export default function NPCPanel({
 // ── NPC form ──────────────────────────────────────────────────────────────────
 
 interface FormProps {
-  state:            EditState;
-  locations:        Location[];
-  onChange:         (s: EditState) => void;
-  onSave:           () => void;
-  onCancel:         () => void;
-  saving:           boolean;
-  isNew?:           boolean;
-  npcId?:           number;
+  state:             EditState;
+  locations:         Location[];
+  onChange:          (s: EditState) => void;
+  onSave:            () => void;
+  onCancel:          () => void;
+  saving:            boolean;
+  isNew?:            boolean;
+  npcId?:            number;
   onUploadPortrait?: (id: number, file: File) => Promise<void>;
+  onSetPortrait?:    (id: number, url: string) => Promise<void>;
 }
 
-function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, npcId, onUploadPortrait }: FormProps) {
+function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, npcId, onUploadPortrait, onSetPortrait }: FormProps) {
+  const [showLibrary, setShowLibrary] = useState(false);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       onChange({ ...state, [key]: e.target.value });
@@ -265,17 +269,24 @@ function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, 
         <label className="form-label">Notes</label>
         <textarea value={state.notes} onChange={set('notes')} placeholder="Personality, history, secrets… (supports **bold**, *italic*, - lists)" rows={4} />
       </div>
-      {!isNew && npcId != null && onUploadPortrait && (
+      {!isNew && npcId != null && (onUploadPortrait || onSetPortrait) && (
         <div className="form-group">
           <label className="form-label">Portrait</label>
-          <label className="btn btn-sm" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
-            📷 Upload Portrait
-            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
-              const f = e.target.files?.[0];
-              if (f) await onUploadPortrait(npcId, f);
-              e.target.value = '';
-            }} />
-          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {onUploadPortrait && (
+              <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+                📷 Upload
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+                  const f = e.target.files?.[0];
+                  if (f) await onUploadPortrait(npcId, f);
+                  e.target.value = '';
+                }} />
+              </label>
+            )}
+            {onSetPortrait && (
+              <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
+            )}
+          </div>
         </div>
       )}
       <div className="form-actions">
@@ -284,6 +295,12 @@ function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, 
         </button>
         <button className="btn btn-sm" onClick={onCancel} disabled={saving}>Cancel</button>
       </div>
+      {showLibrary && onSetPortrait && npcId != null && (
+        <LibraryPicker
+          onSelect={async url => { await onSetPortrait(npcId, url); }}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
     </div>
   );
 }

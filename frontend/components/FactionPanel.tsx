@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { Faction } from '../types';
 import MarkdownText from './MarkdownText';
+import LibraryPicker from './LibraryPicker';
 
 function repLabel(rep: number): string {
   if (rep <= -50) return 'Hostile';
@@ -56,9 +57,10 @@ interface Props {
 }
 
 export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, onDelete, onLightbox }: Props) {
-  const [editingId, setEditingId] = useState<number | 'new' | null>(null);
-  const [editState, setEditState] = useState<EditState | null>(null);
-  const [saving,    setSaving]    = useState(false);
+  const [editingId,   setEditingId]   = useState<number | 'new' | null>(null);
+  const [editState,   setEditState]   = useState<EditState | null>(null);
+  const [saving,      setSaving]      = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
 
   const startNew  = () => { setEditState(blankEdit()); setEditingId('new'); };
   const startEdit = (f: Faction) => { setEditState(toEdit(f)); setEditingId(f.id); };
@@ -124,6 +126,7 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
                     e.target.value = '';
                   }} />
                 </label>
+                <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
                 {factions.find(fc => fc.id === editingId)?.image_url && (
                   <button className="btn btn-sm" onClick={async () => {
                     try { await api.factions.deleteImage(editingId); await onUpdate(editingId, {}); }
@@ -138,6 +141,13 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
             <button className="btn btn-sm" onClick={cancel} disabled={saving}>Cancel</button>
           </div>
         </div>
+      )}
+
+      {showLibrary && typeof editingId === 'number' && (
+        <LibraryPicker
+          onSelect={async url => { await onUpdate(editingId, { image_url: url }); setShowLibrary(false); }}
+          onClose={() => setShowLibrary(false)}
+        />
       )}
 
       {factions.length === 0 && editingId === null && (

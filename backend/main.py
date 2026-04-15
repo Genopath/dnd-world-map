@@ -38,6 +38,10 @@ ICONS_DIR    = UPLOADS_DIR / "icons";     ICONS_DIR.mkdir(exist_ok=True)
 IMAGES_DIR   = UPLOADS_DIR / "images";    IMAGES_DIR.mkdir(exist_ok=True)
 SUBMAPS_DIR  = UPLOADS_DIR / "submaps";   SUBMAPS_DIR.mkdir(exist_ok=True)
 
+# Library: committed to git next to main.py — survives redeployments
+LIBRARY_DIR  = Path(__file__).parent / "library"
+LIBRARY_DIR.mkdir(exist_ok=True)
+
 app = FastAPI(title="D&D World Map API")
 
 _raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
@@ -52,6 +56,7 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/library", StaticFiles(directory=str(LIBRARY_DIR)), name="library")
 
 
 # ── WebSocket broadcast ───────────────────────────────────────────────────────
@@ -151,6 +156,23 @@ def _path_out(entry: models.PlayerPathEntry, db: Session) -> schemas.PathEntryOu
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Image library ─────────────────────────────────────────────────────────────
+
+_IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.avif', '.ico'}
+
+@app.get("/library-list")
+def list_library():
+    """Return all image files committed to backend/library/."""
+    try:
+        files = sorted(
+            [f for f in LIBRARY_DIR.iterdir() if f.is_file() and f.suffix.lower() in _IMAGE_EXTS],
+            key=lambda f: f.name.lower(),
+        )
+    except Exception:
+        files = []
+    return [{"name": f.name, "url": f"/library/{f.name}"} for f in files]
 
 
 # ── Campaign management ───────────────────────────────────────────────────────

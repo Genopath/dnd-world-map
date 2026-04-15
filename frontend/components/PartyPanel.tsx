@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { PartyMember } from '../types';
+import LibraryPicker from './LibraryPicker';
 
 const COMMON_CONDITIONS = ['Poisoned', 'Frightened', 'Blinded', 'Deafened', 'Prone', 'Stunned', 'Paralyzed', 'Unconscious', 'Exhausted', 'Restrained', 'Charmed', 'Invisible'];
 
@@ -62,9 +63,10 @@ interface Props {
 }
 
 export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDelete, onLightbox }: Props) {
-  const [editingId, setEditingId]   = useState<number | 'new' | null>(null);
-  const [editState, setEditState]   = useState<EditState | null>(null);
-  const [saving,    setSaving]      = useState(false);
+  const [editingId,    setEditingId]    = useState<number | 'new' | null>(null);
+  const [editState,    setEditState]    = useState<EditState | null>(null);
+  const [saving,       setSaving]       = useState(false);
+  const [showLibrary,  setShowLibrary]  = useState(false);
   // Per-card HP input: memberId → raw input string
   const [hpInputs,  setHpInputs]   = useState<Record<number, string>>({});
 
@@ -175,6 +177,7 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
                     e.target.value = '';
                   }} />
                 </label>
+                <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
                 {party.find(m => m.id === editingId)?.portrait_url && (
                   <button className="btn btn-sm" onClick={async () => {
                     try { await api.party.deletePortrait(editingId); await onUpdate(editingId, {}); }
@@ -189,6 +192,13 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
             <button className="btn btn-sm" onClick={cancel} disabled={saving}>Cancel</button>
           </div>
         </div>
+      )}
+
+      {showLibrary && typeof editingId === 'number' && (
+        <LibraryPicker
+          onSelect={async url => { await onUpdate(editingId, { portrait_url: url }); setShowLibrary(false); }}
+          onClose={() => setShowLibrary(false)}
+        />
       )}
 
       {/* Member cards */}

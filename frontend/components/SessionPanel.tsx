@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { SessionEntry } from '../types';
 import MarkdownText from './MarkdownText';
+import LibraryPicker from './LibraryPicker';
 
 type EditState = {
   session_number: number;
@@ -28,12 +29,13 @@ interface Props {
 }
 
 export default function SessionPanel({ sessions, isDMMode, onCreate, onUpdate, onDelete, onLightbox }: Props) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [editingId,  setEditingId]  = useState<number | null>(null);
-  const [editState,  setEditState]  = useState<EditState | null>(null);
-  const [isAdding,   setIsAdding]   = useState(false);
-  const [addState,   setAddState]   = useState<EditState>(nextBlank(sessions));
-  const [saving,     setSaving]     = useState(false);
+  const [expandedId,      setExpandedId]      = useState<number | null>(null);
+  const [editingId,       setEditingId]       = useState<number | null>(null);
+  const [editState,       setEditState]       = useState<EditState | null>(null);
+  const [isAdding,        setIsAdding]        = useState(false);
+  const [addState,        setAddState]        = useState<EditState>(nextBlank(sessions));
+  const [saving,          setSaving]          = useState(false);
+  const [librarySessionId, setLibrarySessionId] = useState<number | null>(null);
 
   const sorted = [...sessions].sort((a, b) => b.session_number - a.session_number);
 
@@ -132,6 +134,7 @@ export default function SessionPanel({ sessions, isDMMode, onCreate, onUpdate, o
                           e.target.value = '';
                         }} />
                       </label>
+                      <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setLibrarySessionId(s.id); }}>📚 Library</button>
                       {s.image_url && (
                         <button className="btn btn-sm" onClick={async e => { e.stopPropagation(); await api.sessions.deleteImage(s.id); await onUpdate(s.id, {}); }}>🗑 Image</button>
                       )}
@@ -144,6 +147,12 @@ export default function SessionPanel({ sessions, isDMMode, onCreate, onUpdate, o
           )}
         </div>
       ))}
+      {librarySessionId !== null && (
+        <LibraryPicker
+          onSelect={async url => { await onUpdate(librarySessionId, { image_url: url }); setLibrarySessionId(null); }}
+          onClose={() => setLibrarySessionId(null)}
+        />
+      )}
     </div>
   );
 }

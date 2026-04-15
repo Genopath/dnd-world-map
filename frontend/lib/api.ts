@@ -166,6 +166,9 @@ export const api = {
   handouts: {
     upload: (file: File) => upload<{ url: string; name: string }>('/handouts/upload', file),
   },
+  library: {
+    list: () => req<{ name: string; url: string }[]>('/library-list'),
+  },
   data: {
     export: () => req<object>('/export'),
     import: (payload: object) =>

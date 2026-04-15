@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { Faction, Location, NPC, Quest, QuestObjective, QuestTier, SessionEntry } from '../types';
 import MarkdownText from './MarkdownText';
+import LibraryPicker from './LibraryPicker';
 
 type QuestStatus = 'active' | 'completed' | 'failed';
 type Filter = 'all' | QuestStatus | QuestTier;
@@ -118,14 +119,15 @@ export default function QuestPanel({
   quests, locations, npcs, factions, sessions, isDMMode,
   onCreate, onUpdate, onDelete, onLightbox, onLinkNpc, onUnlinkNpc, onNavigateToNpc, jumpToId,
 }: Props) {
-  const [filter,     setFilter]     = useState<Filter>('all');
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [editingId,  setEditingId]  = useState<number | null>(null);
-  const [editState,  setEditState]  = useState<EditState | null>(null);
-  const [isAdding,   setIsAdding]   = useState(false);
-  const [addState,   setAddState]   = useState<EditState>(blank());
-  const [saving,     setSaving]     = useState(false);
-  const [boardView,  setBoardView]  = useState(false);
+  const [filter,        setFilter]        = useState<Filter>('all');
+  const [expandedId,    setExpandedId]    = useState<number | null>(null);
+  const [editingId,     setEditingId]     = useState<number | null>(null);
+  const [editState,     setEditState]     = useState<EditState | null>(null);
+  const [isAdding,      setIsAdding]      = useState(false);
+  const [addState,      setAddState]      = useState<EditState>(blank());
+  const [saving,        setSaving]        = useState(false);
+  const [boardView,     setBoardView]     = useState(false);
+  const [libraryQuestId, setLibraryQuestId] = useState<number | null>(null);
 
   const jumpProcessed = useRef<number | null>(null);
   useEffect(() => {
@@ -309,6 +311,12 @@ export default function QuestPanel({
             )}
           </div>
         ))
+      )}
+      {libraryQuestId !== null && (
+        <LibraryPicker
+          onSelect={async url => { await onUpdate(libraryQuestId, { image_url: url }); setLibraryQuestId(null); }}
+          onClose={() => setLibraryQuestId(null)}
+        />
       )}
     </div>
   );
@@ -502,6 +510,7 @@ function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode,
               e.target.value = '';
             }} />
           </label>
+          <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setLibraryQuestId(q.id); }}>📚 Library</button>
           {q.image_url && (
             <button className="btn btn-sm" onClick={async e => { e.stopPropagation(); await api.quests.deleteImage(q.id); await onUpdate(q.id, {}); }}>🗑 Image</button>
           )}
