@@ -330,12 +330,16 @@ export default function Home() {
   const handleAddPin = useCallback(async (x: number, y: number) => {
     setIsAddingPin(false);
     try {
-      const newLoc = await api.locations.create({ name: 'New Location', type: 'city', subtitle: '', description: '', quest_hooks: [], handouts: [], dm_notes: '', discovered: false, x, y });
+      const newLoc = await api.locations.create({
+        name: 'New Location', type: 'city', subtitle: '', description: '',
+        quest_hooks: [], handouts: [], dm_notes: '', discovered: false, x, y,
+        parent_id: currentMapId,
+      });
       setLocations(prev => [...prev, newLoc]);
       setSelectedId(newLoc.id);
       setSidebarTab('location');
     } catch (e) { console.error(e); }
-  }, []);
+  }, [currentMapId]);
 
   const handleUpdateLocation = useCallback(async (id: number, data: Partial<Location>) => {
     const updated = await api.locations.update(id, data);
@@ -671,8 +675,8 @@ export default function Home() {
             <>
               <button className="btn btn-sm btn-icon" title="Set / change DM passcode" onClick={() => { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('set'); }}>🔒</button>
 
-              {/* Fog toolbar */}
-              <div className="fog-toolbar">
+              {/* Fog toolbar — world map only */}
+              <div className="fog-toolbar" style={currentMapId != null ? { display: 'none' } : undefined}>
                 <button
                   className={`btn btn-sm ${fogPaint ? 'btn-active' : ''}`}
                   onClick={() => setFogPaint(p => !p)}
@@ -738,8 +742,8 @@ export default function Home() {
             selectedId={selectedId}
             playerPath={levelPlayerPath} quests={visibleQuests} isAddingPin={isAddingPin && isDMMode}
             mapImageUrl={currentMapUrl} isDMMode={isDMMode}
-            fogData={fogData}
-            fogPaintMode={fogPaint}
+            fogData={currentMapId != null ? '1'.repeat(10000) : fogData}
+            fogPaintMode={fogPaint && currentMapId == null}
             fogBrushMode={fogBrush}
             fogBrushSize={fogSize}
             mapStack={mapStack}
