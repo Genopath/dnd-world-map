@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, LargeBinary, String, Text
 from sqlalchemy.sql import func
 
 from database import Base
@@ -22,6 +22,7 @@ class Location(Base):
     image_url = Column(String(500), nullable=True)        # hero/banner image
     parent_id = Column(Integer, nullable=True)            # null = root map level
     submap_image_url = Column(String(500), nullable=True) # interior map image
+    fog_data         = Column(Text, nullable=True)         # per-submap fog (10000-char '0'/'1')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -186,3 +187,11 @@ class QuestNPCLink(Base):
 
     quest_id = Column(Integer, primary_key=True)
     npc_id   = Column(Integer, primary_key=True)
+
+
+class StoredImage(Base):
+    __tablename__ = "stored_images"
+
+    id           = Column(String(64), primary_key=True)   # UUID hex
+    content_type = Column(String(100), default="image/png")
+    data         = Column(LargeBinary, nullable=False)

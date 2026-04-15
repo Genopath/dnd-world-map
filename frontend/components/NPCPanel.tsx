@@ -38,6 +38,7 @@ interface Props {
   onUpdate:           (id: number, data: Partial<NPC>) => Promise<void>;
   onDelete:           (id: number) => Promise<void>;
   onUploadPortrait:   (id: number, file: File) => Promise<void>;
+  onDeletePortrait:   (id: number) => Promise<void>;
   onLightbox:         (url: string) => void;
   onNavigateToQuest:  (id: number) => void;
   onUnlinkNpc:        (questId: number, npcId: number) => Promise<void>;
@@ -46,7 +47,7 @@ interface Props {
 
 export default function NPCPanel({
   npcs, locations, quests, isDMMode, selectedLocationId,
-  onCreate, onUpdate, onDelete, onUploadPortrait, onLightbox,
+  onCreate, onUpdate, onDelete, onUploadPortrait, onDeletePortrait, onLightbox,
   onNavigateToQuest, onUnlinkNpc, jumpToId,
 }: Props) {
   const [filterMode, setFilterMode] = useState<'all' | 'location'>('all');
@@ -186,6 +187,8 @@ export default function NPCPanel({
                   onSave={saveEdit} onCancel={() => setEditingId(null)} saving={saving}
                   npcId={npc.id} onUploadPortrait={onUploadPortrait}
                   onSetPortrait={async (id, url) => { await onUpdate(id, { portrait_url: url }); }}
+                  hasPortrait={!!npc.portrait_url}
+                  onDeletePortrait={onDeletePortrait}
                 />
               ) : (
                 <>
@@ -253,9 +256,11 @@ interface FormProps {
   pendingPortraitUrl?:  string | null;
   onPendingFile?:       (f: File | null) => void;
   onPendingUrl?:        (url: string | null) => void;
+  hasPortrait?:         boolean;
+  onDeletePortrait?:    (id: number) => Promise<void>;
 }
 
-function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, npcId, onUploadPortrait, onSetPortrait, pendingPortraitFile, pendingPortraitUrl, onPendingFile, onPendingUrl }: FormProps) {
+function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, npcId, onUploadPortrait, onSetPortrait, pendingPortraitFile, pendingPortraitUrl, onPendingFile, onPendingUrl, hasPortrait, onDeletePortrait }: FormProps) {
   const [showLibrary, setShowLibrary] = useState(false);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -332,6 +337,11 @@ function NPCForm({ state, locations, onChange, onSave, onCancel, saving, isNew, 
             )}
             {onSetPortrait && (
               <button className="btn btn-sm" onClick={() => setShowLibrary(true)}>📚 Library</button>
+            )}
+            {hasPortrait && onDeletePortrait && npcId != null && (
+              <button className="btn btn-sm btn-danger" onClick={async () => {
+                await onDeletePortrait(npcId);
+              }}>🗑 Remove</button>
             )}
           </div>
         </div>

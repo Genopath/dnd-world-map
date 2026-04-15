@@ -39,6 +39,7 @@ function _buildBrowserBackup(data: {
     player_path: data.playerPath.map(e => ({
       id: e.id, location_id: e.location_id,
       position: e.position, travel_type: e.travel_type ?? 'foot',
+      distance: e.distance ?? null, distance_unit: e.distance_unit ?? null,
     })),
     character_paths: data.characterPaths,
   };
@@ -98,6 +99,7 @@ export default function Home() {
   // ── Phase-3 state ───────────────────────────────────────────────────────────
   const [calendarConfig,  setCalendarConfig]  = useState<CalendarConfig | null>(null);
   const [mapStack,        setMapStack]        = useState<number[]>([]);
+  const [submapFogData,   setSubmapFogData]   = useState<string>('1'.repeat(10000));
   const [characterPaths,  setCharacterPaths]  = useState<CharacterPathEntry[]>([]);
 
   // ── Navigation jump state ────────────────────────────────────────────────────
@@ -207,6 +209,14 @@ export default function Home() {
     setCampaignSlug(slug);
     setCampaignName(name);
     setShowCampaignSelector(false);
+    // Reset all per-campaign UI state so nothing leaks across campaigns
+    setSelectedId(null);
+    setMapStack([]);
+    setSubmapFogData('1'.repeat(10000));
+    setNpcJumpId(null);
+    setQuestJumpId(null);
+    setIsAddingPin(false);
+    setFogPaint(false);
   }, []);
 
   // ── Initial load (runs once campaign is selected) ────────────────────────────
@@ -306,6 +316,9 @@ export default function Home() {
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const currentMapId  = mapStack.length > 0 ? mapStack[mapStack.length - 1] : null;
+  // Ref so async callbacks (WS refresh) can read the live value without going stale
+  const currentMapIdRef = useRef(currentMapId);
+  currentMapIdRef.current = currentMapId;
   const currentMapUrl = currentMapId != null
     ? (locations.find(l => l.id === currentMapId)?.submap_image_url ?? null)
     : mapConfig.image_url;
@@ -400,6 +413,10 @@ export default function Home() {
     const { portrait_url } = await api.npcs.uploadPortrait(id, file);
     setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url } : n)));
   }, []);
+  const handleDeleteNpcPortrait = useCallback(async (id: number) => {
+    await api.npcs.deletePortrait(id);
+    setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url: null } : n)));
+  }, []);
 
   // ── Quest handlers ────────────────────────────────────────────────────────────
   const handleCreateQuest = useCallback(async (data: Omit<Quest, 'id' | 'created_at'>) => {
@@ -451,8 +468,19 @@ export default function Home() {
   }, []);
 
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────
-  const handleEnterSubmap    = useCallback((id: number) => setMapStack(prev => [...prev, id]), []);
-  const handleExitSubmap     = useCallback(() => setMapStack(prev => prev.slice(0, -1)), []);
+  const handleEnterSubmap = useCallback(async (id: number) => {
+    setMapStack(prev => [...prev, id]);
+    try {
+      const result = await api.locations.getFog(id);
+      setSubmapFogData(result.data || '1'.repeat(10000));
+    } catch {
+      setSubmapFogData('1'.repeat(10000));
+    }
+  }, []);
+  const handleExitSubmap = useCallback(() => {
+    setMapStack([]);
+    setSubmapFogData('1'.repeat(10000));
+  }, []);
   const handleUpdateCalendar = useCallback(async (data: Partial<Omit<CalendarConfig, 'id'>>) => {
     const updated = await api.calendar.update(data);
     setCalendarConfig(updated);
@@ -516,14 +544,21 @@ export default function Home() {
 
   // ── WebSocket (player mode) ───────────────────────────────────────────────────
   const handleWSRefresh = useCallback(async () => {
-    const [locs, path, fogResult, partyData, factionData, campaignData, calConfig, charPaths, updatedNpcs, updatedQuests] = await Promise.all([
+    const fetches: Promise<unknown>[] = [
       api.locations.list(), api.path.get(), api.fog.get(),
       api.party.list(), api.factions.list(), api.campaign.get(), api.calendar.get(),
       api.characterPaths.listAll(), api.npcs.list(), api.quests.list(),
-    ]);
+    ];
+    const activeSubmap = currentMapIdRef.current;
+    if (activeSubmap != null) fetches.push(api.locations.getFog(activeSubmap));
+
+    const [locs, path, fogResult, partyData, factionData, campaignData, calConfig, charPaths, updatedNpcs, updatedQuests, submapFog] =
+      await Promise.all(fetches) as [Location[], typeof path, {data:string}, PartyMember[], Faction[], CampaignSettings, CalendarConfig, CharacterPathEntry[], NPC[], Quest[], {data:string}|undefined];
+
     setLocations(locs);
     setPlayerPath(path);
-    setFogData(fogResult.data || '1'.repeat(10000));
+    setFogData((fogResult as {data:string}).data || '1'.repeat(10000));
+    if (activeSubmap != null && submapFog) setSubmapFogData(submapFog.data || '1'.repeat(10000));
     setParty(partyData);
     setFactions(factionData);
     setCampaign(campaignData);
@@ -536,9 +571,14 @@ export default function Home() {
 
   // ── Fog handler ───────────────────────────────────────────────────────────────
   const handleFogChange = useCallback(async (data: string) => {
-    setFogData(data);
-    try { await api.fog.update(data); } catch (e) { console.error('Fog save failed:', e); }
-  }, []);
+    if (currentMapId != null) {
+      setSubmapFogData(data);
+      try { await api.locations.updateFog(currentMapId, data); } catch (e) { console.error('Submap fog save failed:', e); }
+    } else {
+      setFogData(data);
+      try { await api.fog.update(data); } catch (e) { console.error('Fog save failed:', e); }
+    }
+  }, [currentMapId]);
 
   // ── Map upload ───────────────────────────────────────────────────────────────
   const handleMapUpload = useCallback(async (file: File) => {
@@ -699,8 +739,14 @@ export default function Home() {
                       <option value={3}>Brush L</option>
                       <option value={5}>Brush XL</option>
                     </select>
-                    <button className="btn btn-sm" onClick={async () => { await api.fog.revealAll(); setFogData('1'.repeat(10000)); }} title="Reveal entire map">Reveal All</button>
-                    <button className="btn btn-sm" onClick={async () => { await api.fog.hideAll(); setFogData('0'.repeat(10000)); }} title="Hide entire map">Hide All</button>
+                    <button className="btn btn-sm" onClick={async () => {
+                      if (currentMapId != null) { await api.locations.revealFog(currentMapId); setSubmapFogData('1'.repeat(10000)); }
+                      else { await api.fog.revealAll(); setFogData('1'.repeat(10000)); }
+                    }} title="Reveal entire map">Reveal All</button>
+                    <button className="btn btn-sm" onClick={async () => {
+                      if (currentMapId != null) { await api.locations.hideFog(currentMapId); setSubmapFogData('0'.repeat(10000)); }
+                      else { await api.fog.hideAll(); setFogData('0'.repeat(10000)); }
+                    }} title="Hide entire map">Hide All</button>
                   </>
                 )}
               </div>
@@ -742,8 +788,8 @@ export default function Home() {
             selectedId={selectedId}
             playerPath={levelPlayerPath} quests={visibleQuests} isAddingPin={isAddingPin && isDMMode}
             mapImageUrl={currentMapUrl} isDMMode={isDMMode}
-            fogData={currentMapId != null ? '1'.repeat(10000) : fogData}
-            fogPaintMode={fogPaint && currentMapId == null}
+            fogData={currentMapId != null ? submapFogData : fogData}
+            fogPaintMode={fogPaint}
             fogBrushMode={fogBrush}
             fogBrushSize={fogSize}
             mapStack={mapStack}
@@ -774,7 +820,7 @@ export default function Home() {
             onAddToPath={handleAddToPath} onRemoveFromPath={handleRemoveFromPath} onReorderPath={handleReorderPath}
             onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
             onCreateNPC={handleCreateNPC} onUpdateNPC={handleUpdateNPC} onDeleteNPC={handleDeleteNPC}
-            onUploadPortrait={handleUploadPortrait}
+            onUploadPortrait={handleUploadPortrait} onDeleteNpcPortrait={handleDeleteNpcPortrait}
             onCreateQuest={handleCreateQuest} onUpdateQuest={handleUpdateQuest} onDeleteQuest={handleDeleteQuest}
             onCreateSession={handleCreateSession} onUpdateSession={handleUpdateSession} onDeleteSession={handleDeleteSession}
             onCreateParty={handleCreateParty} onUpdateParty={handleUpdateParty} onDeleteParty={handleDeleteParty}
@@ -782,6 +828,7 @@ export default function Home() {
             onUpdateCampaign={handleUpdateCampaign}
             onUpdateCalendar={handleUpdateCalendar}
             onEnterSubmap={handleEnterSubmap}
+            isInsideSubmap={mapStack.length > 0}
             onLightbox={setLightboxUrl}
             onAddToCharPath={handleAddToCharPath}
             onRemoveFromCharPath={handleRemoveFromCharPath}

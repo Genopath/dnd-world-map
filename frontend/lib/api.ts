@@ -47,6 +47,10 @@ export const api = {
     deleteImage:   (id: number) => req<{ ok: boolean }>(`/locations/${id}/image`, { method: 'DELETE' }),
     uploadSubmap:  (id: number, file: File) => upload<{ submap_image_url: string }>(`/locations/${id}/submap`, file),
     deleteSubmap:  (id: number) => req<{ ok: boolean }>(`/locations/${id}/submap`, { method: 'DELETE' }),
+    getFog:      (id: number) => req<{ data: string }>(`/locations/${id}/fog`),
+    updateFog:   (id: number, data: string) => req<{ ok: boolean }>(`/locations/${id}/fog`, { method: 'PUT', body: JSON.stringify({ data }) }),
+    revealFog:   (id: number) => req<{ ok: boolean }>(`/locations/${id}/fog/reveal-all`, { method: 'POST' }),
+    hideFog:     (id: number) => req<{ ok: boolean }>(`/locations/${id}/fog/hide-all`, { method: 'POST' }),
   },
   path: {
     get: () => req<PathEntry[]>('/player-path'),
@@ -73,6 +77,8 @@ export const api = {
       req<{ deleted: number }>(`/npcs/${id}`, { method: 'DELETE' }),
     uploadPortrait: (id: number, file: File) =>
       upload<{ portrait_url: string }>(`/npcs/${id}/portrait`, file),
+    deletePortrait: (id: number) =>
+      req<{ ok: boolean }>(`/npcs/${id}/portrait`, { method: 'DELETE' }),
   },
   quests: {
     list: () => req<Quest[]>('/quests'),

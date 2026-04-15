@@ -54,6 +54,7 @@ _MIGRATIONS = [
     "ALTER TABLE player_path ADD COLUMN distance_unit VARCHAR(50)",
     "ALTER TABLE character_paths ADD COLUMN distance REAL",
     "ALTER TABLE character_paths ADD COLUMN distance_unit VARCHAR(50)",
+    "ALTER TABLE locations ADD COLUMN fog_data TEXT",
 ]
 
 

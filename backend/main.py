@@ -8,12 +8,12 @@ import base64
 import json
 import os
 import re
-import shutil
 import uuid
 from pathlib import Path
 from typing import List, Optional, Set
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response as _Response
 from pydantic import BaseModel as _BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -61,7 +61,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 app.mount("/map-files", StaticFiles(directory=str(MAPS_DIR)), name="map-files")
 app.mount("/library", StaticFiles(directory=str(LIBRARY_DIR)), name="library")
 
@@ -165,6 +165,46 @@ def _path_out(entry: models.PlayerPathEntry, db: Session) -> schemas.PathEntryOu
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── DB-backed image storage ───────────────────────────────────────────────────
+# Images are stored as binary blobs in the campaign SQLite DB so they survive
+# redeployments without needing a persistent filesystem volume.
+
+async def _store_image(file: UploadFile, slug: str, db: Session) -> str:
+    """Read the uploaded file and persist it in the campaign DB. Returns serve URL."""
+    image_id = uuid.uuid4().hex
+    data = await file.read()
+    content_type = file.content_type or "image/png"
+    img = models.StoredImage(id=image_id, content_type=content_type, data=data)
+    db.add(img)
+    db.commit()
+    return f"/img/{slug}/{image_id}"
+
+
+def _delete_stored_image(url: str | None, db: Session) -> None:
+    """If the url points to a DB-stored image, delete the blob."""
+    if url and url.startswith("/img/"):
+        parts = url.split("/")   # ['', 'img', slug, image_id]
+        if len(parts) == 4:
+            db.query(models.StoredImage).filter(models.StoredImage.id == parts[3]).delete()
+            db.commit()
+
+
+@app.get("/img/{slug}/{image_id}")
+def serve_stored_image(slug: str, image_id: str):
+    """Serve an image that was stored as a blob in the campaign DB."""
+    from sqlalchemy.orm import sessionmaker as _sm
+    engine = database.get_engine_for_campaign(slug)
+    factory = _sm(autocommit=False, autoflush=False, bind=engine)
+    db = factory()
+    try:
+        img = db.query(models.StoredImage).filter(models.StoredImage.id == image_id).first()
+        if not img:
+            raise HTTPException(status_code=404, detail="Image not found")
+        return _Response(content=bytes(img.data), media_type=img.content_type)
+    finally:
+        db.close()
 
 
 # ── Image library ─────────────────────────────────────────────────────────────
@@ -300,10 +340,42 @@ def delete_location(loc_id: int, db: Session = Depends(get_db)):
     loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
     if not loc:
         raise HTTPException(status_code=404, detail="Location not found")
-    db.delete(loc)
+
+    # Collect all location IDs to delete (the location + all descendants)
+    def _collect_ids(parent_id: int) -> list[int]:
+        ids = [parent_id]
+        children = db.query(models.Location.id).filter(models.Location.parent_id == parent_id).all()
+        for (child_id,) in children:
+            ids.extend(_collect_ids(child_id))
+        return ids
+
+    all_ids = _collect_ids(loc_id)
+
+    # Clean up stored images for every location being deleted
+    for lid in all_ids:
+        doomed = db.query(models.Location).filter(models.Location.id == lid).first()
+        if doomed:
+            for url in (doomed.icon_url, doomed.image_url, doomed.submap_image_url):
+                _delete_stored_image(url, db)
+
+    # Cascade: path entries, character paths, NPC nullify location reference
     db.query(models.PlayerPathEntry).filter(
-        models.PlayerPathEntry.location_id == loc_id
-    ).delete()
+        models.PlayerPathEntry.location_id.in_(all_ids)
+    ).delete(synchronize_session=False)
+    db.query(models.CharacterPath).filter(
+        models.CharacterPath.location_id.in_(all_ids)
+    ).delete(synchronize_session=False)
+    db.query(models.NPC).filter(
+        models.NPC.location_id.in_(all_ids)
+    ).update({"location_id": None}, synchronize_session=False)
+    db.query(models.Quest).filter(
+        models.Quest.location_id.in_(all_ids)
+    ).update({"location_id": None}, synchronize_session=False)
+
+    # Delete all the locations (children first via reverse order to satisfy any FK)
+    for lid in reversed(all_ids):
+        db.query(models.Location).filter(models.Location.id == lid).delete()
+
     db.commit()
     return {"deleted": loc_id}
 
@@ -311,15 +383,12 @@ def delete_location(loc_id: int, db: Session = Depends(get_db)):
 # ── Location images & sub-maps ────────────────────────────────────────────────
 
 @app.post("/locations/{loc_id}/image")
-async def upload_location_image(loc_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_location_image(loc_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
     if not loc:
         raise HTTPException(status_code=404, detail="Location not found")
-    ext = Path(file.filename or "image").suffix or ".png"
-    filename = f"loc_{loc_id}_img{ext}"
-    with open(IMAGES_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    loc.image_url = f"/uploads/images/{filename}"
+    _delete_stored_image(loc.image_url, db)
+    loc.image_url = await _store_image(file, slug, db)
     db.commit()
     return {"image_url": loc.image_url}
 
@@ -329,21 +398,19 @@ def delete_location_image(loc_id: int, db: Session = Depends(get_db)):
     loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
     if not loc:
         raise HTTPException(status_code=404, detail="Location not found")
+    _delete_stored_image(loc.image_url, db)
     loc.image_url = None
     db.commit()
     return {"ok": True}
 
 
 @app.post("/locations/{loc_id}/submap")
-async def upload_location_submap(loc_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_location_submap(loc_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
     if not loc:
         raise HTTPException(status_code=404, detail="Location not found")
-    ext = Path(file.filename or "submap").suffix or ".png"
-    filename = f"submap_{loc_id}{ext}"
-    with open(MAPS_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    loc.submap_image_url = f"/map-files/{filename}"
+    _delete_stored_image(loc.submap_image_url, db)
+    loc.submap_image_url = await _store_image(file, slug, db)
     db.commit()
     return {"submap_image_url": loc.submap_image_url}
 
@@ -353,6 +420,7 @@ def delete_location_submap(loc_id: int, db: Session = Depends(get_db)):
     loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
     if not loc:
         raise HTTPException(status_code=404, detail="Location not found")
+    _delete_stored_image(loc.submap_image_url, db)
     loc.submap_image_url = None
     db.commit()
     return {"ok": True}
@@ -361,15 +429,12 @@ def delete_location_submap(loc_id: int, db: Session = Depends(get_db)):
 # ── Location icon upload ──────────────────────────────────────────────────────
 
 @app.post("/locations/{loc_id}/icon")
-async def upload_location_icon(loc_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_location_icon(loc_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
     if not loc:
         raise HTTPException(status_code=404, detail="Location not found")
-    ext = Path(file.filename or "icon").suffix or ".png"
-    filename = f"loc_{loc_id}{ext}"
-    with open(ICONS_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    loc.icon_url = f"/uploads/icons/{filename}"
+    _delete_stored_image(loc.icon_url, db)
+    loc.icon_url = await _store_image(file, slug, db)
     db.commit()
     return {"icon_url": loc.icon_url}
 
@@ -379,6 +444,7 @@ def delete_location_icon(loc_id: int, db: Session = Depends(get_db)):
     loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
     if not loc:
         raise HTTPException(status_code=404, detail="Location not found")
+    _delete_stored_image(loc.icon_url, db)
     loc.icon_url = None
     db.commit()
     return {"ok": True}
@@ -545,10 +611,12 @@ def get_map_config(slug: str = Depends(database.get_campaign_slug), db: Session 
         db.refresh(config)
     if not config.image_filename:
         return {"image_url": None}
-    # New location: DATA_DIR/maps/ (persistent alongside campaign DB)
+    # DB-stored image (new approach)
+    if config.image_filename.startswith("/img/"):
+        return {"image_url": config.image_filename}
+    # Filesystem fallback (legacy)
     if (MAPS_DIR / config.image_filename).exists():
         return {"image_url": f"/map-files/{config.image_filename}"}
-    # Backward compat: old uploads/world_map.png location
     if (UPLOADS_DIR / config.image_filename).exists():
         return {"image_url": f"/uploads/{config.image_filename}"}
     return {"image_url": None}
@@ -558,19 +626,20 @@ def get_map_config(slug: str = Depends(database.get_campaign_slug), db: Session 
 async def upload_map(file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
-    ext = Path(file.filename or "map.png").suffix or ".png"
-    # Include slug so multiple campaigns don't overwrite each other
-    filename = f"world_map_{slug}{ext}"
-    with open(MAPS_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
     config = db.query(models.MapConfig).first()
+    if config:
+        _delete_stored_image(
+            config.image_filename if config.image_filename and config.image_filename.startswith("/img/") else None,
+            db,
+        )
+    url = await _store_image(file, slug, db)
     if not config:
-        config = models.MapConfig(image_filename=filename)
+        config = models.MapConfig(image_filename=url)
         db.add(config)
     else:
-        config.image_filename = filename
+        config.image_filename = url
     db.commit()
-    return {"image_url": f"/map-files/{filename}"}
+    return {"image_url": url}
 
 
 # ── NPCs ──────────────────────────────────────────────────────────────────────
@@ -617,17 +686,24 @@ def delete_npc(npc_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/npcs/{npc_id}/portrait")
-async def upload_portrait(npc_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_portrait(npc_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     npc = db.query(models.NPC).filter(models.NPC.id == npc_id).first()
     if not npc:
         raise HTTPException(status_code=404, detail="NPC not found")
-    ext = Path(file.filename or "portrait").suffix or ".png"
-    filename = f"npc_{npc_id}{ext}"
-    with open(PORTRAITS_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    npc.portrait_url = f"/uploads/portraits/{filename}"
+    _delete_stored_image(npc.portrait_url, db)
+    npc.portrait_url = await _store_image(file, slug, db)
     db.commit()
     return {"portrait_url": npc.portrait_url}
+
+@app.delete("/npcs/{npc_id}/portrait")
+def delete_npc_portrait(npc_id: int, db: Session = Depends(get_db)):
+    npc = db.query(models.NPC).filter(models.NPC.id == npc_id).first()
+    if not npc:
+        raise HTTPException(status_code=404, detail="NPC not found")
+    _delete_stored_image(npc.portrait_url, db)
+    npc.portrait_url = None
+    db.commit()
+    return {"ok": True}
 
 
 # ── Quests ────────────────────────────────────────────────────────────────────
@@ -709,15 +785,12 @@ def unlink_npc_from_quest(quest_id: int, npc_id: int, db: Session = Depends(get_
 
 
 @app.post("/quests/{quest_id}/image")
-async def upload_quest_image(quest_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_quest_image(quest_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     quest = db.query(models.Quest).filter(models.Quest.id == quest_id).first()
     if not quest:
         raise HTTPException(status_code=404, detail="Quest not found")
-    ext = Path(file.filename or "image").suffix or ".png"
-    filename = f"quest_{quest_id}_img{ext}"
-    with open(IMAGES_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    quest.image_url = f"/uploads/images/{filename}"
+    _delete_stored_image(quest.image_url, db)
+    quest.image_url = await _store_image(file, slug, db)
     db.commit()
     return {"image_url": quest.image_url}
 
@@ -727,6 +800,7 @@ def delete_quest_image(quest_id: int, db: Session = Depends(get_db)):
     quest = db.query(models.Quest).filter(models.Quest.id == quest_id).first()
     if not quest:
         raise HTTPException(status_code=404, detail="Quest not found")
+    _delete_stored_image(quest.image_url, db)
     quest.image_url = None
     db.commit()
     return {"ok": True}
@@ -771,15 +845,12 @@ def delete_session(session_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/sessions/{session_id}/image")
-async def upload_session_image(session_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_session_image(session_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     entry = db.query(models.SessionLog).filter(models.SessionLog.id == session_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Session not found")
-    ext = Path(file.filename or "image").suffix or ".png"
-    filename = f"session_{session_id}_{uuid.uuid4().hex[:8]}{ext}"
-    with open(IMAGES_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    entry.image_url = f"/uploads/images/{filename}"
+    _delete_stored_image(entry.image_url, db)
+    entry.image_url = await _store_image(file, slug, db)
     db.commit()
     return {"image_url": entry.image_url}
 
@@ -789,6 +860,7 @@ def delete_session_image(session_id: int, db: Session = Depends(get_db)):
     entry = db.query(models.SessionLog).filter(models.SessionLog.id == session_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Session not found")
+    _delete_stored_image(entry.image_url, db)
     entry.image_url = None
     db.commit()
     return {"ok": True}
@@ -889,15 +961,12 @@ def delete_party_member(member_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/party/{member_id}/portrait")
-async def upload_party_portrait(member_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_party_portrait(member_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     m = db.query(models.PartyMember).filter(models.PartyMember.id == member_id).first()
     if not m:
         raise HTTPException(status_code=404, detail="Party member not found")
-    ext = Path(file.filename or "portrait").suffix or ".png"
-    filename = f"party_{member_id}_{uuid.uuid4().hex[:8]}{ext}"
-    with open(PORTRAITS_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    m.portrait_url = f"/uploads/portraits/{filename}"
+    _delete_stored_image(m.portrait_url, db)
+    m.portrait_url = await _store_image(file, slug, db)
     db.commit()
     return {"portrait_url": m.portrait_url}
 
@@ -907,6 +976,7 @@ def delete_party_portrait(member_id: int, db: Session = Depends(get_db)):
     m = db.query(models.PartyMember).filter(models.PartyMember.id == member_id).first()
     if not m:
         raise HTTPException(status_code=404, detail="Party member not found")
+    _delete_stored_image(m.portrait_url, db)
     m.portrait_url = None
     db.commit()
     return {"ok": True}
@@ -948,15 +1018,12 @@ def delete_faction(faction_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/factions/{faction_id}/image")
-async def upload_faction_image(faction_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_faction_image(faction_id: int, file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     f = db.query(models.Faction).filter(models.Faction.id == faction_id).first()
     if not f:
         raise HTTPException(status_code=404, detail="Faction not found")
-    ext = Path(file.filename or "image").suffix or ".png"
-    filename = f"faction_{faction_id}_{uuid.uuid4().hex[:8]}{ext}"
-    with open(IMAGES_DIR / filename, "wb") as f_file:
-        shutil.copyfileobj(file.file, f_file)
-    f.image_url = f"/uploads/images/{filename}"
+    _delete_stored_image(f.image_url, db)
+    f.image_url = await _store_image(file, slug, db)
     db.commit()
     return {"image_url": f.image_url}
 
@@ -966,6 +1033,7 @@ def delete_faction_image(faction_id: int, db: Session = Depends(get_db)):
     f = db.query(models.Faction).filter(models.Faction.id == faction_id).first()
     if not f:
         raise HTTPException(status_code=404, detail="Faction not found")
+    _delete_stored_image(f.image_url, db)
     f.image_url = None
     db.commit()
     return {"ok": True}
@@ -1007,6 +1075,45 @@ def fog_reveal_all(db: Session = Depends(get_db)):
 def fog_hide_all(db: Session = Depends(get_db)):
     fog = _get_or_create_fog(db)
     fog.data = "0" * 10000
+    db.commit()
+    return {"ok": True}
+
+
+# ── Per-location (submap) fog ─────────────────────────────────────────────────
+
+_FOG_REVEALED = "1" * 10000
+
+@app.get("/locations/{loc_id}/fog")
+def get_location_fog(loc_id: int, db: Session = Depends(get_db)):
+    loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location not found")
+    return {"data": getattr(loc, "fog_data", None) or _FOG_REVEALED}
+
+@app.put("/locations/{loc_id}/fog")
+def update_location_fog(loc_id: int, payload: schemas.FogUpdate, db: Session = Depends(get_db)):
+    loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location not found")
+    loc.fog_data = payload.data
+    db.commit()
+    return {"ok": True}
+
+@app.post("/locations/{loc_id}/fog/reveal-all")
+def reveal_location_fog(loc_id: int, db: Session = Depends(get_db)):
+    loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location not found")
+    loc.fog_data = _FOG_REVEALED
+    db.commit()
+    return {"ok": True}
+
+@app.post("/locations/{loc_id}/fog/hide-all")
+def hide_location_fog(loc_id: int, db: Session = Depends(get_db)):
+    loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location not found")
+    loc.fog_data = "0" * 10000
     db.commit()
     return {"ok": True}
 
@@ -1059,14 +1166,10 @@ def update_calendar_config(data: schemas.CalendarConfigUpdate, db: Session = Dep
 # ── Handout upload ────────────────────────────────────────────────────────────
 
 @app.post("/handouts/upload")
-async def upload_handout(file: UploadFile = File(...)):
-    stem = Path(file.filename or "handout").stem
-    ext = Path(file.filename or "handout").suffix or ""
-    safe_stem = re.sub(r"[^\w\-]", "_", stem)[:40]
-    filename = f"{uuid.uuid4().hex[:8]}_{safe_stem}{ext}"
-    with open(HANDOUTS_DIR / filename, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    return {"url": f"/uploads/handouts/{filename}", "name": file.filename or filename}
+async def upload_handout(file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
+    original_name = file.filename or "handout"
+    url = await _store_image(file, slug, db)
+    return {"url": url, "name": original_name}
 
 
 # ── Export / Import ───────────────────────────────────────────────────────────
@@ -1076,12 +1179,24 @@ def export_data(db: Session = Depends(get_db)):
     from datetime import datetime as _dt
 
     def _enc(url: str | None) -> str | None:
-        """Read a file from the uploads directory and return it as base64."""
+        """Return image bytes as 'content_type,base64'. Reads from DB blob or filesystem."""
         if not url:
             return None
+        # DB-stored image: /img/{slug}/{id}
+        if url.startswith("/img/"):
+            parts = url.split("/")
+            if len(parts) == 4:
+                img = db.query(models.StoredImage).filter(models.StoredImage.id == parts[3]).first()
+                if img:
+                    return img.content_type + "," + base64.b64encode(bytes(img.data)).decode()
+            return None
+        # Legacy filesystem image
         path = _DATA_DIR / url.lstrip("/")
         try:
-            return base64.b64encode(path.read_bytes()).decode()
+            ext = Path(url).suffix.lower()
+            ct = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                  "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml"}.get(ext.lstrip("."), "image/png")
+            return ct + "," + base64.b64encode(path.read_bytes()).decode()
         except Exception:
             return None
 
@@ -1177,16 +1292,13 @@ def export_data(db: Session = Depends(get_db)):
     fog = db.query(models.FogOfWar).first()
     fog_out = fog.data if fog else ""
 
-    # Map config + image file
+    # Map config — image_filename may now be a /img/ URL or a legacy filename
     map_cfg = db.query(models.MapConfig).first()
     map_filename = (map_cfg.image_filename or "") if map_cfg else ""
-    # Resolve URL for _enc (new MAPS_DIR takes priority, fall back to legacy UPLOADS_DIR)
-    map_url_for_enc = None
-    if map_filename:
-        if (MAPS_DIR / map_filename).exists():
-            map_url_for_enc = f"/maps/{map_filename}"
-        elif (UPLOADS_DIR / map_filename).exists():
-            map_url_for_enc = f"/uploads/{map_filename}"
+    map_url_for_enc = map_filename if map_filename.startswith("/img/") else (
+        f"/maps/{map_filename}" if map_filename and (MAPS_DIR / map_filename).exists() else
+        f"/uploads/{map_filename}" if map_filename and (UPLOADS_DIR / map_filename).exists() else None
+    )
     map_out = {
         "image_filename": map_filename,
         "_image_data": _enc(map_url_for_enc),
@@ -1212,17 +1324,23 @@ def export_data(db: Session = Depends(get_db)):
 
 
 @app.post("/import")
-def import_data(payload: dict, db: Session = Depends(get_db)):
-    def _restore(data_b64: str | None, url: str | None) -> None:
-        """Write embedded base64 file data back to disk."""
-        if not data_b64 or not url:
-            return
-        path = _DATA_DIR / url.lstrip("/")
-        path.parent.mkdir(parents=True, exist_ok=True)
+def import_data(payload: dict, slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
+    def _restore(encoded: str | None) -> str | None:
+        """Store exported image data as a DB blob. Returns new /img/ URL, or None."""
+        if not encoded:
+            return None
+        # Format: "content_type,base64data"
+        if "," in encoded:
+            ct, b64 = encoded.split(",", 1)
+        else:
+            ct, b64 = "image/png", encoded
         try:
-            path.write_bytes(base64.b64decode(data_b64))
+            data = base64.b64decode(b64)
         except Exception:
-            pass
+            return None
+        new_id = uuid.uuid4().hex
+        db.add(models.StoredImage(id=new_id, content_type=ct, data=data))
+        return f"/img/{slug}/{new_id}"
 
     # ── Wipe all tables (dependency-safe order) ────────────────────────────────
     db.query(models.QuestNPCLink).delete()
@@ -1238,6 +1356,7 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
     db.query(models.MapConfig).delete()
     db.query(models.CampaignSettings).delete()
     db.query(models.CalendarConfig).delete()
+    db.query(models.StoredImage).delete()
     db.commit()
 
     # ── Campaign settings ──────────────────────────────────────────────────────
@@ -1254,10 +1373,11 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
 
     # ── Map config ─────────────────────────────────────────────────────────────
     map_raw = payload.get("map_config") or {}
-    if map_raw.get("image_filename"):
-        fn = map_raw["image_filename"]
-        _restore(map_raw.get("_image_data"), f"/maps/{fn}")
-        db.add(models.MapConfig(image_filename=fn))
+    if map_raw.get("_image_data"):
+        map_url = _restore(map_raw["_image_data"])
+        db.add(models.MapConfig(image_filename=map_url))
+    elif map_raw.get("image_filename"):
+        db.add(models.MapConfig(image_filename=map_raw["image_filename"]))
 
     # ── Fog of war ─────────────────────────────────────────────────────────────
     fog_str = payload.get("fog_of_war") or ""
@@ -1266,9 +1386,9 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
 
     # ── Locations ─────────────────────────────────────────────────────────────
     for d in payload.get("locations", []):
-        _restore(d.get("_icon_data"),   d.get("icon_url"))
-        _restore(d.get("_image_data"),  d.get("image_url"))
-        _restore(d.get("_submap_data"), d.get("submap_image_url"))
+        icon_url     = _restore(d.get("_icon_data"))
+        image_url    = _restore(d.get("_image_data"))
+        submap_url   = _restore(d.get("_submap_data"))
         db.add(models.Location(
             id=d["id"],
             name=d["name"],
@@ -1280,15 +1400,16 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             dm_notes=d.get("dm_notes", ""),
             discovered=d.get("discovered", False),
             x=d["x"], y=d["y"],
-            icon_url=d.get("icon_url"),
-            image_url=d.get("image_url"),
+            icon_url=icon_url,
+            image_url=image_url,
             parent_id=d.get("parent_id"),
-            submap_image_url=d.get("submap_image_url"),
+            submap_image_url=submap_url,
+            fog_data=d.get("fog_data"),
         ))
 
     # ── Party members ──────────────────────────────────────────────────────────
     for d in payload.get("party_members", []):
-        _restore(d.get("_portrait_data"), d.get("portrait_url"))
+        portrait_url = _restore(d.get("_portrait_data"))
         db.add(models.PartyMember(
             id=d["id"],
             name=d["name"],
@@ -1301,13 +1422,13 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             ac=d.get("ac", 10),
             conditions=json.dumps(d.get("conditions", [])),
             notes=d.get("notes", ""),
-            portrait_url=d.get("portrait_url"),
+            portrait_url=portrait_url,
             path_color=d.get("path_color", "#c9a84c"),
         ))
 
     # ── NPCs ───────────────────────────────────────────────────────────────────
     for d in payload.get("npcs", []):
-        _restore(d.get("_portrait_data"), d.get("portrait_url"))
+        portrait_url = _restore(d.get("_portrait_data"))
         db.add(models.NPC(
             id=d["id"],
             location_id=d.get("location_id"),
@@ -1315,13 +1436,13 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             role=d.get("role", ""),
             status=d.get("status", "alive"),
             notes=d.get("notes", ""),
-            portrait_url=d.get("portrait_url"),
+            portrait_url=portrait_url,
             is_visible=d.get("is_visible", True),
         ))
 
     # ── Factions ───────────────────────────────────────────────────────────────
     for d in payload.get("factions", []):
-        _restore(d.get("_image_data"), d.get("image_url"))
+        image_url = _restore(d.get("_image_data"))
         db.add(models.Faction(
             id=d["id"],
             name=d["name"],
@@ -1329,13 +1450,13 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             reputation=d.get("reputation", 0),
             notes=d.get("notes", ""),
             color=d.get("color", "#888888"),
-            image_url=d.get("image_url"),
+            image_url=image_url,
             is_visible=d.get("is_visible", True),
         ))
 
     # ── Sessions ───────────────────────────────────────────────────────────────
     for d in payload.get("sessions", []):
-        _restore(d.get("_image_data"), d.get("image_url"))
+        image_url = _restore(d.get("_image_data"))
         db.add(models.SessionLog(
             id=d["id"],
             session_number=d["session_number"],
@@ -1345,7 +1466,7 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             summary=d.get("summary", ""),
             xp_awarded=d.get("xp_awarded", 0),
             loot_notes=d.get("loot_notes", ""),
-            image_url=d.get("image_url"),
+            image_url=image_url,
             is_visible=d.get("is_visible", True),
         ))
 
@@ -1353,7 +1474,7 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
 
     # ── Quests ─────────────────────────────────────────────────────────────────
     for d in payload.get("quests", []):
-        _restore(d.get("_image_data"), d.get("image_url"))
+        image_url = _restore(d.get("_image_data"))
         db.add(models.Quest(
             id=d["id"],
             title=d["title"],
@@ -1362,7 +1483,7 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             description=d.get("description", ""),
             location_id=d.get("location_id"),
             notes=d.get("notes", ""),
-            image_url=d.get("image_url"),
+            image_url=image_url,
             objectives=json.dumps(d.get("objectives", [])),
             quest_giver_id=d.get("quest_giver_id"),
             reward_gold=d.get("reward_gold", 0),
@@ -1389,6 +1510,8 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             location_id=d["location_id"],
             position=d["position"],
             travel_type=d.get("travel_type", "foot"),
+            distance=d.get("distance"),
+            distance_unit=d.get("distance_unit"),
         ))
 
     # ── Character paths ────────────────────────────────────────────────────────
@@ -1399,6 +1522,8 @@ def import_data(payload: dict, db: Session = Depends(get_db)):
             location_id=d["location_id"],
             position=d["position"],
             travel_type=d.get("travel_type", "foot"),
+            distance=d.get("distance"),
+            distance_unit=d.get("distance_unit"),
         ))
 
     db.commit()

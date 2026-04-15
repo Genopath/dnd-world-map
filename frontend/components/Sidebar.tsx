@@ -80,6 +80,7 @@ interface Props {
   onUpdateNPC:        (id: number, data: Partial<NPC>) => Promise<void>;
   onDeleteNPC:        (id: number) => Promise<void>;
   onUploadPortrait:   (id: number, file: File) => Promise<void>;
+  onDeleteNpcPortrait:(id: number) => Promise<void>;
   onCreateQuest:      (data: Omit<Quest, 'id' | 'created_at'>) => Promise<void>;
   onUpdateQuest:      (id: number, data: Partial<Quest>) => Promise<void>;
   onDeleteQuest:      (id: number) => Promise<void>;
@@ -95,6 +96,7 @@ interface Props {
   onUpdateCampaign:   (data: Partial<Omit<CampaignSettings, 'id'>>) => Promise<void>;
   onUpdateCalendar:   (data: Partial<Omit<CalendarConfig, 'id'>>) => Promise<void>;
   onEnterSubmap:      (locationId: number) => void;
+  isInsideSubmap:     boolean;
   onLightbox:         (url: string) => void;
   characterPaths:     CharacterPathEntry[];
   onAddToCharPath:    (memberId: number, locationId: number) => Promise<void>;
@@ -138,12 +140,12 @@ export default function Sidebar({
   party, factions, campaign, calendarConfig,
   characterPaths, activeTab, selectedLocationId, onTabChange, onUpdate, onDelete,
   onAddToPath, onRemoveFromPath, onReorderPath, onSelectLocation,
-  onCreateNPC, onUpdateNPC, onDeleteNPC, onUploadPortrait,
+  onCreateNPC, onUpdateNPC, onDeleteNPC, onUploadPortrait, onDeleteNpcPortrait,
   onCreateQuest, onUpdateQuest, onDeleteQuest,
   onCreateSession, onUpdateSession, onDeleteSession,
   onCreateParty, onUpdateParty, onDeleteParty,
   onCreateFaction, onUpdateFaction, onDeleteFaction,
-  onUpdateCampaign, onUpdateCalendar, onEnterSubmap,
+  onUpdateCampaign, onUpdateCalendar, onEnterSubmap, isInsideSubmap,
   onLightbox,
   onAddToCharPath, onRemoveFromCharPath, onReorderCharPath, onClearCharPath,
   onLinkNpc, onUnlinkNpc, onNavigateToNpc, onNavigateToQuest,
@@ -231,6 +233,7 @@ export default function Sidebar({
               state={editState} isDMMode={isDMMode} locationId={location.id}
               onChange={setEditState} onSave={saveEdit} onCancel={cancelEdit} saving={saving}
               onUpdateLocation={onUpdate}
+              currentIconUrl={location.icon_url} currentImageUrl={location.image_url} currentSubmapUrl={location.submap_image_url}
             />
           ) : (
             <LocationDetail
@@ -242,6 +245,7 @@ export default function Sidebar({
               onRemoveFromPath={() => { const e = playerPath.find(e => e.location_id === location.id); if (e) onRemoveFromPath(e.id); }}
               onLightbox={onLightbox}
               onEnterSubmap={onEnterSubmap}
+              isInsideSubmap={isInsideSubmap}
               onUpdate={onUpdate}
               onNavigateToNpc={id => { onNavigateToNpc(id); onTabChange('npcs'); }}
               onNavigateToQuest={id => { onNavigateToQuest(id); onTabChange('quests'); }}
@@ -255,7 +259,7 @@ export default function Sidebar({
             npcs={npcs} locations={locations} quests={quests} isDMMode={isDMMode}
             selectedLocationId={selectedLocationId}
             onCreate={onCreateNPC} onUpdate={onUpdateNPC} onDelete={onDeleteNPC}
-            onUploadPortrait={onUploadPortrait} onLightbox={onLightbox}
+            onUploadPortrait={onUploadPortrait} onDeletePortrait={onDeleteNpcPortrait} onLightbox={onLightbox}
             onNavigateToQuest={onNavigateToQuest}
             onUnlinkNpc={onUnlinkNpc}
             jumpToId={npcJumpId}
@@ -344,12 +348,13 @@ interface DetailProps {
   onAddToPath: () => void; onRemoveFromPath: () => void;
   onLightbox: (url: string) => void;
   onEnterSubmap: (id: number) => void;
+  isInsideSubmap: boolean;
   onUpdate: (id: number, data: Partial<Location>) => Promise<void>;
   onNavigateToNpc: (id: number) => void;
   onNavigateToQuest: (id: number) => void;
 }
 
-function LocationDetail({ location, isDMMode, isInPath, npcs, quests, onEdit, onDelete, onDuplicate, onAddToPath, onRemoveFromPath, onLightbox, onEnterSubmap, onUpdate, onNavigateToNpc, onNavigateToQuest }: DetailProps) {
+function LocationDetail({ location, isDMMode, isInPath, npcs, quests, onEdit, onDelete, onDuplicate, onAddToPath, onRemoveFromPath, onLightbox, onEnterSubmap, isInsideSubmap, onUpdate, onNavigateToNpc, onNavigateToQuest }: DetailProps) {
   const residents     = npcs.filter(n => n.location_id === location.id);
   const linkedQuests  = quests.filter(q => q.location_id === location.id);
   const type = location.type as LocationType;
@@ -481,7 +486,7 @@ function LocationDetail({ location, isDMMode, isInPath, npcs, quests, onEdit, on
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {location.submap_image_url && (
+        {location.submap_image_url && !isInsideSubmap && (
           <button className="btn btn-sm btn-primary" onClick={() => onEnterSubmap(location.id)}>
             🗺 Enter Sub-Map
           </button>
@@ -505,9 +510,12 @@ interface EditFormProps {
   onChange: (s: EditState) => void;
   onSave: () => void; onCancel: () => void; saving: boolean;
   onUpdateLocation: (id: number, data: Partial<Location>) => Promise<void>;
+  currentIconUrl?: string | null;
+  currentImageUrl?: string | null;
+  currentSubmapUrl?: string | null;
 }
 
-function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation }: EditFormProps) {
+function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentIconUrl, currentImageUrl, currentSubmapUrl }: EditFormProps) {
   const [libraryFor, setLibraryFor] = useState<'icon' | 'image' | 'submap' | null>(null);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -586,6 +594,12 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               }} />
             </label>
             <button className="btn btn-sm" onClick={() => setLibraryFor('icon')}>📚 Library</button>
+            {currentIconUrl && (
+              <button className="btn btn-sm btn-danger" onClick={async () => {
+                try { await api.locations.deleteIcon(locationId); await onUpdateLocation(locationId, {}); }
+                catch (err) { console.error('Icon delete failed:', err); }
+              }}>🗑 Remove</button>
+            )}
           </div>
           <span className="form-hint" style={{ marginTop: 4 }}>Replaces the colored dot on the map pin</span>
         </div>
@@ -605,6 +619,12 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               }} />
             </label>
             <button className="btn btn-sm" onClick={() => setLibraryFor('image')}>📚 Library</button>
+            {currentImageUrl && (
+              <button className="btn btn-sm btn-danger" onClick={async () => {
+                try { await api.locations.deleteImage(locationId); await onUpdateLocation(locationId, {}); }
+                catch (err) { console.error('Image delete failed:', err); }
+              }}>🗑 Remove</button>
+            )}
           </div>
           <span className="form-hint" style={{ marginTop: 4 }}>Hero image shown in location detail</span>
         </div>
@@ -624,6 +644,12 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               }} />
             </label>
             <button className="btn btn-sm" onClick={() => setLibraryFor('submap')}>📚 Library</button>
+            {currentSubmapUrl && (
+              <button className="btn btn-sm btn-danger" onClick={async () => {
+                try { await api.locations.deleteSubmap(locationId); await onUpdateLocation(locationId, {}); }
+                catch (err) { console.error('Sub-map delete failed:', err); }
+              }}>🗑 Remove</button>
+            )}
           </div>
           <span className="form-hint" style={{ marginTop: 4 }}>Allows players to enter this location's interior map</span>
         </div>
