@@ -288,6 +288,18 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .map-breadcrumb button:hover { text-decoration: underline; color: var(--accent-bright); }
 
 /* ── Pins ──────────────────────────────────────────────────────────────────── */
+
+/* Per-type theme colour cascades to all descendants via --loc-color */
+.pin-city        { --loc-color: var(--pin-city); }
+.pin-dungeon     { --loc-color: var(--pin-dungeon); }
+.pin-wilderness  { --loc-color: var(--pin-wilderness); }
+.pin-landmark    { --loc-color: var(--pin-landmark); }
+.pin-hazard      { --loc-color: var(--pin-hazard); }
+.pin-shop        { --loc-color: var(--pin-shop); }
+.pin-inn         { --loc-color: var(--pin-inn); }
+.pin-temple      { --loc-color: var(--pin-temple); }
+.pin-port        { --loc-color: var(--pin-port); }
+
 .pin {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -300,127 +312,187 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   flex-direction: column;
   align-items: center;
 }
+
+/* Teardrop tail — sits just below the icon circle */
+.pin-body::after {
+  content: '';
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 11px solid var(--loc-color, var(--accent));
+  margin-top: -5px;
+  position: relative;
+  z-index: -1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,0.55));
+}
+/* No tail on simple dot pins */
+.pin-body:has(> .pin-dot)::after { display: none; }
+
+/* Small dot fallback */
 .pin-dot {
-  width: 15px;
-  height: 15px;
+  width: 14px; height: 14px;
   border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.3);
-  box-shadow: 0 0 6px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2);
+  background: var(--loc-color, var(--accent));
+  border: 2px solid rgba(0,0,0,0.5);
+  box-shadow:
+    0 0 0 1.5px var(--loc-color, var(--accent)),
+    0 2px 8px rgba(0,0,0,0.7);
   transition: transform 0.15s, box-shadow 0.15s;
   flex-shrink: 0;
 }
 .pin:hover .pin-dot,
-.pin.selected .pin-dot { transform: scale(1.4); }
-.pin.selected .pin-dot { box-shadow: 0 0 0 3px var(--accent), 0 0 14px var(--accent), 0 2px 8px rgba(0,0,0,0.8); }
+.pin.selected .pin-dot { transform: scale(1.45); }
+.pin.selected .pin-dot {
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px var(--accent), 0 0 16px var(--accent);
+}
 .pin.undiscovered .pin-dot { opacity: 0.3; }
 
+/* Label */
 .pin-label {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(8,7,18,0.96);
-  border: 1px solid var(--border-gold);
+  background: rgba(5,4,14,0.96);
+  border: 1px solid var(--loc-color, var(--border-gold));
   color: var(--text);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   font-family: var(--font-display);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   padding: 3px 9px;
   border-radius: 3px;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.75);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 .pin:hover .pin-label,
 .pin.selected .pin-label { opacity: 1; }
-/* When labels toggle is on, always show all labels */
-.labels-on .pin-label { opacity: 1; }
+.labels-on .pin-label    { opacity: 1; }
+
 /* Pin being dragged */
 .pin.pin-dragging { z-index: 20; cursor: grabbing; }
 .pin.pin-dragging .pin-icon-default,
 .pin.pin-dragging .pin-icon-img,
-.pin.pin-dragging .pin-dot { box-shadow: 0 0 0 3px var(--accent), 0 4px 20px rgba(0,0,0,0.8); }
+.pin.pin-dragging .pin-dot {
+  box-shadow: 0 0 0 3px var(--accent), 0 6px 24px rgba(0,0,0,0.9) !important;
+}
 
-.pin-city       .pin-dot { background: var(--pin-city); }
-.pin-dungeon    .pin-dot { background: var(--pin-dungeon); }
-.pin-wilderness .pin-dot { background: var(--pin-wilderness); }
-.pin-landmark   .pin-dot { background: var(--pin-landmark); }
-.pin-hazard     .pin-dot { background: var(--pin-hazard); }
-.pin-shop       .pin-dot { background: var(--pin-shop); }
-.pin-inn        .pin-dot { background: var(--pin-inn); }
-.pin-temple     .pin-dot { background: var(--pin-temple); }
-.pin-port       .pin-dot { background: var(--pin-port); }
-
+/* Quest badge */
 .pin-quest-dot {
   position: absolute;
-  top: -7px; left: -7px;
+  top: -6px; left: -6px;
   min-width: 14px; height: 14px;
   border-radius: 7px;
-  background: #e05c30;
+  background: linear-gradient(135deg, #d94a20, #9a2010);
   color: #fff;
   font-size: 8px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
   padding: 0 3px;
-  border: 1px solid rgba(0,0,0,0.35);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  border: 1.5px solid rgba(0,0,0,0.45);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65), 0 0 6px rgba(217,74,32,0.55);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
   letter-spacing: 0;
 }
 
+/* Path number badge */
 .pin-path-num {
   position: absolute;
-  top: -9px; right: -9px;
-  width: 15px; height: 15px;
-  background: var(--accent);
+  top: -8px; right: -8px;
+  width: 16px; height: 16px;
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent));
   color: #15100a;
-  font-size: 9px; font-weight: 700;
+  font-size: 9px; font-weight: 800;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   pointer-events: none;
-  border: 1px solid rgba(0,0,0,0.3);
+  border: 1.5px solid rgba(0,0,0,0.4);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.6);
 }
 
-/* Custom icon pin */
+/* ── Default type icon (SVG on coloured circle) ── */
+.pin-icon-default {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  /* background colour comes from inline style */
+  border: none;
+  box-shadow:
+    inset 0 -4px 8px rgba(0,0,0,0.45),
+    inset 0 2px 5px rgba(255,255,255,0.13),
+    0 0 0 2.5px rgba(0,0,0,0.7),
+    0 0 0 4.5px var(--loc-color, var(--accent)),
+    0 4px 16px rgba(0,0,0,0.85);
+  transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+/* Glass-shine highlight */
+.pin-icon-default::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 28%,
+    rgba(255,255,255,0.3) 0%,
+    rgba(255,255,255,0.07) 40%,
+    transparent 65%);
+  pointer-events: none;
+  z-index: 2;
+}
+/* SVG icon — white paths on transparent background, no invert needed */
+.pin-icon-svg {
+  width: 58%; height: 58%;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  object-fit: contain;
+  pointer-events: none;
+  position: relative; z-index: 1;
+  flex-shrink: 0;
+}
+.pin:hover .pin-icon-default,
+.pin.selected .pin-icon-default {
+  transform: scale(1.2) translateY(-1px);
+  box-shadow:
+    inset 0 -4px 8px rgba(0,0,0,0.45),
+    inset 0 2px 5px rgba(255,255,255,0.16),
+    0 0 0 2.5px rgba(0,0,0,0.7),
+    0 0 0 5px var(--loc-color, var(--accent)),
+    0 0 0 7.5px rgba(0,0,0,0.25),
+    0 6px 22px rgba(0,0,0,0.9),
+    0 0 20px color-mix(in srgb, var(--loc-color, var(--accent)) 65%, transparent);
+}
+.pin.undiscovered .pin-icon-default { opacity: 0.3; }
+
+/* ── Custom uploaded icon ── */
 .pin-icon-img {
-  width: 34px; height: 34px;
+  width: 38px; height: 38px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(201,168,76,0.5);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.7);
+  border: none;
+  box-shadow:
+    0 0 0 2.5px rgba(0,0,0,0.7),
+    0 0 0 4.5px var(--loc-color, var(--accent)),
+    0 4px 16px rgba(0,0,0,0.85);
   transition: transform 0.15s, box-shadow 0.15s;
   flex-shrink: 0;
 }
 .pin:hover .pin-icon-img,
 .pin.selected .pin-icon-img {
-  transform: scale(1.25);
-  box-shadow: 0 0 0 3px var(--accent), 0 0 14px rgba(201,168,76,0.5);
+  transform: scale(1.2) translateY(-1px);
+  box-shadow:
+    0 0 0 2.5px rgba(0,0,0,0.7),
+    0 0 0 5px var(--loc-color, var(--accent)),
+    0 0 0 7.5px rgba(0,0,0,0.25),
+    0 6px 22px rgba(0,0,0,0.9),
+    0 0 20px color-mix(in srgb, var(--loc-color, var(--accent)) 65%, transparent);
 }
-/* Default game-icon pin (type icon on colored background) */
-.pin-icon-default {
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  border: 2px solid rgba(255,255,255,0.15);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.7);
-  transition: transform 0.15s, box-shadow 0.15s;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-.pin-icon-svg {
-  width: 65%; height: 65%;
-  filter: invert(1);
-  object-fit: contain;
-  pointer-events: none;
-}
-.pin:hover .pin-icon-default,
-.pin.selected .pin-icon-default {
-  transform: scale(1.25);
-  box-shadow: 0 0 0 3px var(--accent), 0 0 14px rgba(201,168,76,0.5);
-}
-.pin.undiscovered .pin-icon-default { opacity: 0.3; }
+.pin.undiscovered .pin-icon-img { opacity: 0.3; }
 
 /* ── Sidebar ───────────────────────────────────────────────────────────────── */
 .sidebar {
