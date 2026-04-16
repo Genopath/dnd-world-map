@@ -141,6 +141,7 @@ export default function Home() {
   const [showPinLabels,   setShowPinLabels]   = useState(() => typeof window !== 'undefined' && localStorage.getItem('show_pin_labels') === '1');
   const [showDistLabels,  setShowDistLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_dist_labels') !== '0' : true);
   const [showTimeLabels,  setShowTimeLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_time_labels') !== '0' : true);
+  const [showScaleBar,    setShowScaleBar]    = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_scale_bar') !== '0' : true);
   const [fitTrigger,      setFitTrigger]      = useState(0);
 
   // ── Phase-1 state ───────────────────────────────────────────────────────────
@@ -388,7 +389,16 @@ export default function Home() {
   const visibleSessions = isDMMode ? sessions : sessions.filter(s => s.is_visible !== false);
 
   // ── Derived state ───────────────────────────────────────────────────────────
-  const currentMapId  = mapStack.length > 0 ? mapStack[mapStack.length - 1] : null;
+  const currentMapId    = mapStack.length > 0 ? mapStack[mapStack.length - 1] : null;
+  const currentMapScale = (() => {
+    if (currentMapId != null) {
+      const loc = locations.find(l => l.id === currentMapId);
+      return (loc?.scale_value != null && loc.scale_unit)
+        ? { value: loc.scale_value, unit: loc.scale_unit } : null;
+    }
+    return (mapConfig.scale_value != null && mapConfig.scale_unit)
+      ? { value: mapConfig.scale_value, unit: mapConfig.scale_unit } : null;
+  })();
   // Ref so async callbacks (WS refresh) can read the live value without going stale
   const currentMapIdRef = useRef(currentMapId);
   currentMapIdRef.current = currentMapId;
@@ -788,6 +798,18 @@ export default function Home() {
     scheduleIdbBackup();
   }, [mapStack, campaignSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleSetMapScale = useCallback(async (value: number, unit: string) => {
+    if (currentMapId != null) {
+      // Submap — scale stored on the location record
+      await api.locations.update(currentMapId, { scale_value: value, scale_unit: unit });
+      setLocations(prev => prev.map(l => l.id === currentMapId ? { ...l, scale_value: value, scale_unit: unit } : l));
+    } else {
+      // World map — scale stored in map config
+      const updated = await api.map.updateScale({ scale_value: value, scale_unit: unit });
+      setMapConfig(prev => ({ ...prev, scale_value: updated.scale_value, scale_unit: updated.scale_unit }));
+    }
+  }, [currentMapId]);
+
   // ── Export / Import ───────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
     const data = await api.data.export();
@@ -968,6 +990,11 @@ export default function Home() {
                 title="Toggle travel time labels on paths"
                 onClick={() => setShowTimeLabels(v => { const next = !v; localStorage.setItem('show_time_labels', next ? '1' : '0'); return next; })}
               >⏱ Time</button>
+              <button
+                className={`btn btn-sm ${showScaleBar ? 'btn-active' : ''}`}
+                title={currentMapScale ? 'Toggle scale bar' : 'Toggle scale bar (no scale set — click ✏ on map to set)'}
+                onClick={() => setShowScaleBar(v => { const next = !v; localStorage.setItem('show_scale_bar', next ? '1' : '0'); return next; })}
+              >📐 Scale</button>
               <label className="btn" style={{ cursor: 'pointer' }}>
                 {mapStack.length > 0 ? 'Upload Submap' : 'Upload Map'}
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
@@ -1019,6 +1046,9 @@ export default function Home() {
             waypointMode={waypointMode}
             onSaveWaypoints={handleSaveWaypoints}
             onCancelWaypoints={handleCancelWaypoints}
+            mapScale={currentMapScale}
+            showScaleBar={showScaleBar}
+            onSetMapScale={handleSetMapScale}
           />
           <Sidebar
             location={selectedLocation} isDMMode={isDMMode}

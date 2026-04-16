@@ -64,6 +64,10 @@ _MIGRATIONS = [
     "ALTER TABLE player_path ADD COLUMN travel_time_unit VARCHAR(50)",
     "ALTER TABLE character_paths ADD COLUMN travel_time REAL",
     "ALTER TABLE character_paths ADD COLUMN travel_time_unit VARCHAR(50)",
+    "ALTER TABLE map_config ADD COLUMN scale_value REAL",
+    "ALTER TABLE map_config ADD COLUMN scale_unit VARCHAR(50)",
+    "ALTER TABLE locations ADD COLUMN scale_value REAL",
+    "ALTER TABLE locations ADD COLUMN scale_unit VARCHAR(50)",
 ]
 
 

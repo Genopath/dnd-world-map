@@ -16,7 +16,9 @@ export interface Location {
   image_url?: string | null;
   parent_id?: number | null;
   submap_image_url?: string | null;
-  pin_size?: 'sm' | 'md' | 'lg';
+  pin_size?:    'sm' | 'md' | 'lg';
+  scale_value?: number | null;
+  scale_unit?:  string | null;
   created_at?: string;
 }
 
@@ -36,7 +38,9 @@ export interface PathEntry {
 }
 
 export interface MapConfig {
-  image_url: string | null;
+  image_url:   string | null;
+  scale_value?: number | null;
+  scale_unit?:  string | null;
 }
 
 export interface NPC {

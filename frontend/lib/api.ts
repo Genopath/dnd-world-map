@@ -66,6 +66,8 @@ export const api = {
   map: {
     config: () => req<MapConfig>('/map-config'),
     upload: (file: File) => upload<MapConfig>('/map-config/upload', file),
+    updateScale: (data: { scale_value?: number | null; scale_unit?: string | null }) =>
+      req<MapConfig>('/map-config', { method: 'PATCH', body: JSON.stringify(data) }),
   },
   npcs: {
     list: () => req<NPC[]>('/npcs'),

@@ -606,6 +606,26 @@ def clear_character_path(member_id: int, db: Session = Depends(get_db)):
 
 # ── Map Config / Upload ───────────────────────────────────────────────────────
 
+def _map_config_out(config: models.MapConfig) -> dict:
+    """Build the map-config response dict from a MapConfig row."""
+    fn = config.image_filename or ""
+    if not fn:
+        image_url = None
+    elif fn.startswith("/img/"):
+        image_url = fn
+    elif (MAPS_DIR / fn).exists():
+        image_url = f"/map-files/{fn}"
+    elif (UPLOADS_DIR / fn).exists():
+        image_url = f"/uploads/{fn}"
+    else:
+        image_url = None
+    return {
+        "image_url":   image_url,
+        "scale_value": getattr(config, "scale_value", None),
+        "scale_unit":  getattr(config, "scale_unit", None),
+    }
+
+
 @app.get("/map-config")
 def get_map_config(slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     config = db.query(models.MapConfig).first()
@@ -614,17 +634,21 @@ def get_map_config(slug: str = Depends(database.get_campaign_slug), db: Session 
         db.add(config)
         db.commit()
         db.refresh(config)
-    if not config.image_filename:
-        return {"image_url": None}
-    # DB-stored image (new approach)
-    if config.image_filename.startswith("/img/"):
-        return {"image_url": config.image_filename}
-    # Filesystem fallback (legacy)
-    if (MAPS_DIR / config.image_filename).exists():
-        return {"image_url": f"/map-files/{config.image_filename}"}
-    if (UPLOADS_DIR / config.image_filename).exists():
-        return {"image_url": f"/uploads/{config.image_filename}"}
-    return {"image_url": None}
+    return _map_config_out(config)
+
+
+@app.patch("/map-config")
+def patch_map_config(data: schemas.MapConfigUpdate, db: Session = Depends(get_db)):
+    config = db.query(models.MapConfig).first()
+    if not config:
+        config = models.MapConfig()
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+    for field in data.model_fields_set:
+        setattr(config, field, getattr(data, field))
+    db.commit()
+    return _map_config_out(config)
 
 
 @app.post("/map-config/upload")
@@ -644,7 +668,7 @@ async def upload_map(file: UploadFile = File(...), slug: str = Depends(database.
     else:
         config.image_filename = url
     db.commit()
-    return {"image_url": url}
+    return _map_config_out(config)
 
 
 # ── NPCs ──────────────────────────────────────────────────────────────────────
@@ -1306,7 +1330,9 @@ def export_data(db: Session = Depends(get_db)):
     )
     map_out = {
         "image_filename": map_filename,
-        "_image_data": _enc(map_url_for_enc),
+        "_image_data":    _enc(map_url_for_enc),
+        "scale_value":    getattr(map_cfg, "scale_value", None) if map_cfg else None,
+        "scale_unit":     getattr(map_cfg, "scale_unit",  None) if map_cfg else None,
     }
 
     return {
@@ -1386,8 +1412,12 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
         # source campaign's DB and are meaningless in the destination campaign.
         if not fn.startswith("/img/"):
             map_url = fn
-    if map_url:
-        db.add(models.MapConfig(image_filename=map_url))
+    if map_url or map_raw.get("scale_value") is not None:
+        db.add(models.MapConfig(
+            image_filename=map_url or "",
+            scale_value=map_raw.get("scale_value"),
+            scale_unit=map_raw.get("scale_unit"),
+        ))
 
     # ── Fog of war ─────────────────────────────────────────────────────────────
     fog_str = payload.get("fog_of_war") or ""

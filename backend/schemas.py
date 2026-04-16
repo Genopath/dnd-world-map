@@ -33,7 +33,9 @@ class LocationUpdate(BaseModel):
     icon_url: Optional[str] = None
     image_url: Optional[str] = None
     submap_image_url: Optional[str] = None
-    pin_size: Optional[str] = None
+    pin_size:    Optional[str]   = None
+    scale_value: Optional[float] = None
+    scale_unit:  Optional[str]   = None
 
 
 class LocationOut(BaseModel):
@@ -53,6 +55,8 @@ class LocationOut(BaseModel):
     parent_id: Optional[int] = None
     submap_image_url: Optional[str] = None
     pin_size: str = 'md'
+    scale_value: Optional[float] = None
+    scale_unit:  Optional[str]   = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -372,6 +376,18 @@ class CharacterPathEntryOut(BaseModel):
     travel_time_unit: Optional[str] = None
     visited_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
+
+
+# ── Map Config ────────────────────────────────────────────────────────────────
+
+class MapConfigOut(BaseModel):
+    image_url:   Optional[str]   = None
+    scale_value: Optional[float] = None
+    scale_unit:  Optional[str]   = None
+
+class MapConfigUpdate(BaseModel):
+    scale_value: Optional[float] = None
+    scale_unit:  Optional[str]   = None
 
 
 # ── Calendar Config ───────────────────────────────────────────────────────────

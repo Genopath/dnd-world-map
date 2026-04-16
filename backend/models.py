@@ -24,6 +24,8 @@ class Location(Base):
     submap_image_url = Column(String(500), nullable=True) # interior map image
     fog_data         = Column(Text, nullable=True)         # per-submap fog (10000-char '0'/'1')
     pin_size         = Column(String(10), default='md')    # 'sm' | 'md' | 'lg'
+    scale_value      = Column(Float, nullable=True)         # per-submap scale: map is X units wide
+    scale_unit       = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -46,8 +48,10 @@ class PlayerPathEntry(Base):
 class MapConfig(Base):
     __tablename__ = "map_config"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id             = Column(Integer, primary_key=True, index=True)
     image_filename = Column(String(500), default="")
+    scale_value    = Column(Float, nullable=True)
+    scale_unit     = Column(String(50), nullable=True)
 
 
 class NPC(Base):

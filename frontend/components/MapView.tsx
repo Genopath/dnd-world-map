@@ -98,6 +98,10 @@ interface Props {
   onDuplicateLocation?: (loc: Location) => void;
   onAddToPath?:       (locationId: number) => void;
   onEnterSubmap?:     (id: number) => void;
+  // Scale bar
+  mapScale?:          { value: number; unit: string } | null;
+  showScaleBar?:      boolean;
+  onSetMapScale?:     (value: number, unit: string) => void;
   // Waypoint drawing — freehand drag on map
   waypointMode?:      { entryId: number; isChar: boolean } | null;
   onSaveWaypoints?:   (entryId: number, pts: [number, number][], isChar: boolean) => void;
@@ -119,7 +123,8 @@ function ptsToPolyline(pts: [number, number][], mapEl: HTMLElement): string {
   return pts.map(([x, y]) => `${((x / 100) * w).toFixed(1)},${((y / 100) * h).toFixed(1)}`).join(' ');
 }
 
-// Render an arrowhead polygon at the midpoint of a % path, in SVG pixel space.
+// Render arrowhead polygon(s) on a % path, in SVG pixel space.
+// fwd arrow at 70% of path, rev arrow at 30% — offset from label at geometric midpoint.
 function ArrowAtMid({ pts, mapEl, color, direction }: {
   pts:       [number, number][];
   mapEl:     HTMLElement;
@@ -144,34 +149,121 @@ function ArrowAtMid({ pts, mapEl, color, direction }: {
   const total = cuml[cuml.length - 1];
   if (total < 5) return null;
 
-  // Find the point at 50% of total length
-  const half = total / 2;
-  let si = 1;
-  while (si < px.length - 1 && cuml[si] < half) si++;
-  const frac = (half - cuml[si - 1]) / (cuml[si] - cuml[si - 1]);
-  const cx = px[si - 1][0] + frac * (px[si][0] - px[si - 1][0]);
-  const cy = px[si - 1][1] + frac * (px[si][1] - px[si - 1][1]);
-  const angle = Math.atan2(px[si][1] - px[si - 1][1], px[si][0] - px[si - 1][0]) * 180 / Math.PI;
-
-  // Arrow triangle: tip at (0,0), base at (-S, ±S*0.45)
   const S = 10;
   const aPts = `0,0 ${-S},${(S * 0.45).toFixed(1)} ${-S},${(-S * 0.45).toFixed(1)}`;
-  const tx = cx.toFixed(1);
-  const ty = cy.toFixed(1);
+
+  function arrowAt(frac: number, flip: boolean) {
+    const target = total * frac;
+    let si = 1;
+    while (si < px.length - 1 && cuml[si] < target) si++;
+    const t = (target - cuml[si - 1]) / (cuml[si] - cuml[si - 1]);
+    const cx = px[si - 1][0] + t * (px[si][0] - px[si - 1][0]);
+    const cy = px[si - 1][1] + t * (px[si][1] - px[si - 1][1]);
+    const baseAngle = Math.atan2(px[si][1] - px[si - 1][1], px[si][0] - px[si - 1][0]) * 180 / Math.PI;
+    const angle = flip ? baseAngle + 180 : baseAngle;
+    return (
+      <polygon key={`${frac}-${flip}`} points={aPts} fill={color} opacity={0.95}
+        transform={`translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${angle.toFixed(1)})`}
+        style={{ pointerEvents: 'none' }} />
+    );
+  }
 
   return (
     <>
-      {direction !== 'backward' && (
-        <polygon points={aPts} fill={color} opacity={0.95}
-          transform={`translate(${tx},${ty}) rotate(${angle.toFixed(1)})`}
-          style={{ pointerEvents: 'none' }} />
-      )}
-      {direction !== 'forward' && (
-        <polygon points={aPts} fill={color} opacity={0.95}
-          transform={`translate(${tx},${ty}) rotate(${(angle + 180).toFixed(1)})`}
-          style={{ pointerEvents: 'none' }} />
-      )}
+      {direction !== 'backward'  && arrowAt(0.70, false)}
+      {direction !== 'forward'   && arrowAt(0.30, true)}
     </>
+  );
+}
+
+// ── Scale bar ─────────────────────────────────────────────────────────────────
+const SCALE_UNITS = ['miles', 'km', 'leagues', 'feet', 'yards', 'meters', 'AU', 'hexes', 'squares'];
+const NICE_SCALE  = [1,2,5,10,25,50,100,200,250,500,1000,2000,5000,10000,25000,50000];
+
+function ScaleBar({ totalValue, unit, isDM, onSet }: {
+  totalValue: number;
+  unit:       string;
+  isDM:       boolean;
+  onSet?:     (v: number, u: string) => void;
+}) {
+  const [editing,  setEditing]  = useState(false);
+  const [editVal,  setEditVal]  = useState(String(totalValue));
+  const [editUnit, setEditUnit] = useState(unit);
+
+  // Keep edit fields in sync when external value changes
+  useEffect(() => { setEditVal(String(totalValue)); setEditUnit(unit); }, [totalValue, unit]);
+
+  // Pick a nice reference distance ≈ 15% of total map width
+  const target  = totalValue * 0.15;
+  const refDist = NICE_SCALE.reduce((best, n) =>
+    n < totalValue && Math.abs(n - target) < Math.abs(best - target) ? n : best,
+    NICE_SCALE[0]);
+  const barPct  = (refDist / totalValue) * 100;
+
+  function save() {
+    const v = parseFloat(editVal);
+    if (!isNaN(v) && v > 0 && onSet) onSet(v, editUnit);
+    setEditing(false);
+  }
+
+  const barStyle: React.CSSProperties = {
+    position: 'absolute', bottom: 52, left: 16, zIndex: 20,
+    userSelect: 'none', pointerEvents: 'all',
+  };
+
+  if (editing) {
+    return (
+      <div data-no-draw style={{ ...barStyle, background: '#1a2535e0', padding: '7px 10px', borderRadius: 6, display: 'flex', gap: 6, alignItems: 'center', border: '1px solid #3a5070' }}>
+        <span style={{ fontSize: 11, color: '#b8d0f0', flexShrink: 0 }}>Map width:</span>
+        <input
+          type="number" min="1" value={editVal} autoFocus
+          style={{ width: 72, fontSize: 12, padding: '2px 4px', borderRadius: 3 }}
+          onChange={e => setEditVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+        />
+        <select value={editUnit} style={{ fontSize: 12, padding: '2px 2px', borderRadius: 3 }}
+          onChange={e => setEditUnit(e.target.value)}>
+          {SCALE_UNITS.map(u => <option key={u}>{u}</option>)}
+        </select>
+        <button data-no-draw onClick={save}
+          style={{ fontSize: 12, padding: '2px 8px', background: '#2a4a2a', border: '1px solid #4a8a4a', borderRadius: 3, color: '#8d8', cursor: 'pointer' }}>
+          ✓
+        </button>
+        <button data-no-draw onClick={() => setEditing(false)}
+          style={{ fontSize: 12, padding: '2px 8px', background: '#3a2a2a', border: '1px solid #8a4a4a', borderRadius: 3, color: '#d88', cursor: 'pointer' }}>
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div data-no-draw style={barStyle} onMouseDown={e => e.stopPropagation()}>
+      {/* Bar */}
+      <div style={{
+        width: `${barPct}%`, minWidth: 40, maxWidth: '40%',
+        height: 3, background: '#fff',
+        borderLeft: '2px solid #fff', borderRight: '2px solid #fff', borderBottom: '2px solid #fff',
+        boxShadow: '0 0 5px rgba(0,0,0,0.8)',
+        marginBottom: 3,
+      }} />
+      {/* Label */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{
+          fontSize: 11, fontWeight: 700, color: '#fff',
+          textShadow: '0 0 4px #000, 0 0 4px #000',
+        }}>
+          {refDist.toLocaleString()} {unit}
+        </span>
+        {isDM && onSet && (
+          <button data-no-draw
+            onClick={() => setEditing(true)}
+            style={{ fontSize: 10, padding: '1px 5px', background: '#1e2d4a90', border: '1px solid #3a5070', borderRadius: 3, color: '#7090c0', cursor: 'pointer' }}>
+            ✏
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -208,6 +300,9 @@ export default function MapView({
   onDuplicateLocation,
   onAddToPath,
   onEnterSubmap,
+  mapScale,
+  showScaleBar = true,
+  onSetMapScale,
   waypointMode,
   onSaveWaypoints,
   onCancelWaypoints,
@@ -749,12 +844,12 @@ export default function MapView({
                   filter="url(#glow)">
                   {style.symbol}
                   {distLabel && (
-                    <tspan x={`${mx}%`} dy="13" fontSize="9"
-                      fill="#ffe58a" stroke="#000" strokeWidth="2" paintOrder="stroke">{distLabel}</tspan>
+                    <tspan x={`${mx}%`} dy="14" fontSize="9"
+                      style={{ fill: '#ffe58a', stroke: '#000', strokeWidth: '2.5', paintOrder: 'stroke' }}>{distLabel}</tspan>
                   )}
                   {timeLabel && (
-                    <tspan x={`${mx}%`} dy={distLabel ? '11' : '13'} fontSize="9"
-                      fill="#80d8ff" stroke="#000" strokeWidth="2" paintOrder="stroke">{timeLabel}</tspan>
+                    <tspan x={`${mx}%`} dy={distLabel ? '12' : '14'} fontSize="9"
+                      style={{ fill: '#80d8ff', stroke: '#000', strokeWidth: '2.5', paintOrder: 'stroke' }}>{timeLabel}</tspan>
                   )}
                 </text>
               </g>
@@ -847,6 +942,16 @@ export default function MapView({
             </div>
           );
         })}
+
+        {/* ── Scale bar ──────────────────────────────────────────────────── */}
+        {showScaleBar && mapScale && mapScale.value > 0 && (
+          <ScaleBar
+            totalValue={mapScale.value}
+            unit={mapScale.unit}
+            isDM={isDMMode}
+            onSet={onSetMapScale}
+          />
+        )}
       </div>
 
       {/* ── Type filter strip ──────────────────────────────────────────────── */}
