@@ -14,9 +14,11 @@ interface Props {
 export default function FogCanvas({ fogData, isDMMode, paintMode, brushMode, brushSize, onFogChange }: Props) {
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const isPainting = useRef(false);
-  const localFog   = useRef<string>(fogData);
-  // Sync localFog when prop changes (e.g. reveal-all / hide-all)
-  useEffect(() => { localFog.current = fogData; }, [fogData]);
+  const localFog   = useRef<string>(fogData); // accumulates in-progress brush strokes
+  // Updated synchronously on every render — always current, never stale in async callbacks.
+  // This prevents the ResizeObserver from drawing old fog when the map image changes.
+  const fogDataRef = useRef<string>(fogData);
+  fogDataRef.current = fogData;
 
   // ── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -35,7 +37,10 @@ export default function FogCanvas({ fogData, isDMMode, paintMode, brushMode, bru
     const fogOpacity = isDMMode ? 0.6 : 1.0;
     ctx.fillStyle = `rgba(0,0,0,${fogOpacity})`;
 
-    const data = localFog.current;
+    // While actively painting, use localFog (has unsaved strokes).
+    // Otherwise always read from fogDataRef so async callbacks (ResizeObserver)
+    // never render stale fog after a map switch.
+    const data = isPainting.current ? localFog.current : fogDataRef.current;
     for (let row = 0; row < GRID; row++) {
       for (let col = 0; col < GRID; col++) {
         const idx = row * GRID + col;
@@ -46,8 +51,9 @@ export default function FogCanvas({ fogData, isDMMode, paintMode, brushMode, bru
     }
   }, [isDMMode]);
 
-  // Re-draw whenever fogData or mode changes
-  useEffect(() => { draw(); }, [fogData, isDMMode, draw]);
+  // Re-draw whenever fogData or mode changes; also sync localFog so new strokes
+  // start from the current server state rather than a stale snapshot.
+  useEffect(() => { localFog.current = fogData; draw(); }, [fogData, isDMMode, draw]);
 
   // ── Resize observer ───────────────────────────────────────────────────────
   useEffect(() => {
