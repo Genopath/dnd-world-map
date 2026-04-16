@@ -142,6 +142,7 @@ export default function Home() {
   const [showDistLabels,  setShowDistLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_dist_labels') !== '0' : true);
   const [showTimeLabels,  setShowTimeLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_time_labels') !== '0' : true);
   const [showScaleBar,    setShowScaleBar]    = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_scale_bar') !== '0' : true);
+  const [rulerMode,       setRulerMode]       = useState(false);
   const [fitTrigger,      setFitTrigger]      = useState(0);
 
   // ── Phase-1 state ───────────────────────────────────────────────────────────
@@ -995,6 +996,11 @@ export default function Home() {
                 title={currentMapScale ? 'Toggle scale bar' : 'Toggle scale bar (no scale set — click ✏ on map to set)'}
                 onClick={() => setShowScaleBar(v => { const next = !v; localStorage.setItem('show_scale_bar', next ? '1' : '0'); return next; })}
               >📐 Scale</button>
+              <button
+                className={`btn btn-sm ${rulerMode ? 'btn-active' : ''}`}
+                title={currentMapScale ? 'Ruler tool — click map to set anchor, move to measure' : 'Ruler tool (set map scale first for distance readout)'}
+                onClick={() => setRulerMode(v => !v)}
+              >📐 Ruler</button>
               <label className="btn" style={{ cursor: 'pointer' }}>
                 {mapStack.length > 0 ? 'Upload Submap' : 'Upload Map'}
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
@@ -1049,6 +1055,7 @@ export default function Home() {
             mapScale={currentMapScale}
             showScaleBar={showScaleBar}
             onSetMapScale={handleSetMapScale}
+            rulerActive={rulerMode}
           />
           <Sidebar
             location={selectedLocation} isDMMode={isDMMode}

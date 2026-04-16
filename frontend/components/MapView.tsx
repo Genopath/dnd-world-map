@@ -102,6 +102,8 @@ interface Props {
   mapScale?:          { value: number; unit: string } | null;
   showScaleBar?:      boolean;
   onSetMapScale?:     (value: number, unit: string) => void;
+  // Ruler tool
+  rulerActive?:       boolean;
   // Waypoint drawing — freehand drag on map
   waypointMode?:      { entryId: number; isChar: boolean } | null;
   onSaveWaypoints?:   (entryId: number, pts: [number, number][], isChar: boolean) => void;
@@ -357,6 +359,7 @@ export default function MapView({
   mapScale,
   showScaleBar = true,
   onSetMapScale,
+  rulerActive = false,
   waypointMode,
   onSaveWaypoints,
   onCancelWaypoints,
@@ -387,6 +390,21 @@ export default function MapView({
   // without needing waypointMode in their deps arrays (avoids stale closure bugs)
   const waypointModeRef = useRef(waypointMode);
   waypointModeRef.current = waypointMode;
+
+  // ── Ruler tool ───────────────────────────────────────────────────────────
+  const [rulerAnchor, setRulerAnchor] = useState<[number, number] | null>(null);
+  const [rulerCursor, setRulerCursor] = useState<[number, number] | null>(null);
+  const rulerActiveRef = useRef(rulerActive);
+  rulerActiveRef.current = rulerActive;
+  // Clear ruler state when tool is deactivated
+  useEffect(() => { if (!rulerActive) { setRulerAnchor(null); setRulerCursor(null); } }, [rulerActive]);
+  // Escape clears current anchor
+  useEffect(() => {
+    if (!rulerActive) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRulerAnchor(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [rulerActive]);
 
   // ── Freehand waypoint drawing ─────────────────────────────────────────────
   const [freehandPts, setFreehandPts] = useState<[number, number][]>([]);
@@ -522,6 +540,17 @@ export default function MapView({
   }, [fogPaintMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // ── Ruler cursor tracking ──────────────────────────────────────────────
+    if (rulerActiveRef.current) {
+      const mapEl = imgRef.current ?? placeholderRef.current;
+      if (mapEl) {
+        const rect = mapEl.getBoundingClientRect();
+        const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+        const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+        setRulerCursor([x, y]);
+      }
+    }
+
     // ── Freehand waypoint drawing ──────────────────────────────────────────
     if (isDrawingWp.current && waypointModeRef.current) {
       const dx = e.clientX - lastSample.current.clientX;
@@ -627,6 +656,12 @@ export default function MapView({
       const y = ((e.clientY - rect.top) / rect.height) * 100;
       if (x < 0 || x > 100 || y < 0 || y > 100) return;
 
+      // ── Ruler: click sets/moves anchor ──────────────────────────────────
+      if (rulerActiveRef.current) {
+        setRulerAnchor([x, y]);
+        return;
+      }
+
       if (isAddingPin) {
         onAddPin(x, y);
       } else {
@@ -706,6 +741,7 @@ export default function MapView({
         fogPaintMode ? 'fog-painting' : '',
         showLabels   ? 'labels-on'    : '',
         waypointMode ? 'waypoint-drawing' : '',
+        rulerActive  ? 'ruler-active'  : '',
       ].filter(Boolean).join(' ')}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -919,6 +955,51 @@ export default function MapView({
               <polyline points={pts} stroke="#7ec8f0" strokeWidth="2" fill="none" opacity="0.8"
                 strokeDasharray="4,4" />
             ) : null;
+          })()}
+
+          {/* ── Ruler overlay ──────────────────────────────────────────── */}
+          {rulerActive && rulerAnchor && rulerCursor && (() => {
+            const [ax, ay] = rulerAnchor;
+            const [cx, cy] = rulerCursor;
+            const mx = (ax + cx) / 2;
+            const my = (ay + cy) / 2;
+            // Compute real-world distance using map scale + image aspect ratio
+            let distLabel = '';
+            if (mapScale && mapScale.value > 0) {
+              const mapEl = imgRef.current;
+              const natW = mapEl?.naturalWidth  || mapEl?.offsetWidth  || 1;
+              const natH = mapEl?.naturalHeight || mapEl?.offsetHeight || 1;
+              const dx = (cx - ax) / 100 * mapScale.value;
+              const dy = (cy - ay) / 100 * mapScale.value * (natH / natW);
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist >= 10000) distLabel = `${(dist / 1000).toFixed(1)}k ${mapScale.unit}`;
+              else if (dist >= 10) distLabel = `${Math.round(dist).toLocaleString()} ${mapScale.unit}`;
+              else if (dist >= 1)  distLabel = `${dist.toFixed(1)} ${mapScale.unit}`;
+              else                 distLabel = `${dist.toFixed(2)} ${mapScale.unit}`;
+            }
+            return (
+              <g>
+                {/* Shadow line */}
+                <line x1={`${ax}%`} y1={`${ay}%`} x2={`${cx}%`} y2={`${cy}%`}
+                  stroke="#000" strokeWidth="3.5" strokeDasharray="10,5" opacity="0.5" />
+                {/* Ruler line */}
+                <line x1={`${ax}%`} y1={`${ay}%`} x2={`${cx}%`} y2={`${cy}%`}
+                  stroke="#f0e060" strokeWidth="1.8" strokeDasharray="10,5" />
+                {/* Anchor dot */}
+                <circle cx={`${ax}%`} cy={`${ay}%`} r="5" fill="#f0e060" stroke="#000" strokeWidth="1.5" />
+                {/* Cursor crosshair */}
+                <circle cx={`${cx}%`} cy={`${cy}%`} r="4" fill="none" stroke="#f0e060" strokeWidth="1.8" />
+                <circle cx={`${cx}%`} cy={`${cy}%`} r="1.5" fill="#f0e060" />
+                {/* Distance label */}
+                {distLabel && (
+                  <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="auto"
+                    fontSize="13" fontWeight="700"
+                    style={{ fill: '#f0e060', stroke: '#000', strokeWidth: '3', paintOrder: 'stroke', userSelect: 'none', pointerEvents: 'none' }}>
+                    {distLabel}
+                  </text>
+                )}
+              </g>
+            );
           })()}
         </svg>
 
