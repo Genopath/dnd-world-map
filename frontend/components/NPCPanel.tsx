@@ -43,6 +43,7 @@ interface Props {
   onNavigateToQuest:  (id: number) => void;
   onUnlinkNpc:        (questId: number, npcId: number) => Promise<void>;
   jumpToId:           number | null;
+  onScheduleBackup?:  () => void;
 }
 
 export default function NPCPanel({
