@@ -54,9 +54,10 @@ interface Props {
   onUpdate: (id: number, data: Partial<Faction>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onLightbox: (url: string) => void;
+  onScheduleBackup?: () => void;
 }
 
-export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, onDelete, onLightbox }: Props) {
+export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, onDelete, onLightbox, onScheduleBackup }: Props) {
   const [editingId,   setEditingId]   = useState<number | 'new' | null>(null);
   const [editState,   setEditState]   = useState<EditState | null>(null);
   const [saving,      setSaving]      = useState(false);
@@ -79,7 +80,7 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
       if (editingId === 'new') {
         const faction = await onCreate(fromEdit(editState));
         if (pendingFile) {
-          try { await api.factions.uploadImage(faction.id, pendingFile); await onUpdate(faction.id, {}); } catch (e) { console.error(e); }
+          try { await api.factions.uploadImage(faction.id, pendingFile); await onUpdate(faction.id, {}); onScheduleBackup?.(); } catch (e) { console.error(e); }
         } else if (pendingUrl) {
           try { await onUpdate(faction.id, { image_url: pendingUrl }); } catch (e) { console.error(e); }
         }
@@ -153,7 +154,7 @@ export default function FactionPanel({ factions, isDMMode, onCreate, onUpdate, o
                     if (editingId === 'new') {
                       setPendingFile(f); setPendingUrl(null);
                     } else if (typeof editingId === 'number') {
-                      try { await api.factions.uploadImage(editingId, f); await onUpdate(editingId, {}); }
+                      try { await api.factions.uploadImage(editingId, f); await onUpdate(editingId, {}); onScheduleBackup?.(); }
                       catch (err) { console.error('Image upload failed:', err); }
                     }
                     e.target.value = '';

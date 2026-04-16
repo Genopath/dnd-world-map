@@ -60,9 +60,10 @@ interface Props {
   onUpdate: (id: number, data: Partial<PartyMember>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onLightbox: (url: string) => void;
+  onScheduleBackup?: () => void;
 }
 
-export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDelete, onLightbox }: Props) {
+export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDelete, onLightbox, onScheduleBackup }: Props) {
   const [editingId,    setEditingId]    = useState<number | 'new' | null>(null);
   const [editState,    setEditState]    = useState<EditState | null>(null);
   const [saving,       setSaving]       = useState(false);
@@ -83,7 +84,7 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
       if (editingId === 'new') {
         const member = await onCreate(fromEdit(editState));
         if (pendingFile) {
-          try { await api.party.uploadPortrait(member.id, pendingFile); await onUpdate(member.id, {}); } catch (e) { console.error(e); }
+          try { await api.party.uploadPortrait(member.id, pendingFile); await onUpdate(member.id, {}); onScheduleBackup?.(); } catch (e) { console.error(e); }
         } else if (pendingUrl) {
           try { await onUpdate(member.id, { portrait_url: pendingUrl }); } catch (e) { console.error(e); }
         }
@@ -181,7 +182,7 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
                   if (editingId === 'new') {
                     setPendingFile(f); setPendingUrl(null);
                   } else if (typeof editingId === 'number') {
-                    try { await api.party.uploadPortrait(editingId, f); await onUpdate(editingId, {}); }
+                    try { await api.party.uploadPortrait(editingId, f); await onUpdate(editingId, {}); onScheduleBackup?.(); }
                     catch (err) { console.error('Portrait upload failed:', err); }
                   }
                   e.target.value = '';

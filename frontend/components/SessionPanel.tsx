@@ -26,9 +26,10 @@ interface Props {
   onUpdate: (id: number, data: Partial<SessionEntry>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onLightbox: (url: string) => void;
+  onScheduleBackup?: () => void;
 }
 
-export default function SessionPanel({ sessions, isDMMode, onCreate, onUpdate, onDelete, onLightbox }: Props) {
+export default function SessionPanel({ sessions, isDMMode, onCreate, onUpdate, onDelete, onLightbox, onScheduleBackup }: Props) {
   const [expandedId,      setExpandedId]      = useState<number | null>(null);
   const [editingId,       setEditingId]       = useState<number | null>(null);
   const [editState,       setEditState]       = useState<EditState | null>(null);
@@ -129,7 +130,7 @@ export default function SessionPanel({ sessions, isDMMode, onCreate, onUpdate, o
                         <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          try { await api.sessions.uploadImage(s.id, f); await onUpdate(s.id, {}); }
+                          try { await api.sessions.uploadImage(s.id, f); await onUpdate(s.id, {}); onScheduleBackup?.(); }
                           catch (err) { console.error('Image upload failed:', err); }
                           e.target.value = '';
                         }} />

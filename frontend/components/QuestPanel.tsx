@@ -113,11 +113,13 @@ interface Props {
   onUnlinkNpc:      (questId: number, npcId: number) => Promise<void>;
   onNavigateToNpc:  (id: number) => void;
   jumpToId:         number | null;
+  onScheduleBackup?: () => void;
 }
 
 export default function QuestPanel({
   quests, locations, npcs, factions, sessions, isDMMode,
   onCreate, onUpdate, onDelete, onLightbox, onLinkNpc, onUnlinkNpc, onNavigateToNpc, jumpToId,
+  onScheduleBackup,
 }: Props) {
   const [filter,        setFilter]        = useState<Filter>('all');
   const [expandedId,    setExpandedId]    = useState<number | null>(null);
@@ -305,6 +307,7 @@ export default function QuestPanel({
                     onStartEdit={() => startEdit(q)}
                     onToggleObjective={toggleObjective}
                     onCreate={onCreate}
+                    onScheduleBackup={onScheduleBackup}
                   />
                 )}
               </div>
@@ -354,9 +357,10 @@ interface DetailProps {
   onStartEdit:        () => void;
   onToggleObjective:  (q: Quest, id: number) => Promise<void>;
   onCreate:           (data: Omit<Quest, 'id' | 'created_at'>) => Promise<void>;
+  onScheduleBackup?:  () => void;
 }
 
-function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode, onUpdate, onDelete, onLightbox, onLinkNpc, onUnlinkNpc, onNavigateToNpc, onStartEdit, onToggleObjective, onCreate }: DetailProps) {
+function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode, onUpdate, onDelete, onLightbox, onLinkNpc, onUnlinkNpc, onNavigateToNpc, onStartEdit, onToggleObjective, onCreate, onScheduleBackup }: DetailProps) {
   const [showLibrary, setShowLibrary] = useState(false);
   const giver        = q.quest_giver_id ? npcs.find(n => n.id === q.quest_giver_id) : null;
   const faction      = q.faction_id     ? factions.find(f => f.id === q.faction_id) : null;
@@ -501,7 +505,7 @@ function QuestDetail({ q, locations, npcs, factions, sessions, quests, isDMMode,
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
               const f = e.target.files?.[0];
               if (!f) return;
-              try { await api.quests.uploadImage(q.id, f); await onUpdate(q.id, {}); }
+              try { await api.quests.uploadImage(q.id, f); await onUpdate(q.id, {}); onScheduleBackup?.(); }
               catch (err) { console.error('Image upload failed:', err); }
               e.target.value = '';
             }} />

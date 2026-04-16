@@ -124,6 +124,7 @@ function _idbBackupAsync(slug: string, force = false): void {
 export default function Home() {
   // ── Campaign selection ──────────────────────────────────────────────────────
   const [campaignSlug,         setCampaignSlug]         = useState<string | null>(null);
+  const _idbBackupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [campaignName,         setCampaignName]         = useState<string>('');
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
 
@@ -482,7 +483,8 @@ export default function Home() {
   const handleUploadPortrait = useCallback(async (id: number, file: File) => {
     const { portrait_url } = await api.npcs.uploadPortrait(id, file);
     setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url } : n)));
-  }, []);
+    scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleDeleteNpcPortrait = useCallback(async (id: number) => {
     await api.npcs.deletePortrait(id);
     setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url: null } : n)));
@@ -666,10 +668,19 @@ export default function Home() {
     } else {
       setMapConfig(await api.map.upload(file));
     }
-    // Force an immediate IndexedDB backup so the new map image is persisted
-    // regardless of the once-per-session throttle.
-    if (campaignSlug) _idbBackupAsync(campaignSlug, true);
-  }, [mapStack, campaignSlug]);
+    // Trigger a fresh IndexedDB backup now that a map image changed.
+    scheduleIdbBackup();
+  }, [mapStack, campaignSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced IDB backup — waits 3 s after the last upload then fires a full export.
+  // Using a debounce avoids concurrent export calls when several images are uploaded in quick succession.
+  const scheduleIdbBackup = useCallback(() => {
+    if (!campaignSlug) return;
+    if (_idbBackupTimerRef.current) clearTimeout(_idbBackupTimerRef.current);
+    _idbBackupTimerRef.current = setTimeout(() => {
+      _idbBackupAsync(campaignSlug, true);
+    }, 3000);
+  }, [campaignSlug]);
 
   // ── Export / Import ───────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
@@ -930,6 +941,7 @@ export default function Home() {
             onUpdateCharPathTravelType={handleUpdateCharPathTravelType}
             onUpdatePathDistance={handleUpdatePathDistance}
             onUpdateCharPathDistance={handleUpdateCharPathDistance}
+            onScheduleBackup={scheduleIdbBackup}
           />
         </div>
       </div>

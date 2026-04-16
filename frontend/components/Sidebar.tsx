@@ -118,6 +118,7 @@ interface Props {
   onUpdatePathDistance?:      (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onUpdateCharPathDistance?:  (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onDuplicateLocation:        (loc: Location) => Promise<void>;
+  onScheduleBackup?:          () => void;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -154,6 +155,7 @@ export default function Sidebar({
   onUpdatePathTravelType, onUpdateCharPathTravelType,
   onUpdatePathDistance, onUpdateCharPathDistance,
   onDuplicateLocation,
+  onScheduleBackup,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [editState,  setEditState]  = useState<EditState | null>(null);
@@ -261,6 +263,7 @@ export default function Sidebar({
             selectedLocationId={selectedLocationId}
             onCreate={onCreateNPC} onUpdate={onUpdateNPC} onDelete={onDeleteNPC}
             onUploadPortrait={onUploadPortrait} onDeletePortrait={onDeleteNpcPortrait} onLightbox={onLightbox}
+            onScheduleBackup={onScheduleBackup}
             onNavigateToQuest={onNavigateToQuest}
             onUnlinkNpc={onUnlinkNpc}
             jumpToId={npcJumpId}
@@ -278,6 +281,7 @@ export default function Sidebar({
             onLinkNpc={onLinkNpc} onUnlinkNpc={onUnlinkNpc}
             onNavigateToNpc={onNavigateToNpc}
             jumpToId={questJumpId}
+            onScheduleBackup={onScheduleBackup}
           />
         )}
 
@@ -287,6 +291,7 @@ export default function Sidebar({
             sessions={sessions} isDMMode={isDMMode}
             onCreate={onCreateSession} onUpdate={onUpdateSession} onDelete={onDeleteSession}
             onLightbox={onLightbox}
+            onScheduleBackup={onScheduleBackup}
           />
         )}
 
@@ -296,6 +301,7 @@ export default function Sidebar({
             party={party} isDMMode={isDMMode}
             onCreate={onCreateParty} onUpdate={onUpdateParty} onDelete={onDeleteParty}
             onLightbox={onLightbox}
+            onScheduleBackup={onScheduleBackup}
           />
         )}
 
@@ -305,6 +311,7 @@ export default function Sidebar({
             factions={factions} isDMMode={isDMMode}
             onCreate={onCreateFaction} onUpdate={onUpdateFaction} onDelete={onDeleteFaction}
             onLightbox={onLightbox}
+            onScheduleBackup={onScheduleBackup}
           />
         )}
 
@@ -602,7 +609,7 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
                 const f = e.target.files?.[0];
                 if (!f) return;
-                try { await api.locations.uploadIcon(locationId, f); await onUpdateLocation(locationId, {}); }
+                try { await api.locations.uploadIcon(locationId, f); await onUpdateLocation(locationId, {}); onScheduleBackup?.(); }
                 catch (err) { console.error('Icon upload failed:', err); }
                 e.target.value = '';
               }} />
@@ -627,7 +634,7 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
                 const f = e.target.files?.[0];
                 if (!f) return;
-                try { await api.locations.uploadImage(locationId, f); await onUpdateLocation(locationId, {}); }
+                try { await api.locations.uploadImage(locationId, f); await onUpdateLocation(locationId, {}); onScheduleBackup?.(); }
                 catch (err) { console.error('Image upload failed:', err); }
                 e.target.value = '';
               }} />
@@ -652,7 +659,7 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
                 const f = e.target.files?.[0];
                 if (!f) return;
-                try { await api.locations.uploadSubmap(locationId, f); await onUpdateLocation(locationId, {}); }
+                try { await api.locations.uploadSubmap(locationId, f); await onUpdateLocation(locationId, {}); onScheduleBackup?.(); }
                 catch (err) { console.error('Sub-map upload failed:', err); }
                 e.target.value = '';
               }} />
