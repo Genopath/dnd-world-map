@@ -181,7 +181,7 @@ export default function Home() {
           const newCamp = await api.campaigns.create(name);
           // Point the API at this campaign before importing
           setCurrentCampaign(newCamp.slug);
-          await api.data.import(backup as object);
+          await api.data.import(new File([JSON.stringify(backup)], 'backup.json', { type: 'application/json' }));
 
           // Re-key the backup under the new slug (in case it changed)
           if (newCamp.slug !== oldSlug) {
