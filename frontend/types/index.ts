@@ -27,6 +27,8 @@ export interface PathEntry {
   travel_type?: string;
   distance?: number | null;
   distance_unit?: string | null;
+  travel_time?: number | null;
+  travel_time_unit?: string | null;
   direction?: 'forward' | 'backward' | 'both';
   waypoints?: string | null;  // JSON "[[x,y],...]"
   visited_at?: string;
@@ -90,6 +92,8 @@ export interface CharacterPathEntry {
   travel_type?: string;
   distance?: number | null;
   distance_unit?: string | null;
+  travel_time?: number | null;
+  travel_time_unit?: string | null;
   direction?: 'forward' | 'backward' | 'both';
   waypoints?: string | null;
   visited_at?: string;

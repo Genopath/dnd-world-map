@@ -85,6 +85,7 @@ interface Props {
   showPartyPath:      boolean;
   showLabels:         boolean;
   showDistLabels:     boolean;
+  showTimeLabels:     boolean;
   fitTrigger:         number;
   onSelectLocation:   (id: number) => void;
   onDeselect:         () => void;
@@ -137,6 +138,7 @@ export default function MapView({
   showPartyPath,
   showLabels,
   showDistLabels,
+  showTimeLabels,
   fitTrigger,
   onSelectLocation,
   onDeselect,
@@ -436,6 +438,8 @@ export default function MapView({
       travelType: e.travel_type,
       distance: e.distance,
       distance_unit: e.distance_unit,
+      travel_time: e.travel_time,
+      travel_time_unit: e.travel_time_unit,
       direction: (e.direction ?? 'forward') as 'forward' | 'backward' | 'both',
       waypoints: parseWaypoints(e.waypoints),
       entryId: e.id,
@@ -443,6 +447,7 @@ export default function MapView({
     .filter((s): s is {
       loc: Location; travelType: string | undefined;
       distance: number | null | undefined; distance_unit: string | null | undefined;
+      travel_time: number | null | undefined; travel_time_unit: string | null | undefined;
       direction: 'forward' | 'backward' | 'both'; waypoints: [number, number][];
       entryId: number;
     } => s.loc !== undefined);
@@ -596,7 +601,8 @@ export default function MapView({
           }}
         >
           <defs>
-            <filter id="glow">
+            {/* Expanded filter region so arrow markers aren't clipped */}
+            <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
               <feGaussianBlur stdDeviation="3" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
@@ -693,6 +699,8 @@ export default function MapView({
             const my = (prev.loc.y + seg.loc.y) / 2;
             const distLabel = showDistLabels && seg.distance != null
               ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
+            const timeLabel = showTimeLabels && seg.travel_time != null
+              ? `${seg.travel_time}${seg.travel_time_unit ? ' ' + seg.travel_time_unit : ''}` : null;
             const ttName = (seg.travelType ?? 'foot') as TravelType;
             const fwdId = `url(#arrow-fwd-${ttName})`;
             const revId = `url(#arrow-rev-${ttName})`;
@@ -724,7 +732,14 @@ export default function MapView({
                   fontSize="12" style={{ userSelect: 'none', pointerEvents: 'none' }}
                   filter="url(#glow)">
                   {style.symbol}
-                  {distLabel && <tspan x={`${mx}%`} dy="13" fontSize="9" fill="#e8d9a0">{distLabel}</tspan>}
+                  {distLabel && (
+                    <tspan x={`${mx}%`} dy="13" fontSize="9"
+                      fill="#fff" stroke="#000" strokeWidth="2" paintOrder="stroke">{distLabel}</tspan>
+                  )}
+                  {timeLabel && (
+                    <tspan x={`${mx}%`} dy={distLabel ? '11' : '13'} fontSize="9"
+                      fill="#aee" stroke="#000" strokeWidth="2" paintOrder="stroke">{timeLabel}</tspan>
+                  )}
                 </text>
               </g>
             );

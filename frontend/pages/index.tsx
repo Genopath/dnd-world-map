@@ -140,6 +140,7 @@ export default function Home() {
   const [error,         setError]         = useState<string | null>(null);
   const [showPinLabels,   setShowPinLabels]   = useState(() => typeof window !== 'undefined' && localStorage.getItem('show_pin_labels') === '1');
   const [showDistLabels,  setShowDistLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_dist_labels') !== '0' : true);
+  const [showTimeLabels,  setShowTimeLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_time_labels') !== '0' : true);
   const [fitTrigger,      setFitTrigger]      = useState(0);
 
   // ── Phase-1 state ───────────────────────────────────────────────────────────
@@ -481,6 +482,14 @@ export default function Home() {
   const handleUpdateCharPathDistance = useCallback(async (entryId: number, distance: number | null, unit: string) => {
     await api.characterPaths.updateEntry(entryId, { distance, distance_unit: unit });
     setCharacterPaths(prev => prev.map(e => e.id === entryId ? { ...e, distance, distance_unit: unit } : e));
+  }, []);
+  const handleUpdatePathTravelTime = useCallback(async (entryId: number, travel_time: number | null, unit: string) => {
+    await api.path.updateEntry(entryId, { travel_time, travel_time_unit: unit });
+    setPlayerPath(prev => prev.map(e => e.id === entryId ? { ...e, travel_time, travel_time_unit: unit } : e));
+  }, []);
+  const handleUpdateCharPathTravelTime = useCallback(async (entryId: number, travel_time: number | null, unit: string) => {
+    await api.characterPaths.updateEntry(entryId, { travel_time, travel_time_unit: unit });
+    setCharacterPaths(prev => prev.map(e => e.id === entryId ? { ...e, travel_time, travel_time_unit: unit } : e));
   }, []);
   const handleUpdatePathDirection = useCallback(async (entryId: number, direction: string) => {
     await api.path.updateEntry(entryId, { direction });
@@ -945,6 +954,11 @@ export default function Home() {
                 title="Toggle distance labels on paths"
                 onClick={() => setShowDistLabels(v => { const next = !v; localStorage.setItem('show_dist_labels', next ? '1' : '0'); return next; })}
               >📏 Distance</button>
+              <button
+                className={`btn btn-sm ${showTimeLabels ? 'btn-active' : ''}`}
+                title="Toggle travel time labels on paths"
+                onClick={() => setShowTimeLabels(v => { const next = !v; localStorage.setItem('show_time_labels', next ? '1' : '0'); return next; })}
+              >⏱ Time</button>
               <label className="btn" style={{ cursor: 'pointer' }}>
                 {mapStack.length > 0 ? 'Upload Submap' : 'Upload Map'}
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
@@ -980,6 +994,7 @@ export default function Home() {
             showPartyPath={showPartyPath}
             showLabels={showPinLabels}
             showDistLabels={showDistLabels}
+            showTimeLabels={showTimeLabels}
             fitTrigger={fitTrigger}
             onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
             onDeselect={() => setSelectedId(null)}
@@ -1036,6 +1051,8 @@ export default function Home() {
             onUpdateCharPathTravelType={handleUpdateCharPathTravelType}
             onUpdatePathDistance={handleUpdatePathDistance}
             onUpdateCharPathDistance={handleUpdateCharPathDistance}
+            onUpdatePathTravelTime={handleUpdatePathTravelTime}
+            onUpdateCharPathTravelTime={handleUpdateCharPathTravelTime}
             onUpdatePathDirection={handleUpdatePathDirection}
             onUpdateCharPathDirection={handleUpdateCharPathDirection}
             onStartWaypointDraw={handleStartWaypointDraw}

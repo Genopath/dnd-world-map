@@ -120,6 +120,8 @@ interface Props {
   onUpdateCharPathTravelType: (entryId: number, type: string) => Promise<void>;
   onUpdatePathDistance?:      (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onUpdateCharPathDistance?:  (entryId: number, distance: number | null, unit: string) => Promise<void>;
+  onUpdatePathTravelTime?:    (entryId: number, time: number | null, unit: string) => Promise<void>;
+  onUpdateCharPathTravelTime?:(entryId: number, time: number | null, unit: string) => Promise<void>;
   onUpdatePathDirection?:     (entryId: number, dir: string) => Promise<void>;
   onUpdateCharPathDirection?: (entryId: number, dir: string) => Promise<void>;
   onStartWaypointDraw?:       (entryId: number, isChar: boolean) => void;
@@ -161,6 +163,7 @@ export default function Sidebar({
   hiddenCharIds, showPartyPath, onToggleCharPath, onTogglePartyPath,
   onUpdatePathTravelType, onUpdateCharPathTravelType,
   onUpdatePathDistance, onUpdateCharPathDistance,
+  onUpdatePathTravelTime, onUpdateCharPathTravelTime,
   onUpdatePathDirection, onUpdateCharPathDirection,
   onStartWaypointDraw, onClearWaypoints,
   onDuplicateLocation,
@@ -351,6 +354,8 @@ export default function Sidebar({
             onUpdateCharTravelType={onUpdateCharPathTravelType}
             onUpdateDistance={onUpdatePathDistance}
             onUpdateCharDistance={onUpdateCharPathDistance}
+            onUpdateTravelTime={onUpdatePathTravelTime}
+            onUpdateCharTravelTime={onUpdateCharPathTravelTime}
             onUpdateDirection={onUpdatePathDirection}
             onUpdateCharDirection={onUpdateCharPathDirection}
             onStartWaypointDraw={onStartWaypointDraw}
@@ -718,42 +723,45 @@ const CHAR_PATH_COLORS = ['#e05c5c', '#5c9fe0', '#60cc78', '#c05ce0', '#e0a040',
 
 // ── Distance editor — needs local state so the controlled select works ────────
 
-const DISTANCE_UNITS_LIST = ['hours', 'days', 'weeks', 'months', 'years', 'miles', 'km', 'leagues'];
+const DISTANCE_UNITS_LIST = ['miles', 'km', 'leagues', 'feet', 'yards', 'meters'];
+const TIME_UNITS_LIST     = ['hours', 'days', 'weeks', 'months', 'years'];
 
-function DistanceRow({ entryId, distance, distanceUnit, onSave }: {
-  entryId:      number;
-  distance:     number | null | undefined;
-  distanceUnit: string | null | undefined;
-  onSave:       (id: number, dist: number | null, unit: string) => void;
+function MeasureRow({ entryId, label, value, unit, defaultUnit, units, onSave }: {
+  entryId:     number;
+  label:       string;
+  value:       number | null | undefined;
+  unit:        string | null | undefined;
+  defaultUnit: string;
+  units:       string[];
+  onSave:      (id: number, val: number | null, unit: string) => void;
 }) {
-  const [dist, setDist] = React.useState<string>(distance != null ? String(distance) : '');
-  const [unit, setUnit] = React.useState<string>(distanceUnit ?? 'days');
+  const [val, setVal]   = React.useState<string>(value != null ? String(value) : '');
+  const [u, setU]       = React.useState<string>(unit ?? defaultUnit);
 
-  // Sync if props change (e.g. initial data load or reorder)
-  React.useEffect(() => { setDist(distance != null ? String(distance) : ''); }, [distance]);
-  React.useEffect(() => { setUnit(distanceUnit ?? 'days'); }, [distanceUnit]);
+  React.useEffect(() => { setVal(value != null ? String(value) : ''); }, [value]);
+  React.useEffect(() => { setU(unit ?? defaultUnit); }, [unit, defaultUnit]);
 
-  const commit = (d: string, u: string) => {
-    const num = d.trim() === '' ? null : parseFloat(d);
-    onSave(entryId, isNaN(num as number) ? null : num, u);
+  const commit = (v: string, uu: string) => {
+    const num = v.trim() === '' ? null : parseFloat(v);
+    onSave(entryId, isNaN(num as number) ? null : num, uu);
   };
 
   return (
     <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 28, marginTop: 2 }}>
-      <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>Distance:</span>
+      <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>{label}</span>
       <input
         type="number" min="0" step="0.5" placeholder="—"
-        value={dist}
+        value={val}
         style={{ width: 60, fontSize: 11, padding: '1px 4px' }}
-        onChange={e => setDist(e.target.value)}
-        onBlur={e => commit(e.target.value, unit)}
+        onChange={e => setVal(e.target.value)}
+        onBlur={e => commit(e.target.value, u)}
       />
       <select
-        value={unit}
+        value={u}
         style={{ fontSize: 11, padding: '1px 2px' }}
-        onChange={e => { const u = e.target.value; setUnit(u); commit(dist, u); }}
+        onChange={e => { const uu = e.target.value; setU(uu); commit(val, uu); }}
       >
-        {DISTANCE_UNITS_LIST.map(u => <option key={u} value={u}>{u}</option>)}
+        {units.map(uu => <option key={uu} value={uu}>{uu}</option>)}
       </select>
     </div>
   );
@@ -782,6 +790,8 @@ interface PathPanelProps {
   onUpdateCharTravelType:  (entryId: number, type: string) => Promise<void>;
   onUpdateDistance?:       (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onUpdateCharDistance?:   (entryId: number, distance: number | null, unit: string) => Promise<void>;
+  onUpdateTravelTime?:     (entryId: number, time: number | null, unit: string) => Promise<void>;
+  onUpdateCharTravelTime?: (entryId: number, time: number | null, unit: string) => Promise<void>;
   onUpdateDirection?:      (entryId: number, dir: string) => Promise<void>;
   onUpdateCharDirection?:  (entryId: number, dir: string) => Promise<void>;
   onStartWaypointDraw?:    (entryId: number, isChar: boolean) => void;
@@ -796,6 +806,7 @@ function PathPanel({
   onToggleCharPath, onTogglePartyPath,
   onUpdateTravelType, onUpdateCharTravelType,
   onUpdateDistance, onUpdateCharDistance,
+  onUpdateTravelTime, onUpdateCharTravelTime,
   onUpdateDirection, onUpdateCharDirection,
   onStartWaypointDraw, onClearWaypoints,
 }: PathPanelProps) {
@@ -806,7 +817,7 @@ function PathPanel({
   const nextDirection = (d?: string) => d === 'forward' ? 'both' : d === 'both' ? 'backward' : 'forward';
 
   const renderPathList = (
-    entries: { id: number; location_id: number; position: number; travel_type?: string; distance?: number | null; distance_unit?: string | null; direction?: string; waypoints?: string | null; visited_at?: string }[],
+    entries: { id: number; location_id: number; position: number; travel_type?: string; distance?: number | null; distance_unit?: string | null; travel_time?: number | null; travel_time_unit?: string | null; direction?: string; waypoints?: string | null; visited_at?: string }[],
     canEdit: boolean,
     onRem: (id: number) => void,
     onTravelType?: (id: number, type: string) => void,
@@ -814,6 +825,7 @@ function PathPanel({
     onDist?: (id: number, distance: number | null, unit: string) => void,
     onDir?: (id: number, dir: string) => void,
     isChar?: boolean,
+    onTime?: (id: number, time: number | null, unit: string) => void,
   ) => (
     <div className="path-list">
       {entries.map((entry, i) => {
@@ -860,16 +872,32 @@ function PathPanel({
               <button className="path-remove" onClick={() => onRem(entry.id)} title="Remove">✕</button>
             )}
             {canEdit && onDist && i > 0 && (
-              <DistanceRow
+              <MeasureRow
                 entryId={entry.id}
-                distance={entry.distance}
-                distanceUnit={entry.distance_unit}
+                label="Distance:"
+                value={entry.distance}
+                unit={entry.distance_unit}
+                defaultUnit="miles"
+                units={DISTANCE_UNITS_LIST}
                 onSave={onDist}
               />
             )}
-            {!canEdit && i > 0 && entry.distance != null && (
+            {canEdit && onTime && i > 0 && (
+              <MeasureRow
+                entryId={entry.id}
+                label="Travel time:"
+                value={entry.travel_time}
+                unit={entry.travel_time_unit}
+                defaultUnit="days"
+                units={TIME_UNITS_LIST}
+                onSave={onTime}
+              />
+            )}
+            {!canEdit && i > 0 && (entry.distance != null || entry.travel_time != null) && (
               <div style={{ width: '100%', paddingLeft: 28, fontSize: 11, color: 'var(--text-dim)' }}>
-                {entry.distance} {entry.distance_unit ?? 'days'}
+                {entry.distance != null && <span>{entry.distance} {entry.distance_unit ?? 'miles'}</span>}
+                {entry.distance != null && entry.travel_time != null && <span> · </span>}
+                {entry.travel_time != null && <span>{entry.travel_time} {entry.travel_time_unit ?? 'days'}</span>}
               </div>
             )}
             {canEdit && i > 0 && onStartWaypointDraw && (
@@ -969,7 +997,7 @@ function PathPanel({
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {sortedPath.length} waypoint{sortedPath.length !== 1 ? 's' : ''} — click the travel icon to change type
               </div>
-              {renderPathList(sortedPath, isDMMode, onRemove, onUpdateTravelType, onMove, onUpdateDistance, onUpdateDirection, false)}
+              {renderPathList(sortedPath, isDMMode, onRemove, onUpdateTravelType, onMove, onUpdateDistance, onUpdateDirection, false, onUpdateTravelTime)}
             </>
           )}
         </>
@@ -1004,7 +1032,7 @@ function PathPanel({
             {entries.length === 0 ? (
               <div className="path-empty">No waypoints for {m.name}.<br /><span style={{ fontSize: 12, marginTop: 4, display: 'block' }}>Click a pin on the map to select it, then "+ Add Selected".</span></div>
             ) : (
-              renderPathList(entries, isDMMode, onRemoveFromCharPath, onUpdateCharTravelType, undefined, onUpdateCharDistance, onUpdateCharDirection, true)
+              renderPathList(entries, isDMMode, onRemoveFromCharPath, onUpdateCharTravelType, undefined, onUpdateCharDistance, onUpdateCharDirection, true, onUpdateCharTravelTime)
             )}
           </div>
         );

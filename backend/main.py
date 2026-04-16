@@ -156,6 +156,10 @@ def _path_out(entry: models.PlayerPathEntry, db: Session) -> schemas.PathEntryOu
         travel_type=getattr(entry, "travel_type", None) or "foot",
         distance=getattr(entry, "distance", None),
         distance_unit=getattr(entry, "distance_unit", None),
+        direction=getattr(entry, "direction", None) or "forward",
+        waypoints=getattr(entry, "waypoints", None),
+        travel_time=getattr(entry, "travel_time", None),
+        travel_time_unit=getattr(entry, "travel_time_unit", None),
         visited_at=entry.visited_at,
         location=_loc_out(loc) if loc else None,
     )
@@ -1519,6 +1523,10 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
             travel_type=d.get("travel_type", "foot"),
             distance=d.get("distance"),
             distance_unit=d.get("distance_unit"),
+            direction=d.get("direction", "forward"),
+            waypoints=d.get("waypoints"),
+            travel_time=d.get("travel_time"),
+            travel_time_unit=d.get("travel_time_unit"),
         ))
 
     # ── Character paths ────────────────────────────────────────────────────────
@@ -1531,6 +1539,10 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
             travel_type=d.get("travel_type", "foot"),
             distance=d.get("distance"),
             distance_unit=d.get("distance_unit"),
+            direction=d.get("direction", "forward"),
+            waypoints=d.get("waypoints"),
+            travel_time=d.get("travel_time"),
+            travel_time_unit=d.get("travel_time_unit"),
         ))
 
     db.commit()

@@ -36,8 +36,10 @@ class PlayerPathEntry(Base):
     travel_type = Column(String(50), default="foot")
     distance = Column(Float, nullable=True)
     distance_unit = Column(String(50), nullable=True)
-    direction = Column(String(10), default="forward")  # forward | backward | both
-    waypoints = Column(Text, nullable=True)             # JSON: [[x, y], ...]
+    direction        = Column(String(10), default="forward")  # forward | backward | both
+    waypoints        = Column(Text, nullable=True)             # JSON: [[x, y], ...]
+    travel_time      = Column(Float, nullable=True)
+    travel_time_unit = Column(String(50), nullable=True)
     visited_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -182,9 +184,11 @@ class CharacterPath(Base):
     travel_type     = Column(String(50), default="foot")
     distance        = Column(Float, nullable=True)
     distance_unit   = Column(String(50), nullable=True)
-    direction       = Column(String(10), default="forward")
-    waypoints       = Column(Text, nullable=True)
-    visited_at      = Column(DateTime(timezone=True), server_default=func.now())
+    direction        = Column(String(10), default="forward")
+    waypoints        = Column(Text, nullable=True)
+    travel_time      = Column(Float, nullable=True)
+    travel_time_unit = Column(String(50), nullable=True)
+    visited_at       = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class QuestNPCLink(Base):

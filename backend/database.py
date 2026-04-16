@@ -60,6 +60,10 @@ _MIGRATIONS = [
     "ALTER TABLE player_path ADD COLUMN waypoints TEXT",
     "ALTER TABLE character_paths ADD COLUMN direction VARCHAR(10) DEFAULT 'forward'",
     "ALTER TABLE character_paths ADD COLUMN waypoints TEXT",
+    "ALTER TABLE player_path ADD COLUMN travel_time REAL",
+    "ALTER TABLE player_path ADD COLUMN travel_time_unit VARCHAR(50)",
+    "ALTER TABLE character_paths ADD COLUMN travel_time REAL",
+    "ALTER TABLE character_paths ADD COLUMN travel_time_unit VARCHAR(50)",
 ]
 
 
