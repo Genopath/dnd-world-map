@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import List, Optional, Set
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response as _Response
 from pydantic import BaseModel as _BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -1324,7 +1324,7 @@ def export_data(db: Session = Depends(get_db)):
 
 
 @app.post("/import")
-def import_data(payload: dict, slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
+def import_data(payload: dict = Body(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
     def _restore(encoded: str | None) -> str | None:
         """Store exported image data as a DB blob. Returns new /img/ URL, or None."""
         if not encoded:

@@ -608,29 +608,39 @@ export default function Home() {
 
   const handleImport = useCallback(async (file: File) => {
     if (!confirm(`Import "${file.name}"? This will overwrite ALL data in the current campaign.`)) return;
-    const text = await file.text();
-    await api.data.import(JSON.parse(text));
-    // Reload everything
-    const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg] =
-      await Promise.all([
-        api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
-        api.sessions.list(), api.party.list(), api.factions.list(),
-        api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
-        api.fog.get(), api.map.config(),
-      ]);
-    setLocations(locs);
-    setPlayerPath(path);
-    setNpcs(npcList);
-    setQuests(questList);
-    setSessions(sessionList);
-    setParty(partyList);
-    setFactions(factionList);
-    setCampaign(campData);
-    setCalendarConfig(calCfg);
-    setCharacterPaths(charPaths);
-    setFogData(fogResult.data ?? '');
-    setMapConfig(mapCfg);
-    setSelectedId(null);
+    try {
+      let payload: object;
+      try {
+        payload = JSON.parse(await file.text());
+      } catch {
+        alert('Invalid file — could not parse JSON.');
+        return;
+      }
+      await api.data.import(payload);
+      // Reload everything
+      const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg] =
+        await Promise.all([
+          api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
+          api.sessions.list(), api.party.list(), api.factions.list(),
+          api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
+          api.fog.get(), api.map.config(),
+        ]);
+      setLocations(locs);
+      setPlayerPath(path);
+      setNpcs(npcList);
+      setQuests(questList);
+      setSessions(sessionList);
+      setParty(partyList);
+      setFactions(factionList);
+      setCampaign(campData);
+      setCalendarConfig(calCfg);
+      setCharacterPaths(charPaths);
+      setFogData(fogResult.data ?? '');
+      setMapConfig(mapCfg);
+      setSelectedId(null);
+    } catch (err) {
+      alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }, []);
 
   // ── DM Passcode ──────────────────────────────────────────────────────────────
@@ -771,7 +781,7 @@ export default function Home() {
               <button className="btn" onClick={handleExport} title="Export JSON backup">Export</button>
               <label className="btn" style={{ cursor: 'pointer' }} title="Import JSON backup">
                 Import
-                <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ''; }} />
+                <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) await handleImport(f); }} />
               </label>
             </>
           )}
