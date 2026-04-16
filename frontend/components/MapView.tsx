@@ -174,7 +174,11 @@ export default function MapView({
     setHiddenTypes(prev => { const n = new Set(prev); n.has(t) ? n.delete(t) : n.add(t); return n; });
   }, []);
   // Unique types present at this map level
-  const presentTypes = useMemo(() => [...new Set(locations.map(l => l.type))].sort(), [locations]);
+  const presentTypes = useMemo(() => {
+    const seen: Record<string, true> = {};
+    for (const l of locations) seen[l.type] = true;
+    return Object.keys(seen).sort();
+  }, [locations]);
   // Filtered locations (apply type visibility)
   const visibleLocations = useMemo(
     () => locations.filter(l => !hiddenTypes.has(l.type)),
