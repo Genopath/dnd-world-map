@@ -470,6 +470,8 @@ export default function Home() {
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────
   const handleEnterSubmap = useCallback(async (id: number) => {
     setMapStack(prev => [...prev, id]);
+    setFogPaint(false);
+    setFitTrigger(t => t + 1);
     try {
       const result = await api.locations.getFog(id);
       setSubmapFogData(result.data || '1'.repeat(10000));
@@ -480,6 +482,8 @@ export default function Home() {
   const handleExitSubmap = useCallback(() => {
     setMapStack([]);
     setSubmapFogData('1'.repeat(10000));
+    setFogPaint(false);
+    setFitTrigger(t => t + 1);
   }, []);
   const handleUpdateCalendar = useCallback(async (data: Partial<Omit<CalendarConfig, 'id'>>) => {
     const updated = await api.calendar.update(data);
