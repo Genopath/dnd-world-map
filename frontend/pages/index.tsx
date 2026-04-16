@@ -725,8 +725,8 @@ export default function Home() {
             <>
               <button className="btn btn-sm btn-icon" title="Set / change DM passcode" onClick={() => { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('set'); }}>🔒</button>
 
-              {/* Fog toolbar — world map only */}
-              <div className="fog-toolbar" style={currentMapId != null ? { display: 'none' } : undefined}>
+              {/* Fog toolbar — world map and submaps */}
+              <div className="fog-toolbar">
                 <button
                   className={`btn btn-sm ${fogPaint ? 'btn-active' : ''}`}
                   onClick={() => setFogPaint(p => !p)}
