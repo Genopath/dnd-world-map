@@ -237,6 +237,7 @@ export default function Sidebar({
               onUpdateLocation={onUpdate}
               currentPinSize={location.pin_size ?? 'md'}
               currentIconUrl={location.icon_url} currentImageUrl={location.image_url} currentSubmapUrl={location.submap_image_url}
+              onScheduleBackup={onScheduleBackup}
             />
           ) : (
             <LocationDetail
@@ -522,9 +523,10 @@ interface EditFormProps {
   currentIconUrl?: string | null;
   currentImageUrl?: string | null;
   currentSubmapUrl?: string | null;
+  onScheduleBackup?: () => void;
 }
 
-function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentIconUrl, currentImageUrl, currentSubmapUrl }: EditFormProps) {
+function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentIconUrl, currentImageUrl, currentSubmapUrl, onScheduleBackup }: EditFormProps) {
   const [libraryFor, setLibraryFor] = useState<'icon' | 'image' | 'submap' | null>(null);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
