@@ -469,15 +469,17 @@ export default function Home() {
 
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────
   const handleEnterSubmap = useCallback(async (id: number) => {
+    // Fetch fog before updating mapStack so the first render already has
+    // the correct fog data — prevents a flash of revealed content.
+    let fog = '1'.repeat(10000);
+    try {
+      const result = await api.locations.getFog(id);
+      fog = result.data || '1'.repeat(10000);
+    } catch {}
+    setSubmapFogData(fog);
     setMapStack(prev => [...prev, id]);
     setFogPaint(false);
     setFitTrigger(t => t + 1);
-    try {
-      const result = await api.locations.getFog(id);
-      setSubmapFogData(result.data || '1'.repeat(10000));
-    } catch {
-      setSubmapFogData('1'.repeat(10000));
-    }
   }, []);
   const handleExitSubmap = useCallback(() => {
     setMapStack([]);
