@@ -62,6 +62,65 @@ function _loadBrowserBackup(slug: string): { _saved_at?: string; [k: string]: un
   }
 }
 
+// ── IndexedDB backup helpers ──────────────────────────────────────────────────
+// Stores the FULL server export (including base64 image blobs) so maps, submap
+// images, and fog data survive Railway redeployments automatically.
+// IndexedDB has no meaningful size limit (~GB), unlike localStorage (~5 MB).
+
+const _IDB_NAME = 'dnd-campaign-backups';
+const _IDB_STORE = 'exports';
+
+function _idbOpen(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(_IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(_IDB_STORE))
+        req.result.createObjectStore(_IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function _idbSave(key: string, value: unknown): Promise<void> {
+  if (typeof window === 'undefined' || !window.indexedDB) return;
+  try {
+    const db = await _idbOpen();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(_IDB_STORE, 'readwrite');
+      tx.objectStore(_IDB_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror    = () => reject(tx.error);
+    });
+  } catch { /* best-effort — silently ignore */ }
+}
+
+async function _idbLoad(key: string): Promise<{ _saved_at?: string; [k: string]: unknown } | null> {
+  if (typeof window === 'undefined' || !window.indexedDB) return null;
+  try {
+    const db = await _idbOpen();
+    return await new Promise((resolve) => {
+      const tx  = db.transaction(_IDB_STORE, 'readonly');
+      const req = tx.objectStore(_IDB_STORE).get(key);
+      req.onsuccess = () => resolve((req.result as { _saved_at?: string; [k: string]: unknown }) ?? null);
+      req.onerror   = () => resolve(null);
+    });
+  } catch { return null; }
+}
+
+// Calls /export and saves the result (images and all) to IndexedDB.
+// Throttled to once per browser session per campaign; pass force=true to
+// bypass the throttle (e.g. right after a map is uploaded).
+function _idbBackupAsync(slug: string, force = false): void {
+  if (typeof window === 'undefined') return;
+  const key = `idb_saved_${slug}`;
+  if (!force && sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, '1');
+  api.data.export()
+    .then(data => _idbSave(`export_${slug}`, { ...(data as object), _saved_at: new Date().toISOString() }))
+    .catch(() => { /* best-effort */ });
+}
+
 export default function Home() {
   // ── Campaign selection ──────────────────────────────────────────────────────
   const [campaignSlug,         setCampaignSlug]         = useState<string | null>(null);
@@ -171,7 +230,9 @@ export default function Home() {
 
         for (const key of sorted) {
           const oldSlug = key.replace('campaign_backup_', '');
-          const backup  = _loadBrowserBackup(oldSlug);
+          // Prefer IndexedDB backup (has images) over localStorage (no images)
+          const idbBackup = await _idbLoad(`export_${oldSlug}`);
+          const backup    = idbBackup ?? _loadBrowserBackup(oldSlug);
           if (!backup) continue;
 
           const name = (backup.campaign_settings as any)?.world_name
@@ -183,10 +244,13 @@ export default function Home() {
           setCurrentCampaign(newCamp.slug);
           await api.data.import(new File([JSON.stringify(backup)], 'backup.json', { type: 'application/json' }));
 
-          // Re-key the backup under the new slug (in case it changed)
+          // Re-key backups under the new slug (in case it changed)
           if (newCamp.slug !== oldSlug) {
             _saveBrowserBackup(newCamp.slug, backup);
             localStorage.removeItem(key);
+            if (idbBackup) {
+              await _idbSave(`export_${newCamp.slug}`, { ...idbBackup, _saved_at: idbBackup._saved_at });
+            }
           }
 
           if (!firstSlug) { firstSlug = newCamp.slug; firstName = newCamp.name; }
@@ -244,11 +308,14 @@ export default function Home() {
 
         // ── Offer restore from browser backup if server data is gone ──────────
         if (isEmpty) {
-          const cached = _loadBrowserBackup(campaignSlug);
+          // IndexedDB backup includes images (maps, submaps, fog); localStorage does not
+          const idbCached = await _idbLoad(`export_${campaignSlug}`);
+          const cached    = idbCached ?? _loadBrowserBackup(campaignSlug);
           if (cached) {
-            const savedAt = cached._saved_at ? new Date(cached._saved_at as string).toLocaleString() : 'unknown';
+            const savedAt  = cached._saved_at ? new Date(cached._saved_at as string).toLocaleString() : 'unknown';
+            const hasImages = !!idbCached;
             const restore = typeof window !== 'undefined'
-              && window.confirm(`Campaign data appears empty (server may have been redeployed).\n\nRestore from browser backup saved on ${savedAt}?`);
+              && window.confirm(`Campaign data appears empty (server may have been redeployed).\n\nRestore from ${hasImages ? 'full backup (includes maps & images)' : 'text backup (no images)'} saved on ${savedAt}?`);
             if (restore) {
               await api.data.import(new File([JSON.stringify(cached)], 'backup.json', { type: 'application/json' }));
               // Re-fetch everything after restore
@@ -284,6 +351,7 @@ export default function Home() {
 
         // ── Save browser backup whenever we have real data ────────────────────
         if (!isEmpty) {
+          // localStorage: fast metadata backup (no images)
           const backup = _buildBrowserBackup({
             locations: locs, playerPath: path, npcs: npcList, quests: questList,
             sessions: sessionList, party: partyList, factions: factionList,
@@ -291,6 +359,8 @@ export default function Home() {
             fogData: fog,
           });
           _saveBrowserBackup(campaignSlug, backup);
+          // IndexedDB: full backup with all images — once per session in background
+          _idbBackupAsync(campaignSlug);
         }
       })
       .catch(e => setError(String(e)))
@@ -596,7 +666,10 @@ export default function Home() {
     } else {
       setMapConfig(await api.map.upload(file));
     }
-  }, [mapStack]);
+    // Force an immediate IndexedDB backup so the new map image is persisted
+    // regardless of the once-per-session throttle.
+    if (campaignSlug) _idbBackupAsync(campaignSlug, true);
+  }, [mapStack, campaignSlug]);
 
   // ── Export / Import ───────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
