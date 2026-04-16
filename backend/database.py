@@ -56,6 +56,10 @@ _MIGRATIONS = [
     "ALTER TABLE character_paths ADD COLUMN distance_unit VARCHAR(50)",
     "ALTER TABLE locations ADD COLUMN fog_data TEXT",
     "ALTER TABLE locations ADD COLUMN pin_size VARCHAR(10) DEFAULT 'md'",
+    "ALTER TABLE player_path ADD COLUMN direction VARCHAR(10) DEFAULT 'forward'",
+    "ALTER TABLE player_path ADD COLUMN waypoints TEXT",
+    "ALTER TABLE character_paths ADD COLUMN direction VARCHAR(10) DEFAULT 'forward'",
+    "ALTER TABLE character_paths ADD COLUMN waypoints TEXT",
 ]
 
 

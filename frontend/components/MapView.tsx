@@ -96,6 +96,18 @@ interface Props {
   onDuplicateLocation?: (loc: Location) => void;
   onAddToPath?:       (locationId: number) => void;
   onEnterSubmap?:     (id: number) => void;
+  // Waypoint drawing
+  waypointMode?:      { entryId: number; pts: [number, number][] } | null;
+  onAddWaypoint?:     (x: number, y: number) => void;
+  onFinishWaypoints?: () => void;
+  onUndoWaypoint?:    () => void;
+  onCancelWaypoints?: () => void;
+}
+
+// Parse waypoints JSON string to array of [x, y] pairs
+function parseWaypoints(wp: string | null | undefined): [number, number][] {
+  if (!wp) return [];
+  try { return JSON.parse(wp) as [number, number][]; } catch { return []; }
 }
 
 export default function MapView({
@@ -129,6 +141,11 @@ export default function MapView({
   onDuplicateLocation,
   onAddToPath,
   onEnterSubmap,
+  waypointMode,
+  onAddWaypoint,
+  onFinishWaypoints,
+  onUndoWaypoint,
+  onCancelWaypoints,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -311,7 +328,7 @@ export default function MapView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragOverrides, onUpdateLocation]);
 
-  // ── Click (add pin or deselect) ───────────────────────────────────────────
+  // ── Click (add pin, add waypoint, or deselect) ───────────────────────────
   const handleContainerClick = useCallback(
     (e: React.MouseEvent) => {
       if (fogPaintMode) return;
@@ -320,26 +337,44 @@ export default function MapView({
       const mapEl: HTMLElement | null = imgRef.current ?? placeholderRef.current;
       if (!mapEl) return;
 
+      const rect = mapEl.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      if (x < 0 || x > 100 || y < 0 || y > 100) return;
+
+      if (waypointMode && onAddWaypoint) {
+        onAddWaypoint(x, y);
+        return;
+      }
+
       if (isAddingPin) {
-        const rect = mapEl.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / rect.width) * 100;
-        const y = ((e.clientY - rect.top) / rect.height) * 100;
-        if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
-          onAddPin(x, y);
-        }
+        onAddPin(x, y);
       } else {
         onDeselect();
       }
     },
-    [fogPaintMode, isAddingPin, onAddPin, onDeselect],
+    [fogPaintMode, isAddingPin, onAddPin, onDeselect, waypointMode, onAddWaypoint],
   );
 
   // ── Build ordered path for SVG ────────────────────────────────────────────
   // Use allLocations so path lines draw even when some waypoints are undiscovered
   const orderedSegments = [...playerPath]
     .sort((a, b) => a.position - b.position)
-    .map(e => ({ loc: allLocations.find(l => l.id === e.location_id), travelType: e.travel_type, distance: e.distance, distance_unit: e.distance_unit }))
-    .filter((s): s is { loc: Location; travelType: string | undefined; distance: number | null | undefined; distance_unit: string | null | undefined } => s.loc !== undefined);
+    .map(e => ({
+      loc: allLocations.find(l => l.id === e.location_id),
+      travelType: e.travel_type,
+      distance: e.distance,
+      distance_unit: e.distance_unit,
+      direction: (e.direction ?? 'forward') as 'forward' | 'backward' | 'both',
+      waypoints: parseWaypoints(e.waypoints),
+      entryId: e.id,
+    }))
+    .filter((s): s is {
+      loc: Location; travelType: string | undefined;
+      distance: number | null | undefined; distance_unit: string | null | undefined;
+      direction: 'forward' | 'backward' | 'both'; waypoints: [number, number][];
+      entryId: number;
+    } => s.loc !== undefined);
 
   // Keep a flat ordered-path array for the pin position numbers (existing usage)
   const orderedPath = orderedSegments.map(s => s.loc);
@@ -353,8 +388,18 @@ export default function MapView({
         .filter(e => e.party_member_id === member.id)
         .sort((a, b) => a.position - b.position);
       const segments = entries
-        .map(e => ({ loc: allLocations.find(l => l.id === e.location_id), travelType: e.travel_type }))
-        .filter((s): s is { loc: Location; travelType: string | undefined } => s.loc !== undefined);
+        .map(e => ({
+          loc: allLocations.find(l => l.id === e.location_id),
+          travelType: e.travel_type,
+          direction: (e.direction ?? 'forward') as 'forward' | 'backward' | 'both',
+          waypoints: parseWaypoints(e.waypoints),
+          entryId: e.id,
+        }))
+        .filter((s): s is {
+          loc: Location; travelType: string | undefined;
+          direction: 'forward' | 'backward' | 'both'; waypoints: [number, number][];
+          entryId: number;
+        } => s.loc !== undefined);
       return { member, color, segments };
     })
     .filter(cp => cp.segments.length > 1);
@@ -399,6 +444,29 @@ export default function MapView({
       {fogPaintMode && (
         <div className="add-pin-hint" style={{ background: fogBrushMode === 'reveal' ? '#2a6e3a' : '#4a2222' }}>
           {fogBrushMode === 'reveal' ? '☁ Revealing fog — click/drag on map' : '🌑 Hiding area — click/drag on map'}
+        </div>
+      )}
+      {waypointMode && (
+        <div className="add-pin-hint waypoint-hint" style={{ background: '#2a3a5a', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span>✏ Click map to add waypoints ({waypointMode.pts.length} placed)</span>
+          {onUndoWaypoint && waypointMode.pts.length > 0 && (
+            <button onClick={e => { e.stopPropagation(); onUndoWaypoint(); }}
+              style={{ background: '#3a4a6a', border: 'none', color: '#ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 12 }}>
+              ↩ Undo
+            </button>
+          )}
+          {onFinishWaypoints && (
+            <button onClick={e => { e.stopPropagation(); onFinishWaypoints(); }}
+              style={{ background: '#2a5a3a', border: 'none', color: '#8fc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 12 }}>
+              ✓ Done
+            </button>
+          )}
+          {onCancelWaypoints && (
+            <button onClick={e => { e.stopPropagation(); onCancelWaypoints(); }}
+              style={{ background: '#5a2a2a', border: 'none', color: '#f88', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 12 }}>
+              ✕ Cancel
+            </button>
+          )}
         </div>
       )}
 
@@ -451,27 +519,70 @@ export default function MapView({
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
+            {/* Arrow markers per travel type: fwd = marker-end, rev = marker-start */}
+            {(Object.entries(TRAVEL_STYLES) as [TravelType, { color: string; dash: string; symbol: string }][]).map(([type, style]) => (
+              <g key={`markers-${type}`}>
+                <marker id={`arrow-fwd-${type}`} markerWidth="5" markerHeight="5"
+                  refX="4.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,5 L5,2.5 z" fill={style.color} />
+                </marker>
+                <marker id={`arrow-rev-${type}`} markerWidth="5" markerHeight="5"
+                  refX="0.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                  <path d="M5,0 L5,5 L0,2.5 z" fill={style.color} />
+                </marker>
+              </g>
+            ))}
+            {/* Arrow markers per party member */}
+            {party.map(m => {
+              const c = m.path_color || '#c9a84c';
+              return (
+                <g key={`char-markers-${m.id}`}>
+                  <marker id={`arrow-char-fwd-${m.id}`} markerWidth="5" markerHeight="5"
+                    refX="4.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,5 L5,2.5 z" fill={c} />
+                  </marker>
+                  <marker id={`arrow-char-rev-${m.id}`} markerWidth="5" markerHeight="5"
+                    refX="0.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                    <path d="M5,0 L5,5 L0,2.5 z" fill={c} />
+                  </marker>
+                </g>
+              );
+            })}
           </defs>
+
           {/* Character individual paths */}
           {charPathLines.map(({ member, color, segments }) =>
             segments.map((seg, i) => {
               if (i === 0) return null;
               const prev = segments[i - 1];
               const style = travelStyle(seg.travelType);
+              const allPts: [number, number][] = [
+                [prev.loc.x, prev.loc.y],
+                ...seg.waypoints,
+                [seg.loc.x, seg.loc.y],
+              ];
               const mx = (prev.loc.x + seg.loc.x) / 2;
               const my = (prev.loc.y + seg.loc.y) / 2;
+              const fwdId = `url(#arrow-char-fwd-${member.id})`;
+              const revId = `url(#arrow-char-rev-${member.id})`;
               return (
                 <g key={`char-${member.id}-${i}`}>
-                  <line
-                    x1={`${prev.loc.x}%`} y1={`${prev.loc.y}%`}
-                    x2={`${seg.loc.x}%`}  y2={`${seg.loc.y}%`}
-                    stroke="#000" strokeWidth="3" strokeDasharray={style.dash} opacity="0.3"
-                  />
-                  <line
-                    x1={`${prev.loc.x}%`} y1={`${prev.loc.y}%`}
-                    x2={`${seg.loc.x}%`}  y2={`${seg.loc.y}%`}
-                    stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} opacity="0.85"
-                  />
+                  {allPts.slice(1).map((pt, j) => {
+                    const from = allPts[j];
+                    const isFirst = j === 0;
+                    const isLast  = j === allPts.length - 2;
+                    return (
+                      <g key={j}>
+                        <line x1={`${from[0]}%`} y1={`${from[1]}%`} x2={`${pt[0]}%`} y2={`${pt[1]}%`}
+                          stroke="#000" strokeWidth="3" strokeDasharray={style.dash} opacity="0.3" />
+                        <line x1={`${from[0]}%`} y1={`${from[1]}%`} x2={`${pt[0]}%`} y2={`${pt[1]}%`}
+                          stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} opacity="0.85"
+                          markerEnd={isLast && (seg.direction === 'forward' || seg.direction === 'both') ? fwdId : undefined}
+                          markerStart={isFirst && (seg.direction === 'backward' || seg.direction === 'both') ? revId : undefined}
+                        />
+                      </g>
+                    );
+                  })}
                   <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="middle"
                     fontSize="11" style={{ userSelect: 'none', pointerEvents: 'none' }}>
                     {style.symbol}
@@ -485,31 +596,59 @@ export default function MapView({
             if (i === 0) return null;
             const prev = orderedSegments[i - 1];
             const style = travelStyle(seg.travelType);
+            const allPts: [number, number][] = [
+              [prev.loc.x, prev.loc.y],
+              // If this segment is being actively drawn, overlay pending pts
+              ...(waypointMode?.entryId === seg.entryId ? waypointMode.pts : seg.waypoints),
+              [seg.loc.x, seg.loc.y],
+            ];
             const mx = (prev.loc.x + seg.loc.x) / 2;
             const my = (prev.loc.y + seg.loc.y) / 2;
-            const distLabel = showDistLabels && seg.distance != null ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
+            const distLabel = showDistLabels && seg.distance != null
+              ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
+            const ttName = (seg.travelType ?? 'foot') as TravelType;
+            const fwdId = `url(#arrow-fwd-${ttName})`;
+            const revId = `url(#arrow-rev-${ttName})`;
             return (
               <g key={`path-line-${i}`}>
-                <line
-                  x1={`${prev.loc.x}%`} y1={`${prev.loc.y}%`}
-                  x2={`${seg.loc.x}%`}  y2={`${seg.loc.y}%`}
-                  stroke="#000" strokeWidth="4" strokeDasharray={style.dash} opacity="0.35"
-                />
-                <line
-                  x1={`${prev.loc.x}%`} y1={`${prev.loc.y}%`}
-                  x2={`${seg.loc.x}%`}  y2={`${seg.loc.y}%`}
-                  stroke={style.color} strokeWidth="2.5" strokeDasharray={style.dash} opacity="0.9"
-                  filter="url(#glow)"
-                />
+                {allPts.slice(1).map((pt, j) => {
+                  const from = allPts[j];
+                  const isFirst = j === 0;
+                  const isLast  = j === allPts.length - 2;
+                  return (
+                    <g key={j}>
+                      <line x1={`${from[0]}%`} y1={`${from[1]}%`} x2={`${pt[0]}%`} y2={`${pt[1]}%`}
+                        stroke="#000" strokeWidth="4" strokeDasharray={style.dash} opacity="0.35" />
+                      <line x1={`${from[0]}%`} y1={`${from[1]}%`} x2={`${pt[0]}%`} y2={`${pt[1]}%`}
+                        stroke={style.color} strokeWidth="2.5" strokeDasharray={style.dash} opacity="0.9"
+                        filter="url(#glow)"
+                        markerEnd={isLast && (seg.direction === 'forward' || seg.direction === 'both') ? fwdId : undefined}
+                        markerStart={isFirst && (seg.direction === 'backward' || seg.direction === 'both') ? revId : undefined}
+                      />
+                    </g>
+                  );
+                })}
+                {/* Travel symbol at midpoint */}
                 <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="middle"
                   fontSize="12" style={{ userSelect: 'none', pointerEvents: 'none' }}
                   filter="url(#glow)">
                   {style.symbol}
                   {distLabel && <tspan x={`${mx}%`} dy="13" fontSize="9" fill="#e8d9a0">{distLabel}</tspan>}
                 </text>
+                {/* Waypoint handles (DM only) */}
+                {isDMMode && seg.waypoints.map((wp, wi) => (
+                  <circle key={wi} cx={`${wp[0]}%`} cy={`${wp[1]}%`} r="5"
+                    fill={style.color} stroke="#1a1a1a" strokeWidth="1.5" opacity="0.75" />
+                ))}
               </g>
             );
           })}
+
+          {/* Pending waypoints being drawn */}
+          {waypointMode && waypointMode.pts.map((pt, pi) => (
+            <circle key={pi} cx={`${pt[0]}%`} cy={`${pt[1]}%`} r="5"
+              fill="#fff" stroke="#e8c05a" strokeWidth="2" opacity="0.9" />
+          ))}
         </svg>
 
         {/* Pins */}

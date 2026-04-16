@@ -67,6 +67,8 @@ class PathEntryUpdate(BaseModel):
     travel_type:   Optional[str]   = None
     distance:      Optional[float] = None
     distance_unit: Optional[str]   = None
+    direction:     Optional[str]   = None
+    waypoints:     Optional[str]   = None  # JSON "[[x,y],...]" or null to clear
 
 
 class PathEntryOut(BaseModel):
@@ -76,6 +78,8 @@ class PathEntryOut(BaseModel):
     travel_type: str = "foot"
     distance: Optional[float] = None
     distance_unit: Optional[str] = None
+    direction: str = "forward"
+    waypoints: Optional[str] = None
     visited_at: Optional[datetime] = None
     location: Optional[LocationOut] = None
 
@@ -345,6 +349,8 @@ class CharacterPathEntryUpdate(BaseModel):
     travel_type:   Optional[str]   = None
     distance:      Optional[float] = None
     distance_unit: Optional[str]   = None
+    direction:     Optional[str]   = None
+    waypoints:     Optional[str]   = None
 
 class CharacterPathEntryOut(BaseModel):
     id: int
@@ -354,6 +360,8 @@ class CharacterPathEntryOut(BaseModel):
     travel_type: str = "foot"
     distance: Optional[float] = None
     distance_unit: Optional[str] = None
+    direction: str = "forward"
+    waypoints: Optional[str] = None
     visited_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 

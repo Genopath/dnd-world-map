@@ -120,6 +120,10 @@ interface Props {
   onUpdateCharPathTravelType: (entryId: number, type: string) => Promise<void>;
   onUpdatePathDistance?:      (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onUpdateCharPathDistance?:  (entryId: number, distance: number | null, unit: string) => Promise<void>;
+  onUpdatePathDirection?:     (entryId: number, dir: string) => Promise<void>;
+  onUpdateCharPathDirection?: (entryId: number, dir: string) => Promise<void>;
+  onStartWaypointDraw?:       (entryId: number, isChar: boolean) => void;
+  onClearWaypoints?:          (entryId: number, isChar: boolean) => Promise<void>;
   onDuplicateLocation:        (loc: Location) => Promise<void>;
   onScheduleBackup?:          () => void;
 }
@@ -157,6 +161,8 @@ export default function Sidebar({
   hiddenCharIds, showPartyPath, onToggleCharPath, onTogglePartyPath,
   onUpdatePathTravelType, onUpdateCharPathTravelType,
   onUpdatePathDistance, onUpdateCharPathDistance,
+  onUpdatePathDirection, onUpdateCharPathDirection,
+  onStartWaypointDraw, onClearWaypoints,
   onDuplicateLocation,
   onScheduleBackup,
 }: Props) {
@@ -345,6 +351,10 @@ export default function Sidebar({
             onUpdateCharTravelType={onUpdateCharPathTravelType}
             onUpdateDistance={onUpdatePathDistance}
             onUpdateCharDistance={onUpdateCharPathDistance}
+            onUpdateDirection={onUpdatePathDirection}
+            onUpdateCharDirection={onUpdateCharPathDirection}
+            onStartWaypointDraw={onStartWaypointDraw}
+            onClearWaypoints={onClearWaypoints}
           />
         )}
       </div>
@@ -772,6 +782,10 @@ interface PathPanelProps {
   onUpdateCharTravelType:  (entryId: number, type: string) => Promise<void>;
   onUpdateDistance?:       (entryId: number, distance: number | null, unit: string) => Promise<void>;
   onUpdateCharDistance?:   (entryId: number, distance: number | null, unit: string) => Promise<void>;
+  onUpdateDirection?:      (entryId: number, dir: string) => Promise<void>;
+  onUpdateCharDirection?:  (entryId: number, dir: string) => Promise<void>;
+  onStartWaypointDraw?:    (entryId: number, isChar: boolean) => void;
+  onClearWaypoints?:       (entryId: number, isChar: boolean) => Promise<void>;
 }
 
 function PathPanel({
@@ -782,21 +796,31 @@ function PathPanel({
   onToggleCharPath, onTogglePartyPath,
   onUpdateTravelType, onUpdateCharTravelType,
   onUpdateDistance, onUpdateCharDistance,
+  onUpdateDirection, onUpdateCharDirection,
+  onStartWaypointDraw, onClearWaypoints,
 }: PathPanelProps) {
   const [activeSection, setActiveSection] = useState<'party' | number>('party');
 
+  // Direction cycle: forward → both → backward → forward
+  const DIRECTION_LABELS: Record<string, string> = { forward: '→', both: '↔', backward: '←' };
+  const nextDirection = (d?: string) => d === 'forward' ? 'both' : d === 'both' ? 'backward' : 'forward';
+
   const renderPathList = (
-    entries: { id: number; location_id: number; position: number; travel_type?: string; distance?: number | null; distance_unit?: string | null; visited_at?: string }[],
+    entries: { id: number; location_id: number; position: number; travel_type?: string; distance?: number | null; distance_unit?: string | null; direction?: string; waypoints?: string | null; visited_at?: string }[],
     canEdit: boolean,
     onRem: (id: number) => void,
     onTravelType?: (id: number, type: string) => void,
     onMov?: (id: number, dir: -1 | 1) => void,
     onDist?: (id: number, distance: number | null, unit: string) => void,
+    onDir?: (id: number, dir: string) => void,
+    isChar?: boolean,
   ) => (
     <div className="path-list">
       {entries.map((entry, i) => {
         const loc = locations.find(l => l.id === entry.location_id);
         const tt = (entry.travel_type ?? 'foot') as TravelType;
+        const dir = entry.direction ?? 'forward';
+        const hasWaypoints = !!(entry.waypoints && entry.waypoints !== '[]');
         return (
           <div key={entry.id} className="path-entry" style={{ flexWrap: 'wrap', rowGap: 4 }}>
             <div className="path-num">{i + 1}</div>
@@ -808,6 +832,16 @@ function PathPanel({
                 onClick={() => onTravelType(entry.id, nextTravelType(entry.travel_type))}
               >
                 {TRAVEL_SYMBOLS[tt]}
+              </button>
+            )}
+            {canEdit && onDir && i > 0 && (
+              <button
+                className="btn btn-sm btn-ghost"
+                style={{ fontSize: 13, padding: '0 3px', minWidth: 22, opacity: 0.85 }}
+                title={`Direction: ${dir} — click to cycle (→ forward, ↔ both ways, ← backward)`}
+                onClick={() => onDir(entry.id, nextDirection(dir))}
+              >
+                {DIRECTION_LABELS[dir] ?? '→'}
               </button>
             )}
             {(i === 0 || !canEdit) && <span style={{ fontSize: 14, minWidth: 22, display: 'inline-block', textAlign: 'center' }}>📍</span>}
@@ -836,6 +870,28 @@ function PathPanel({
             {!canEdit && i > 0 && entry.distance != null && (
               <div style={{ width: '100%', paddingLeft: 28, fontSize: 11, color: 'var(--text-dim)' }}>
                 {entry.distance} {entry.distance_unit ?? 'days'}
+              </div>
+            )}
+            {canEdit && i > 0 && onStartWaypointDraw && (
+              <div style={{ width: '100%', paddingLeft: 28, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  style={{ fontSize: 11, padding: '1px 6px', color: hasWaypoints ? '#7ec8e3' : 'var(--text-dim)' }}
+                  title={hasWaypoints ? 'Edit custom path (has waypoints)' : 'Draw custom path on map'}
+                  onClick={() => onStartWaypointDraw(entry.id, isChar ?? false)}
+                >
+                  ✏ {hasWaypoints ? 'Edit path' : 'Draw path'}
+                </button>
+                {hasWaypoints && onClearWaypoints && (
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    style={{ fontSize: 11, padding: '1px 6px', color: '#e05c5c' }}
+                    title="Clear custom waypoints (revert to straight line)"
+                    onClick={() => onClearWaypoints(entry.id, isChar ?? false)}
+                  >
+                    × Clear
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -913,7 +969,7 @@ function PathPanel({
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {sortedPath.length} waypoint{sortedPath.length !== 1 ? 's' : ''} — click the travel icon to change type
               </div>
-              {renderPathList(sortedPath, isDMMode, onRemove, onUpdateTravelType, onMove, onUpdateDistance)}
+              {renderPathList(sortedPath, isDMMode, onRemove, onUpdateTravelType, onMove, onUpdateDistance, onUpdateDirection, false)}
             </>
           )}
         </>
@@ -948,7 +1004,7 @@ function PathPanel({
             {entries.length === 0 ? (
               <div className="path-empty">No waypoints for {m.name}.<br /><span style={{ fontSize: 12, marginTop: 4, display: 'block' }}>Click a pin on the map to select it, then "+ Add Selected".</span></div>
             ) : (
-              renderPathList(entries, isDMMode, onRemoveFromCharPath, onUpdateCharTravelType, undefined, onUpdateCharDistance)
+              renderPathList(entries, isDMMode, onRemoveFromCharPath, onUpdateCharTravelType, undefined, onUpdateCharDistance, onUpdateCharDirection, true)
             )}
           </div>
         );
