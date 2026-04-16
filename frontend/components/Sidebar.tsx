@@ -11,10 +11,10 @@ import QuestPanel from './QuestPanel';
 import SessionPanel from './SessionPanel';
 
 // ── Travel type metadata ──────────────────────────────────────────────────────
-type TravelType = 'foot' | 'horse' | 'boat' | 'fly';
-const TRAVEL_TYPES: TravelType[] = ['foot', 'horse', 'boat', 'fly'];
-const TRAVEL_SYMBOLS: Record<TravelType, string> = { foot: '🥾', horse: '🐴', boat: '⛵', fly: '🦅' };
-const TRAVEL_LABELS:  Record<TravelType, string> = { foot: 'Foot', horse: 'Horse', boat: 'Boat', fly: 'Flying' };
+type TravelType = 'foot' | 'horse' | 'boat' | 'fly' | 'portal';
+const TRAVEL_TYPES: TravelType[] = ['foot', 'horse', 'boat', 'fly', 'portal'];
+const TRAVEL_SYMBOLS: Record<TravelType, string> = { foot: '🥾', horse: '🐴', boat: '⛵', fly: '🦅', portal: '🌀' };
+const TRAVEL_LABELS:  Record<TravelType, string> = { foot: 'Foot', horse: 'Horse', boat: 'Boat', fly: 'Flying', portal: 'Portal' };
 function nextTravelType(current?: string): TravelType {
   const idx = TRAVEL_TYPES.indexOf((current ?? 'foot') as TravelType);
   return TRAVEL_TYPES[(idx + 1) % TRAVEL_TYPES.length];
@@ -24,14 +24,17 @@ function nextTravelType(current?: string): TravelType {
 const TYPE_LABELS: Record<LocationType, string> = {
   city: 'City', dungeon: 'Dungeon', wilderness: 'Wilderness', landmark: 'Landmark',
   hazard: 'Hazard', shop: 'Shop', inn: 'Inn', temple: 'Temple', port: 'Port',
+  bridge: 'Bridge', gate: 'Gate', portal: 'Portal',
 };
 const TYPE_ICONS: Record<LocationType, string> = {
   city: '🏰', dungeon: '💀', wilderness: '🌲', landmark: '◈',
   hazard: '⚠', shop: '🪙', inn: '🍺', temple: '⛩', port: '⚓',
+  bridge: '🌉', gate: '🚪', portal: '🌀',
 };
 const BADGE_CLASS: Record<LocationType, string> = {
   city: 'badge-city', dungeon: 'badge-dungeon', wilderness: 'badge-wilderness', landmark: 'badge-landmark',
   hazard: 'badge-hazard', shop: 'badge-shop', inn: 'badge-inn', temple: 'badge-temple', port: 'badge-port',
+  bridge: 'badge-bridge', gate: 'badge-gate', portal: 'badge-portal',
 };
 
 const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
@@ -550,6 +553,11 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               <option value="wilderness">Wilderness</option>
               <option value="dungeon">Dungeon</option>
               <option value="hazard">Hazard</option>
+            </optgroup>
+            <optgroup label="Travel">
+              <option value="bridge">Bridge</option>
+              <option value="gate">Gate</option>
+              <option value="portal">Portal</option>
             </optgroup>
             <optgroup label="Other">
               <option value="landmark">Landmark</option>

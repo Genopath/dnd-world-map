@@ -1,4 +1,4 @@
-export type LocationType = 'city' | 'dungeon' | 'wilderness' | 'landmark' | 'hazard' | 'shop' | 'inn' | 'temple' | 'port';
+export type LocationType = 'city' | 'dungeon' | 'wilderness' | 'landmark' | 'hazard' | 'shop' | 'inn' | 'temple' | 'port' | 'bridge' | 'gate' | 'portal';
 
 export interface Location {
   id: number;

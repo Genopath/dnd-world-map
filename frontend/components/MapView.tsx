@@ -19,6 +19,9 @@ const TYPE_COLORS: Record<string, string> = {
   inn:        'var(--pin-inn)',
   temple:     'var(--pin-temple)',
   port:       'var(--pin-port)',
+  bridge:     'var(--pin-bridge)',
+  gate:       'var(--pin-gate)',
+  portal:     'var(--pin-portal)',
 };
 
 const TYPE_DEFAULT_ICONS: Record<string, string> = {
@@ -31,16 +34,20 @@ const TYPE_DEFAULT_ICONS: Record<string, string> = {
   inn:        '/game-icons/inn.svg',
   temple:     '/game-icons/temple.svg',
   port:       '/game-icons/port.svg',
+  bridge:     '/game-icons/bridge.svg',
+  gate:       '/game-icons/gate.svg',
+  portal:     '/game-icons/portal.svg',
 };
 
 const CHAR_COLORS = ['#e05c5c', '#5c9fe0', '#60cc78', '#c05ce0', '#e0a040', '#40d4c8', '#e07840', '#a0c840'];
 
-type TravelType = 'foot' | 'horse' | 'boat' | 'fly';
+type TravelType = 'foot' | 'horse' | 'boat' | 'fly' | 'portal';
 const TRAVEL_STYLES: Record<TravelType, { color: string; dash: string; symbol: string }> = {
-  foot:  { color: '#e8c05a', dash: '7,4',  symbol: '🥾' },
-  horse: { color: '#d4884a', dash: '14,4', symbol: '🐴' },
-  boat:  { color: '#5a9ae0', dash: '3,7',  symbol: '⛵' },
-  fly:   { color: '#b090d0', dash: '2,9',  symbol: '🦅' },
+  foot:   { color: '#e8c05a', dash: '7,4',  symbol: '🥾' },
+  horse:  { color: '#d4884a', dash: '14,4', symbol: '🐴' },
+  boat:   { color: '#5a9ae0', dash: '3,7',  symbol: '⛵' },
+  fly:    { color: '#b090d0', dash: '2,9',  symbol: '🦅' },
+  portal: { color: '#c060e8', dash: '2,5,10,5', symbol: '🌀' },
 };
 function travelStyle(t?: string) {
   return TRAVEL_STYLES[(t ?? 'foot') as TravelType] ?? TRAVEL_STYLES.foot;
