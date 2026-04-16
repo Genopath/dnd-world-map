@@ -181,13 +181,15 @@ function ArrowAtMid({ pts, mapEl, color, direction }: {
 // ── Scale bar ─────────────────────────────────────────────────────────────────
 const SCALE_UNITS = ['miles', 'km', 'leagues', 'feet', 'yards', 'meters', 'AU', 'hexes', 'squares'];
 const NICE_SCALE  = [1,2,5,10,25,50,100,200,250,500,1000,2000,5000,10000,25000,50000];
+// Target visual width of the scale bar in screen pixels (fixed size, label updates on zoom)
+const SCALE_BAR_TARGET_PX = 120;
 
-function ScaleBar({ totalValue, unit, barWidthPx, isDM, onSet }: {
-  totalValue: number;
-  unit:       string;
-  barWidthPx: number;  // pixel width of the reference-distance bar on screen
-  isDM:       boolean;
-  onSet?:     (v: number, u: string) => void;
+function ScaleBar({ totalValue, unit, screenMapWidth, isDM, onSet }: {
+  totalValue:    number;
+  unit:          string;
+  screenMapWidth: number; // on-screen pixel width of the map image (includes zoom)
+  isDM:          boolean;
+  onSet?:        (v: number, u: string) => void;
 }) {
   const [editing,  setEditing]  = useState(false);
   const [editVal,  setEditVal]  = useState(String(totalValue));
@@ -196,13 +198,14 @@ function ScaleBar({ totalValue, unit, barWidthPx, isDM, onSet }: {
   // Keep edit fields in sync when external value changes
   useEffect(() => { setEditVal(String(totalValue)); setEditUnit(unit); }, [totalValue, unit]);
 
-  // Pick a nice reference distance ≈ 15% of total map width
-  const target  = totalValue * 0.15;
-  const refDist = NICE_SCALE.reduce((best, n) =>
-    n < totalValue && Math.abs(n - target) < Math.abs(best - target) ? n : best,
-    NICE_SCALE[0]);
-  // barWidthPx is for the full map width; scale to refDist
-  const refBarPx = Math.max(40, (refDist / totalValue) * barWidthPx);
+  // Google-Maps-style: fixed visual bar width, label updates with zoom.
+  // units-per-screen-pixel at current zoom:
+  const unitsPerPx = screenMapWidth > 0 ? totalValue / screenMapWidth : totalValue / 800;
+  // Max distance the target bar could represent, then snap down to a nice number
+  const maxDist = SCALE_BAR_TARGET_PX * unitsPerPx;
+  const niceDist = NICE_SCALE.filter(n => n <= maxDist).pop() ?? NICE_SCALE[0];
+  // Actual bar width in screen pixels for this nice distance
+  const barPx = Math.max(8, niceDist / unitsPerPx);
 
   function save() {
     const v = parseFloat(editVal);
@@ -243,9 +246,9 @@ function ScaleBar({ totalValue, unit, barWidthPx, isDM, onSet }: {
 
   return (
     <div data-no-draw style={barStyle} onMouseDown={e => e.stopPropagation()}>
-      {/* Bar */}
+      {/* Bar — fixed visual size, updates label on zoom */}
       <div style={{
-        width: refBarPx,
+        width: barPx,
         height: 3, background: '#fff',
         borderLeft: '2px solid #fff', borderRight: '2px solid #fff', borderBottom: '2px solid #fff',
         boxShadow: '0 0 5px rgba(0,0,0,0.8)',
@@ -257,7 +260,7 @@ function ScaleBar({ totalValue, unit, barWidthPx, isDM, onSet }: {
           fontSize: 11, fontWeight: 700, color: '#fff',
           textShadow: '0 0 4px #000, 0 0 4px #000',
         }}>
-          {refDist.toLocaleString()} {unit}
+          {niceDist.toLocaleString()} {unit}
         </span>
         {isDM && onSet && (
           <button data-no-draw
@@ -1084,13 +1087,13 @@ export default function MapView({
       {showScaleBar && (() => {
         const mapEl = imgRef.current ?? placeholderRef.current;
         // getBoundingClientRect includes CSS transform scale → real on-screen pixels
-        const barWidthPx = mapEl ? mapEl.getBoundingClientRect().width : 0;
+        const screenMapWidth = mapEl ? mapEl.getBoundingClientRect().width : 0;
         if (mapScale && mapScale.value > 0) {
           return (
             <ScaleBar
               totalValue={mapScale.value}
               unit={mapScale.unit}
-              barWidthPx={barWidthPx}
+              screenMapWidth={screenMapWidth}
               isDM={isDMMode}
               onSet={onSetMapScale}
             />
