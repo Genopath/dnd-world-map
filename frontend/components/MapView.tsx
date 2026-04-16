@@ -180,9 +180,10 @@ function ArrowAtMid({ pts, mapEl, color, direction }: {
 const SCALE_UNITS = ['miles', 'km', 'leagues', 'feet', 'yards', 'meters', 'AU', 'hexes', 'squares'];
 const NICE_SCALE  = [1,2,5,10,25,50,100,200,250,500,1000,2000,5000,10000,25000,50000];
 
-function ScaleBar({ totalValue, unit, isDM, onSet }: {
+function ScaleBar({ totalValue, unit, barWidthPx, isDM, onSet }: {
   totalValue: number;
   unit:       string;
+  barWidthPx: number;  // pixel width of the reference-distance bar on screen
   isDM:       boolean;
   onSet?:     (v: number, u: string) => void;
 }) {
@@ -198,7 +199,8 @@ function ScaleBar({ totalValue, unit, isDM, onSet }: {
   const refDist = NICE_SCALE.reduce((best, n) =>
     n < totalValue && Math.abs(n - target) < Math.abs(best - target) ? n : best,
     NICE_SCALE[0]);
-  const barPct  = (refDist / totalValue) * 100;
+  // barWidthPx is for the full map width; scale to refDist
+  const refBarPx = Math.max(40, (refDist / totalValue) * barWidthPx);
 
   function save() {
     const v = parseFloat(editVal);
@@ -241,7 +243,7 @@ function ScaleBar({ totalValue, unit, isDM, onSet }: {
     <div data-no-draw style={barStyle} onMouseDown={e => e.stopPropagation()}>
       {/* Bar */}
       <div style={{
-        width: `${barPct}%`, minWidth: 40, maxWidth: '40%',
+        width: refBarPx,
         height: 3, background: '#fff',
         borderLeft: '2px solid #fff', borderRight: '2px solid #fff', borderBottom: '2px solid #fff',
         boxShadow: '0 0 5px rgba(0,0,0,0.8)',
@@ -263,6 +265,58 @@ function ScaleBar({ totalValue, unit, isDM, onSet }: {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// Shown in DM mode when no scale is set yet — just shows the "Set scale" edit button
+function ScaleBarUnset({ onSet }: { onSet: (v: number, u: string) => void }) {
+  const [editing,  setEditing]  = useState(false);
+  const [editVal,  setEditVal]  = useState('');
+  const [editUnit, setEditUnit] = useState('miles');
+
+  function save() {
+    const v = parseFloat(editVal);
+    if (!isNaN(v) && v > 0) { onSet(v, editUnit); setEditing(false); }
+  }
+
+  const baseStyle: React.CSSProperties = {
+    position: 'absolute', bottom: 52, left: 16, zIndex: 20,
+    userSelect: 'none', pointerEvents: 'all',
+  };
+
+  if (editing) {
+    return (
+      <div data-no-draw style={{ ...baseStyle, background: '#1a2535e0', padding: '7px 10px', borderRadius: 6, display: 'flex', gap: 6, alignItems: 'center', border: '1px solid #3a5070' }}>
+        <span style={{ fontSize: 11, color: '#b8d0f0', flexShrink: 0 }}>Map width:</span>
+        <input
+          type="number" min="1" placeholder="e.g. 500" value={editVal} autoFocus
+          style={{ width: 72, fontSize: 12, padding: '2px 4px', borderRadius: 3 }}
+          onChange={e => setEditVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+        />
+        <select value={editUnit} style={{ fontSize: 12, padding: '2px 2px', borderRadius: 3 }}
+          onChange={e => setEditUnit(e.target.value)}>
+          {SCALE_UNITS.map(u => <option key={u}>{u}</option>)}
+        </select>
+        <button data-no-draw onClick={save}
+          style={{ fontSize: 12, padding: '2px 8px', background: '#2a4a2a', border: '1px solid #4a8a4a', borderRadius: 3, color: '#8d8', cursor: 'pointer' }}>
+          ✓
+        </button>
+        <button data-no-draw onClick={() => setEditing(false)}
+          style={{ fontSize: 12, padding: '2px 8px', background: '#3a2a2a', border: '1px solid #8a4a4a', borderRadius: 3, color: '#d88', cursor: 'pointer' }}>
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div data-no-draw style={baseStyle} onMouseDown={e => e.stopPropagation()}>
+      <button data-no-draw onClick={() => setEditing(true)}
+        style={{ fontSize: 11, padding: '3px 8px', background: '#1a2535c0', border: '1px solid #3a5070', borderRadius: 4, color: '#7090c0', cursor: 'pointer' }}>
+        ✏ Set map scale
+      </button>
     </div>
   );
 }
@@ -943,16 +997,29 @@ export default function MapView({
           );
         })}
 
-        {/* ── Scale bar ──────────────────────────────────────────────────── */}
-        {showScaleBar && mapScale && mapScale.value > 0 && (
-          <ScaleBar
-            totalValue={mapScale.value}
-            unit={mapScale.unit}
-            isDM={isDMMode}
-            onSet={onSetMapScale}
-          />
-        )}
       </div>
+
+      {/* ── Scale bar (fixed in map-container corner, outside map-transform) ── */}
+      {showScaleBar && (() => {
+        const mapEl = imgRef.current ?? placeholderRef.current;
+        // getBoundingClientRect includes CSS transform scale → real on-screen pixels
+        const barWidthPx = mapEl ? mapEl.getBoundingClientRect().width : 0;
+        if (mapScale && mapScale.value > 0) {
+          return (
+            <ScaleBar
+              totalValue={mapScale.value}
+              unit={mapScale.unit}
+              barWidthPx={barWidthPx}
+              isDM={isDMMode}
+              onSet={onSetMapScale}
+            />
+          );
+        }
+        if (isDMMode && onSetMapScale) {
+          return <ScaleBarUnset onSet={onSetMapScale} />;
+        }
+        return null;
+      })()}
 
       {/* ── Type filter strip ──────────────────────────────────────────────── */}
       {presentTypes.length > 1 && (
