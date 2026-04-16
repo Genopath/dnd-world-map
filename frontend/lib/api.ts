@@ -177,8 +177,7 @@ export const api = {
   },
   data: {
     export: () => req<object>('/export'),
-    import: (payload: object) =>
-      req<{ imported: boolean }>('/import', { method: 'POST', body: JSON.stringify(payload) }),
+    import: (file: File) => upload<{ imported: boolean }>('/import', file, 'file'),
   },
   campaigns: {
     list:   () => req<CampaignMeta[]>('/campaigns'),

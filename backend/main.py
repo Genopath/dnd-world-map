@@ -126,6 +126,7 @@ def _loc_out(loc: models.Location) -> schemas.LocationOut:
         image_url=getattr(loc, "image_url", None),
         parent_id=getattr(loc, "parent_id", None),
         submap_image_url=getattr(loc, "submap_image_url", None),
+        pin_size=getattr(loc, "pin_size", None) or "md",
         created_at=loc.created_at,
     )
 
@@ -1324,7 +1325,8 @@ def export_data(db: Session = Depends(get_db)):
 
 
 @app.post("/import")
-def import_data(payload: dict = Body(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
+async def import_data(file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
+    payload: dict = json.loads(await file.read())
     def _restore(encoded: str | None) -> str | None:
         """Store exported image data as a DB blob. Returns new /img/ URL, or None."""
         if not encoded:
@@ -1409,6 +1411,7 @@ def import_data(payload: dict = Body(...), slug: str = Depends(database.get_camp
             parent_id=d.get("parent_id"),
             submap_image_url=submap_url,
             fog_data=d.get("fog_data"),
+            pin_size=d.get("pin_size") or "md",
         ))
 
     # ── Party members ──────────────────────────────────────────────────────────

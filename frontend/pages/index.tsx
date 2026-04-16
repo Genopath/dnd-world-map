@@ -615,14 +615,7 @@ export default function Home() {
   const handleImport = useCallback(async (file: File) => {
     if (!confirm(`Import "${file.name}"? This will overwrite ALL data in the current campaign.`)) return;
     try {
-      let payload: object;
-      try {
-        payload = JSON.parse(await file.text());
-      } catch {
-        alert('Invalid file — could not parse JSON.');
-        return;
-      }
-      await api.data.import(payload);
+      await api.data.import(file);
       // Reload everything
       const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg] =
         await Promise.all([
