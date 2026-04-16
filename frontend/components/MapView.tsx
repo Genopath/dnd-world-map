@@ -108,29 +108,13 @@ function parseWaypoints(wp: string | null | undefined): [number, number][] {
   try { return JSON.parse(wp) as [number, number][]; } catch { return []; }
 }
 
-// Build a Catmull-Rom smooth SVG path from % coordinates.
-// mapEl.clientWidth/clientHeight gives the unscaled image dimensions,
-// which match the SVG user-space (no viewBox, same as the image).
-function catmullRomPath(pts: [number, number][], mapEl: HTMLElement): string {
-  if (pts.length < 2) return '';
+// Convert % waypoints to SVG polyline points string (no smoothing — follows path exactly).
+// mapEl.clientWidth/clientHeight gives the unscaled image size matching SVG user-space.
+function ptsToPolyline(pts: [number, number][], mapEl: HTMLElement): string {
   const w = mapEl.clientWidth;
   const h = mapEl.clientHeight;
-  if (!w || !h) return '';
-  const px: [number, number][] = pts.map(([x, y]) => [(x / 100) * w, (y / 100) * h]);
-  if (px.length === 2) return `M${px[0][0]},${px[0][1]} L${px[1][0]},${px[1][1]}`;
-  let d = `M${px[0][0].toFixed(1)},${px[0][1].toFixed(1)}`;
-  for (let i = 1; i < px.length; i++) {
-    const p0 = px[Math.max(i - 2, 0)];
-    const p1 = px[i - 1];
-    const p2 = px[i];
-    const p3 = px[Math.min(i + 1, px.length - 1)];
-    const c1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1);
-    const c1y = (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1);
-    const c2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1);
-    const c2y = (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1);
-    d += ` C${c1x},${c1y},${c2x},${c2y},${px[i][0].toFixed(1)},${px[i][1].toFixed(1)}`;
-  }
-  return d;
+  if (!w || !h || pts.length < 2) return '';
+  return pts.map(([x, y]) => `${((x / 100) * w).toFixed(1)},${((y / 100) * h).toFixed(1)}`).join(' ');
 }
 
 export default function MapView({
@@ -190,6 +174,10 @@ export default function MapView({
   // Keep a ref to transform for use in non-React event handlers
   const transformRef = useRef(transform);
   transformRef.current = transform;
+  // Keep waypointMode in a ref so mouse-event callbacks always see current value
+  // without needing waypointMode in their deps arrays (avoids stale closure bugs)
+  const waypointModeRef = useRef(waypointMode);
+  waypointModeRef.current = waypointMode;
 
   // ── Freehand waypoint drawing ─────────────────────────────────────────────
   const [freehandPts, setFreehandPts] = useState<[number, number][]>([]);
@@ -298,7 +286,7 @@ export default function MapView({
     if (e.button !== 0) return;
 
     // In waypoint mode: start freehand draw (unless clicking a UI button/control)
-    if (waypointMode) {
+    if (waypointModeRef.current) {
       if ((e.target as HTMLElement).closest('button,[data-no-draw]')) return;
       const mapEl = imgRef.current ?? placeholderRef.current;
       if (mapEl) {
@@ -322,14 +310,14 @@ export default function MapView({
       ty: transformRef.current.y,
     };
     (e.currentTarget as HTMLElement).classList.add('is-dragging');
-  }, [fogPaintMode, waypointMode]);
+  }, [fogPaintMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // ── Freehand waypoint drawing ──────────────────────────────────────────
-    if (isDrawingWp.current && waypointMode) {
+    if (isDrawingWp.current && waypointModeRef.current) {
       const dx = e.clientX - lastSample.current.clientX;
       const dy = e.clientY - lastSample.current.clientY;
-      if (dx * dx + dy * dy >= 8 * 8) { // sample every ~8 screen px
+      if (dx * dx + dy * dy >= 2 * 2) { // sample every ~2 screen px
         const mapEl = imgRef.current ?? placeholderRef.current;
         if (mapEl) {
           const rect = mapEl.getBoundingClientRect();
@@ -374,9 +362,10 @@ export default function MapView({
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     // ── Finish freehand waypoint draw ─────────────────────────────────────
-    if (isDrawingWp.current && waypointMode) {
+    if (isDrawingWp.current && waypointModeRef.current) {
       isDrawingWp.current = false;
       const pts = freehandBuf.current;
+      const wm = waypointModeRef.current;
       // Add the final mouse position as the last point
       const mapEl2 = imgRef.current ?? placeholderRef.current;
       if (mapEl2) {
@@ -386,11 +375,11 @@ export default function MapView({
         pts.push([fx, fy]);
       }
       if (pts.length >= 2 && onSaveWaypoints) {
-        // Keep max ~250 points (downsample if over limit)
-        const simplified = pts.length > 250
-          ? pts.filter((_, i) => i % Math.ceil(pts.length / 250) === 0 || i === pts.length - 1)
+        // Keep max ~1500 points (downsample if over limit)
+        const simplified = pts.length > 1500
+          ? pts.filter((_, i) => i % Math.ceil(pts.length / 1500) === 0 || i === pts.length - 1)
           : pts;
-        onSaveWaypoints(waypointMode.entryId, simplified, waypointMode.isChar);
+        onSaveWaypoints(wm.entryId, simplified, wm.isChar);
       }
       freehandBuf.current = [];
       return;
@@ -412,7 +401,7 @@ export default function MapView({
     isDragging.current = false;
     (e.currentTarget as HTMLElement).classList.remove('is-dragging');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragOverrides, onUpdateLocation, waypointMode, onSaveWaypoints]);
+  }, [dragOverrides, onUpdateLocation, onSaveWaypoints]);
 
   // ── Click (add pin or deselect) ───────────────────────────────────────────
   const handleContainerClick = useCallback(
@@ -661,13 +650,13 @@ export default function MapView({
               const my = (prev.loc.y + seg.loc.y) / 2;
               const fwdId = `url(#arrow-char-fwd-${member.id})`;
               const revId = `url(#arrow-char-rev-${member.id})`;
-              const d = (mapEl && allPts.length >= 2) ? catmullRomPath(allPts, mapEl) : null;
+              const pts = (mapEl && allPts.length >= 2) ? ptsToPolyline(allPts, mapEl) : null;
               return (
                 <g key={`char-${member.id}-${i}`}>
-                  {d ? (
+                  {pts ? (
                     <>
-                      <path d={d} stroke="#000" strokeWidth="3" strokeDasharray={style.dash} fill="none" opacity="0.3" />
-                      <path d={d} stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} fill="none" opacity="0.85"
+                      <polyline points={pts} stroke="#000" strokeWidth="3" strokeDasharray={style.dash} fill="none" opacity="0.3" />
+                      <polyline points={pts} stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} fill="none" opacity="0.85"
                         markerEnd={seg.direction !== 'backward' ? fwdId : undefined}
                         markerStart={seg.direction !== 'forward' ? revId : undefined}
                       />
@@ -707,13 +696,13 @@ export default function MapView({
             const ttName = (seg.travelType ?? 'foot') as TravelType;
             const fwdId = `url(#arrow-fwd-${ttName})`;
             const revId = `url(#arrow-rev-${ttName})`;
-            const d = (mapEl && allPts.length >= 2) ? catmullRomPath(allPts, mapEl) : null;
+            const pts = (mapEl && allPts.length >= 2) ? ptsToPolyline(allPts, mapEl) : null;
             return (
               <g key={`path-line-${i}`}>
-                {d ? (
+                {pts ? (
                   <>
-                    <path d={d} stroke="#000" strokeWidth="4" strokeDasharray={style.dash} fill="none" opacity="0.35" />
-                    <path d={d} stroke={style.color} strokeWidth="2.5" strokeDasharray={style.dash} fill="none" opacity="0.9"
+                    <polyline points={pts} stroke="#000" strokeWidth="4" strokeDasharray={style.dash} fill="none" opacity="0.35" />
+                    <polyline points={pts} stroke={style.color} strokeWidth="2.5" strokeDasharray={style.dash} fill="none" opacity="0.9"
                       filter="url(#glow)"
                       markerEnd={seg.direction !== 'backward' ? fwdId : undefined}
                       markerStart={seg.direction !== 'forward' ? revId : undefined}
@@ -745,9 +734,9 @@ export default function MapView({
           {waypointMode && freehandPts.length >= 2 && (() => {
             const mapEl = imgRef.current ?? placeholderRef.current;
             if (!mapEl) return null;
-            const d = catmullRomPath(freehandPts, mapEl);
-            return d ? (
-              <path d={d} stroke="#7ec8f0" strokeWidth="2" fill="none" opacity="0.8"
+            const pts = ptsToPolyline(freehandPts, mapEl);
+            return pts ? (
+              <polyline points={pts} stroke="#7ec8f0" strokeWidth="2" fill="none" opacity="0.8"
                 strokeDasharray="4,4" />
             ) : null;
           })()}
