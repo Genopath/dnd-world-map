@@ -215,9 +215,10 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   cursor: grab;
   user-select: none;
 }
-.map-container.is-dragging  { cursor: grabbing; }
-.map-container.adding-pin   { cursor: crosshair; }
-.map-container.fog-painting { cursor: default; }
+.map-container.is-dragging      { cursor: grabbing; }
+.map-container.adding-pin       { cursor: crosshair; }
+.map-container.fog-painting     { cursor: default; }
+.map-container.waypoint-drawing { cursor: crosshair; }
 
 .map-transform {
   position: absolute;

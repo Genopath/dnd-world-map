@@ -492,36 +492,23 @@ export default function Home() {
   }, []);
 
   // ── Waypoint drawing ─────────────────────────────────────────────────────────
-  const [waypointMode, setWaypointMode] = useState<{ entryId: number; pts: [number, number][]; isChar: boolean } | null>(null);
+  const [waypointMode, setWaypointMode] = useState<{ entryId: number; isChar: boolean } | null>(null);
 
   const handleStartWaypointDraw = useCallback((entryId: number, isChar: boolean) => {
-    const src = isChar ? characterPaths : playerPath;
-    const entry = src.find(e => e.id === entryId);
-    const existing: [number, number][] = entry?.waypoints ? (() => { try { return JSON.parse(entry.waypoints as string); } catch { return []; } })() : [];
-    setWaypointMode({ entryId, pts: existing, isChar });
-  }, [playerPath, characterPaths]);
-
-  const handleAddWaypoint = useCallback((x: number, y: number) => {
-    setWaypointMode(prev => prev ? { ...prev, pts: [...prev.pts, [x, y]] } : null);
+    setWaypointMode({ entryId, isChar });
   }, []);
 
-  const handleUndoWaypoint = useCallback(() => {
-    setWaypointMode(prev => prev ? { ...prev, pts: prev.pts.slice(0, -1) } : null);
-  }, []);
-
-  const handleFinishWaypoints = useCallback(async () => {
-    if (!waypointMode) return;
-    const { entryId, pts, isChar } = waypointMode;
-    const waypointsJson = pts.length > 0 ? JSON.stringify(pts) : null;
+  const handleSaveWaypoints = useCallback((entryId: number, pts: [number, number][], isChar: boolean) => {
+    const waypointsJson = pts.length >= 2 ? JSON.stringify(pts) : null;
     if (isChar) {
-      await api.characterPaths.updateEntry(entryId, { waypoints: waypointsJson });
+      api.characterPaths.updateEntry(entryId, { waypoints: waypointsJson });
       setCharacterPaths(prev => prev.map(e => e.id === entryId ? { ...e, waypoints: waypointsJson } : e));
     } else {
-      await api.path.updateEntry(entryId, { waypoints: waypointsJson });
+      api.path.updateEntry(entryId, { waypoints: waypointsJson });
       setPlayerPath(prev => prev.map(e => e.id === entryId ? { ...e, waypoints: waypointsJson } : e));
     }
     setWaypointMode(null);
-  }, [waypointMode]);
+  }, []);
 
   const handleCancelWaypoints = useCallback(() => setWaypointMode(null), []);
 
@@ -1005,9 +992,7 @@ export default function Home() {
             onAddToPath={handleAddToPath}
             onEnterSubmap={handleEnterSubmap}
             waypointMode={waypointMode}
-            onAddWaypoint={handleAddWaypoint}
-            onFinishWaypoints={handleFinishWaypoints}
-            onUndoWaypoint={handleUndoWaypoint}
+            onSaveWaypoints={handleSaveWaypoints}
             onCancelWaypoints={handleCancelWaypoints}
           />
           <Sidebar
