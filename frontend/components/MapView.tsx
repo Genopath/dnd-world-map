@@ -66,6 +66,7 @@ interface Props {
   showPartyPath:      boolean;
   showLabels:         boolean;
   showDistLabels:     boolean;
+  pinSize:            'sm' | 'md' | 'lg';
   fitTrigger:         number;
   onSelectLocation:   (id: number) => void;
   onDeselect:         () => void;
@@ -95,6 +96,7 @@ export default function MapView({
   showPartyPath,
   showLabels,
   showDistLabels,
+  pinSize,
   fitTrigger,
   onSelectLocation,
   onDeselect,
@@ -323,6 +325,7 @@ export default function MapView({
         isAddingPin  ? 'adding-pin'   : '',
         fogPaintMode ? 'fog-painting' : '',
         showLabels   ? 'labels-on'    : '',
+        pinSize !== 'md' ? `pin-size-${pinSize}` : '',
       ].filter(Boolean).join(' ')}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -517,7 +520,10 @@ export default function MapView({
                     {activeQuestCounts.get(loc.id)! > 1 ? activeQuestCounts.get(loc.id) : '!'}
                   </div>
                 )}
-                <div className="pin-label">{loc.name}</div>
+                <div className="pin-label">
+                  <span>{loc.name}</span>
+                  {loc.subtitle && <span className="pin-label-subtitle">{loc.subtitle}</span>}
+                </div>
               </div>
             </div>
           );

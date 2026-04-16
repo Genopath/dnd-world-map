@@ -369,10 +369,68 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   transition: opacity 0.12s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.75);
   text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
 }
 .pin:hover .pin-label,
 .pin.selected .pin-label { opacity: 1; }
 .labels-on .pin-label    { opacity: 1; }
+
+.pin-label-subtitle {
+  font-size: 8.5px;
+  font-weight: 400;
+  font-family: var(--font-body);
+  letter-spacing: 0.03em;
+  opacity: 0.65;
+  text-shadow: none;
+}
+
+/* ── Pin size variants ─────────────────────────────────────────────────────── */
+/* Default (md) is the current 38px size — no extra class needed. */
+
+/* Small */
+.pin-size-sm .pin-icon-default,
+.pin-size-sm .pin-icon-img { width: 26px; height: 26px; }
+.pin-size-sm .pin-icon-default {
+  box-shadow:
+    inset 0 -3px 6px rgba(0,0,0,0.45),
+    inset 0 1.5px 4px rgba(255,255,255,0.13),
+    0 0 0 2px rgba(0,0,0,0.7),
+    0 0 0 3.5px var(--loc-color, var(--accent)),
+    0 3px 12px rgba(0,0,0,0.85);
+}
+.pin-size-sm .pin-body::after {
+  border-left-width: 4px;
+  border-right-width: 4px;
+  border-top-width: 8px;
+  margin-top: -3px;
+}
+.pin-size-sm .pin-dot { width: 10px; height: 10px; }
+.pin-size-sm .pin-label { font-size: 9px; padding: 2px 7px; }
+.pin-size-sm .pin-label-subtitle { font-size: 7.5px; }
+
+/* Large */
+.pin-size-lg .pin-icon-default,
+.pin-size-lg .pin-icon-img { width: 50px; height: 50px; }
+.pin-size-lg .pin-icon-default {
+  box-shadow:
+    inset 0 -5px 10px rgba(0,0,0,0.45),
+    inset 0 2.5px 6px rgba(255,255,255,0.13),
+    0 0 0 3px rgba(0,0,0,0.7),
+    0 0 0 5.5px var(--loc-color, var(--accent)),
+    0 5px 20px rgba(0,0,0,0.85);
+}
+.pin-size-lg .pin-body::after {
+  border-left-width: 8px;
+  border-right-width: 8px;
+  border-top-width: 14px;
+  margin-top: -6px;
+}
+.pin-size-lg .pin-dot { width: 18px; height: 18px; }
+.pin-size-lg .pin-label { font-size: 12px; padding: 4px 11px; }
+.pin-size-lg .pin-label-subtitle { font-size: 10px; }
 
 /* Pin being dragged */
 .pin.pin-dragging { z-index: 20; cursor: grabbing; }
