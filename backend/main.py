@@ -1373,11 +1373,15 @@ def import_data(payload: dict = Body(...), slug: str = Depends(database.get_camp
 
     # ── Map config ─────────────────────────────────────────────────────────────
     map_raw = payload.get("map_config") or {}
-    if map_raw.get("_image_data"):
-        map_url = _restore(map_raw["_image_data"])
+    map_url = _restore(map_raw.get("_image_data"))
+    if map_url is None and map_raw.get("image_filename"):
+        fn = map_raw["image_filename"]
+        # Only preserve legacy filesystem filenames; /img/ URLs belong to the
+        # source campaign's DB and are meaningless in the destination campaign.
+        if not fn.startswith("/img/"):
+            map_url = fn
+    if map_url:
         db.add(models.MapConfig(image_filename=map_url))
-    elif map_raw.get("image_filename"):
-        db.add(models.MapConfig(image_filename=map_raw["image_filename"]))
 
     # ── Fog of war ─────────────────────────────────────────────────────────────
     fog_str = payload.get("fog_of_war") or ""
