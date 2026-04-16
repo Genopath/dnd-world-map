@@ -250,7 +250,7 @@ export default function Home() {
             const restore = typeof window !== 'undefined'
               && window.confirm(`Campaign data appears empty (server may have been redeployed).\n\nRestore from browser backup saved on ${savedAt}?`);
             if (restore) {
-              await api.data.import(cached as object);
+              await api.data.import(new File([JSON.stringify(cached)], 'backup.json', { type: 'application/json' }));
               // Re-fetch everything after restore
               const [rLocs, rPath, rCfg, rNpcs, rQuests, rSessions, rParty, rFactions, rCamp, rFog, rCal, rCharPaths] =
                 await Promise.all([
