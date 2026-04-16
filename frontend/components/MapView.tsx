@@ -81,8 +81,9 @@ interface Props {
   mapStack:           number[];
   characterPaths:     CharacterPathEntry[];
   party:              PartyMember[];
-  hiddenCharIds:      Set<number>;
-  showPartyPath:      boolean;
+  hiddenCharIds:        Set<number>;
+  hiddenSegmentIds?:    Set<number>;
+  showPartyPath:        boolean;
   showLabels:         boolean;
   showDistLabels:     boolean;
   showTimeLabels:     boolean;
@@ -118,6 +119,62 @@ function ptsToPolyline(pts: [number, number][], mapEl: HTMLElement): string {
   return pts.map(([x, y]) => `${((x / 100) * w).toFixed(1)},${((y / 100) * h).toFixed(1)}`).join(' ');
 }
 
+// Render an arrowhead polygon at the midpoint of a % path, in SVG pixel space.
+function ArrowAtMid({ pts, mapEl, color, direction }: {
+  pts:       [number, number][];
+  mapEl:     HTMLElement;
+  color:     string;
+  direction: 'forward' | 'backward' | 'both';
+}) {
+  if (pts.length < 2) return null;
+  const w = mapEl.clientWidth;
+  const h = mapEl.clientHeight;
+  if (!w || !h) return null;
+
+  // Convert % → SVG px
+  const px: [number, number][] = pts.map(([x, y]) => [x / 100 * w, y / 100 * h]);
+
+  // Cumulative lengths along path
+  const cuml = [0];
+  for (let i = 1; i < px.length; i++) {
+    const dx = px[i][0] - px[i - 1][0];
+    const dy = px[i][1] - px[i - 1][1];
+    cuml.push(cuml[i - 1] + Math.sqrt(dx * dx + dy * dy));
+  }
+  const total = cuml[cuml.length - 1];
+  if (total < 5) return null;
+
+  // Find the point at 50% of total length
+  const half = total / 2;
+  let si = 1;
+  while (si < px.length - 1 && cuml[si] < half) si++;
+  const frac = (half - cuml[si - 1]) / (cuml[si] - cuml[si - 1]);
+  const cx = px[si - 1][0] + frac * (px[si][0] - px[si - 1][0]);
+  const cy = px[si - 1][1] + frac * (px[si][1] - px[si - 1][1]);
+  const angle = Math.atan2(px[si][1] - px[si - 1][1], px[si][0] - px[si - 1][0]) * 180 / Math.PI;
+
+  // Arrow triangle: tip at (0,0), base at (-S, ±S*0.45)
+  const S = 10;
+  const aPts = `0,0 ${-S},${(S * 0.45).toFixed(1)} ${-S},${(-S * 0.45).toFixed(1)}`;
+  const tx = cx.toFixed(1);
+  const ty = cy.toFixed(1);
+
+  return (
+    <>
+      {direction !== 'backward' && (
+        <polygon points={aPts} fill={color} opacity={0.95}
+          transform={`translate(${tx},${ty}) rotate(${angle.toFixed(1)})`}
+          style={{ pointerEvents: 'none' }} />
+      )}
+      {direction !== 'forward' && (
+        <polygon points={aPts} fill={color} opacity={0.95}
+          transform={`translate(${tx},${ty}) rotate(${(angle + 180).toFixed(1)})`}
+          style={{ pointerEvents: 'none' }} />
+      )}
+    </>
+  );
+}
+
 export default function MapView({
   locations,
   allLocations,
@@ -135,6 +192,7 @@ export default function MapView({
   characterPaths,
   party,
   hiddenCharIds,
+  hiddenSegmentIds,
   showPartyPath,
   showLabels,
   showDistLabels,
@@ -601,7 +659,7 @@ export default function MapView({
           }}
         >
           <defs>
-            {/* Expanded filter region so arrow markers aren't clipped */}
+            {/* Filter region expanded so nothing at edges gets clipped */}
             <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
               <feGaussianBlur stdDeviation="3" result="blur" />
               <feMerge>
@@ -609,75 +667,38 @@ export default function MapView({
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
-            {/* Arrow markers per travel type: fwd = marker-end, rev = marker-start */}
-            {(Object.entries(TRAVEL_STYLES) as [TravelType, { color: string; dash: string; symbol: string }][]).map(([type, style]) => (
-              <g key={`markers-${type}`}>
-                <marker id={`arrow-fwd-${type}`} markerWidth="5" markerHeight="5"
-                  refX="4.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
-                  <path d="M0,0 L0,5 L5,2.5 z" fill={style.color} />
-                </marker>
-                <marker id={`arrow-rev-${type}`} markerWidth="5" markerHeight="5"
-                  refX="0.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
-                  <path d="M5,0 L5,5 L0,2.5 z" fill={style.color} />
-                </marker>
-              </g>
-            ))}
-            {/* Arrow markers per party member */}
-            {party.map(m => {
-              const c = m.path_color || '#c9a84c';
-              return (
-                <g key={`char-markers-${m.id}`}>
-                  <marker id={`arrow-char-fwd-${m.id}`} markerWidth="5" markerHeight="5"
-                    refX="4.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
-                    <path d="M0,0 L0,5 L5,2.5 z" fill={c} />
-                  </marker>
-                  <marker id={`arrow-char-rev-${m.id}`} markerWidth="5" markerHeight="5"
-                    refX="0.5" refY="2.5" orient="auto" markerUnits="strokeWidth">
-                    <path d="M5,0 L5,5 L0,2.5 z" fill={c} />
-                  </marker>
-                </g>
-              );
-            })}
           </defs>
 
-          {/* Helper: render one segment as a smooth curve or straight line */}
           {/* Character individual paths */}
           {charPathLines.map(({ member, color, segments }) =>
             segments.map((seg, i) => {
               if (i === 0) return null;
+              if (hiddenSegmentIds?.has(seg.entryId)) return null;
               const prev = segments[i - 1];
               const style = travelStyle(seg.travelType);
               const mapEl = imgRef.current ?? placeholderRef.current;
-              // Use live freehand preview if currently drawing this segment
               const wp = (waypointMode?.entryId === seg.entryId && freehandPts.length >= 2)
                 ? freehandPts : seg.waypoints;
               const allPts: [number, number][] = [[prev.loc.x, prev.loc.y], ...wp, [seg.loc.x, seg.loc.y]];
               const mx = (prev.loc.x + seg.loc.x) / 2;
               const my = (prev.loc.y + seg.loc.y) / 2;
-              const fwdId = `url(#arrow-char-fwd-${member.id})`;
-              const revId = `url(#arrow-char-rev-${member.id})`;
               const pts = (mapEl && allPts.length >= 2) ? ptsToPolyline(allPts, mapEl) : null;
               return (
                 <g key={`char-${member.id}-${i}`}>
                   {pts ? (
                     <>
                       <polyline points={pts} stroke="#000" strokeWidth="3" strokeDasharray={style.dash} fill="none" opacity="0.3" />
-                      <polyline points={pts} stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} fill="none" opacity="0.85"
-                        markerEnd={seg.direction !== 'backward' ? fwdId : undefined}
-                        markerStart={seg.direction !== 'forward' ? revId : undefined}
-                      />
+                      <polyline points={pts} stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} fill="none" opacity="0.85" />
                     </>
                   ) : (
                     <>
                       <line x1={`${prev.loc.x}%`} y1={`${prev.loc.y}%`} x2={`${seg.loc.x}%`} y2={`${seg.loc.y}%`}
                         stroke="#000" strokeWidth="3" strokeDasharray={style.dash} opacity="0.3" />
                       <line x1={`${prev.loc.x}%`} y1={`${prev.loc.y}%`} x2={`${seg.loc.x}%`} y2={`${seg.loc.y}%`}
-                        stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} opacity="0.85"
-                        markerEnd={seg.direction !== 'backward' ? fwdId : undefined}
-                        markerStart={seg.direction !== 'forward' ? revId : undefined}
-                      />
+                        stroke={color} strokeWidth="1.8" strokeDasharray={style.dash} opacity="0.85" />
                     </>
                   )}
+                  {mapEl && <ArrowAtMid pts={allPts} mapEl={mapEl} color={color} direction={seg.direction} />}
                   <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="middle"
                     fontSize="11" style={{ userSelect: 'none', pointerEvents: 'none' }}>
                     {style.symbol}
@@ -689,6 +710,7 @@ export default function MapView({
 
           {showPartyPath && orderedSegments.map((seg, i) => {
             if (i === 0) return null;
+            if (hiddenSegmentIds?.has(seg.entryId)) return null;
             const prev = orderedSegments[i - 1];
             const style = travelStyle(seg.travelType);
             const mapEl = imgRef.current ?? placeholderRef.current;
@@ -701,9 +723,6 @@ export default function MapView({
               ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
             const timeLabel = showTimeLabels && seg.travel_time != null
               ? `${seg.travel_time}${seg.travel_time_unit ? ' ' + seg.travel_time_unit : ''}` : null;
-            const ttName = (seg.travelType ?? 'foot') as TravelType;
-            const fwdId = `url(#arrow-fwd-${ttName})`;
-            const revId = `url(#arrow-rev-${ttName})`;
             const pts = (mapEl && allPts.length >= 2) ? ptsToPolyline(allPts, mapEl) : null;
             return (
               <g key={`path-line-${i}`}>
@@ -712,8 +731,6 @@ export default function MapView({
                     <polyline points={pts} stroke="#000" strokeWidth="4" strokeDasharray={style.dash} fill="none" opacity="0.35" />
                     <polyline points={pts} stroke={style.color} strokeWidth="2.5" strokeDasharray={style.dash} fill="none" opacity="0.9"
                       filter="url(#glow)"
-                      markerEnd={seg.direction !== 'backward' ? fwdId : undefined}
-                      markerStart={seg.direction !== 'forward' ? revId : undefined}
                     />
                   </>
                 ) : (
@@ -723,22 +740,21 @@ export default function MapView({
                     <line x1={`${prev.loc.x}%`} y1={`${prev.loc.y}%`} x2={`${seg.loc.x}%`} y2={`${seg.loc.y}%`}
                       stroke={style.color} strokeWidth="2.5" strokeDasharray={style.dash} opacity="0.9"
                       filter="url(#glow)"
-                      markerEnd={seg.direction !== 'backward' ? fwdId : undefined}
-                      markerStart={seg.direction !== 'forward' ? revId : undefined}
                     />
                   </>
                 )}
+                {mapEl && <ArrowAtMid pts={allPts} mapEl={mapEl} color={style.color} direction={seg.direction} />}
                 <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="middle"
                   fontSize="12" style={{ userSelect: 'none', pointerEvents: 'none' }}
                   filter="url(#glow)">
                   {style.symbol}
                   {distLabel && (
                     <tspan x={`${mx}%`} dy="13" fontSize="9"
-                      fill="#fff" stroke="#000" strokeWidth="2" paintOrder="stroke">{distLabel}</tspan>
+                      fill="#ffe58a" stroke="#000" strokeWidth="2" paintOrder="stroke">{distLabel}</tspan>
                   )}
                   {timeLabel && (
                     <tspan x={`${mx}%`} dy={distLabel ? '11' : '13'} fontSize="9"
-                      fill="#aee" stroke="#000" strokeWidth="2" paintOrder="stroke">{timeLabel}</tspan>
+                      fill="#80d8ff" stroke="#000" strokeWidth="2" paintOrder="stroke">{timeLabel}</tspan>
                   )}
                 </text>
               </g>

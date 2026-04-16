@@ -113,9 +113,11 @@ interface Props {
   npcJumpId:           number | null;
   questJumpId:         number | null;
   hiddenCharIds:              Set<number>;
+  hiddenSegmentIds?:          Set<number>;
   showPartyPath:              boolean;
   onToggleCharPath:           (memberId: number) => void;
   onTogglePartyPath:          () => void;
+  onToggleSegment?:           (entryId: number) => void;
   onUpdatePathTravelType:     (entryId: number, type: string) => Promise<void>;
   onUpdateCharPathTravelType: (entryId: number, type: string) => Promise<void>;
   onUpdatePathDistance?:      (entryId: number, distance: number | null, unit: string) => Promise<void>;
@@ -160,7 +162,7 @@ export default function Sidebar({
   onAddToCharPath, onRemoveFromCharPath, onReorderCharPath, onClearCharPath,
   onLinkNpc, onUnlinkNpc, onNavigateToNpc, onNavigateToQuest,
   npcJumpId, questJumpId,
-  hiddenCharIds, showPartyPath, onToggleCharPath, onTogglePartyPath,
+  hiddenCharIds, hiddenSegmentIds, showPartyPath, onToggleCharPath, onTogglePartyPath, onToggleSegment,
   onUpdatePathTravelType, onUpdateCharPathTravelType,
   onUpdatePathDistance, onUpdateCharPathDistance,
   onUpdatePathTravelTime, onUpdateCharPathTravelTime,
@@ -360,6 +362,8 @@ export default function Sidebar({
             onUpdateCharDirection={onUpdateCharPathDirection}
             onStartWaypointDraw={onStartWaypointDraw}
             onClearWaypoints={onClearWaypoints}
+            hiddenSegmentIds={hiddenSegmentIds}
+            onToggleSegment={onToggleSegment}
           />
         )}
       </div>
@@ -796,6 +800,8 @@ interface PathPanelProps {
   onUpdateCharDirection?:  (entryId: number, dir: string) => Promise<void>;
   onStartWaypointDraw?:    (entryId: number, isChar: boolean) => void;
   onClearWaypoints?:       (entryId: number, isChar: boolean) => Promise<void>;
+  hiddenSegmentIds?:       Set<number>;
+  onToggleSegment?:        (entryId: number) => void;
 }
 
 function PathPanel({
@@ -809,6 +815,7 @@ function PathPanel({
   onUpdateTravelTime, onUpdateCharTravelTime,
   onUpdateDirection, onUpdateCharDirection,
   onStartWaypointDraw, onClearWaypoints,
+  hiddenSegmentIds, onToggleSegment,
 }: PathPanelProps) {
   const [activeSection, setActiveSection] = useState<'party' | number>('party');
 
@@ -867,6 +874,16 @@ function PathPanel({
                 <button className="path-arrow" onClick={() => onMov(entry.id, -1)} disabled={i === 0} title="Move up">▲</button>
                 <button className="path-arrow" onClick={() => onMov(entry.id, 1)} disabled={i === entries.length - 1} title="Move down">▼</button>
               </div>
+            )}
+            {i > 0 && onToggleSegment && (
+              <button
+                className="btn btn-sm btn-ghost"
+                style={{ fontSize: 13, padding: '0 3px', minWidth: 22, opacity: hiddenSegmentIds?.has(entry.id) ? 0.4 : 0.85 }}
+                title={hiddenSegmentIds?.has(entry.id) ? 'Show path segment on map' : 'Hide path segment on map'}
+                onClick={() => onToggleSegment(entry.id)}
+              >
+                {hiddenSegmentIds?.has(entry.id) ? '🚫' : '👁'}
+              </button>
             )}
             {canEdit && (
               <button className="path-remove" onClick={() => onRem(entry.id)} title="Remove">✕</button>

@@ -162,6 +162,7 @@ export default function Home() {
   const [mapStack,        setMapStack]        = useState<number[]>([]);
   const [submapFogData,   setSubmapFogData]   = useState<string>('1'.repeat(10000));
   const [characterPaths,  setCharacterPaths]  = useState<CharacterPathEntry[]>([]);
+  const [hiddenSegmentIds, setHiddenSegmentIds] = useState<Set<number>>(new Set());
 
   // ── Navigation jump state ────────────────────────────────────────────────────
   const [npcJumpId,   setNpcJumpId]   = useState<number | null>(null);
@@ -483,6 +484,14 @@ export default function Home() {
     await api.characterPaths.updateEntry(entryId, { distance, distance_unit: unit });
     setCharacterPaths(prev => prev.map(e => e.id === entryId ? { ...e, distance, distance_unit: unit } : e));
   }, []);
+  const handleToggleSegment = useCallback((entryId: number) => {
+    setHiddenSegmentIds(prev => {
+      const next = new Set(prev);
+      next.has(entryId) ? next.delete(entryId) : next.add(entryId);
+      return next;
+    });
+  }, []);
+
   const handleUpdatePathTravelTime = useCallback(async (entryId: number, travel_time: number | null, unit: string) => {
     await api.path.updateEntry(entryId, { travel_time, travel_time_unit: unit });
     setPlayerPath(prev => prev.map(e => e.id === entryId ? { ...e, travel_time, travel_time_unit: unit } : e));
@@ -991,6 +1000,7 @@ export default function Home() {
             characterPaths={levelCharPaths}
             party={party}
             hiddenCharIds={hiddenCharIds}
+            hiddenSegmentIds={hiddenSegmentIds}
             showPartyPath={showPartyPath}
             showLabels={showPinLabels}
             showDistLabels={showDistLabels}
@@ -1044,9 +1054,11 @@ export default function Home() {
             npcJumpId={npcJumpId}
             questJumpId={questJumpId}
             hiddenCharIds={hiddenCharIds}
+            hiddenSegmentIds={hiddenSegmentIds}
             showPartyPath={showPartyPath}
             onToggleCharPath={handleToggleCharPath}
             onTogglePartyPath={handleTogglePartyPath}
+            onToggleSegment={handleToggleSegment}
             onUpdatePathTravelType={handleUpdatePathTravelType}
             onUpdateCharPathTravelType={handleUpdateCharPathTravelType}
             onUpdatePathDistance={handleUpdatePathDistance}
