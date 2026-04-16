@@ -66,7 +66,6 @@ interface Props {
   showPartyPath:      boolean;
   showLabels:         boolean;
   showDistLabels:     boolean;
-  pinSize:            'sm' | 'md' | 'lg';
   fitTrigger:         number;
   onSelectLocation:   (id: number) => void;
   onDeselect:         () => void;
@@ -96,7 +95,6 @@ export default function MapView({
   showPartyPath,
   showLabels,
   showDistLabels,
-  pinSize,
   fitTrigger,
   onSelectLocation,
   onDeselect,
@@ -325,7 +323,6 @@ export default function MapView({
         isAddingPin  ? 'adding-pin'   : '',
         fogPaintMode ? 'fog-painting' : '',
         showLabels   ? 'labels-on'    : '',
-        pinSize !== 'md' ? `pin-size-${pinSize}` : '',
       ].filter(Boolean).join(' ')}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -473,6 +470,7 @@ export default function MapView({
               className={[
                 'pin',
                 `pin-${loc.type}`,
+                loc.pin_size && loc.pin_size !== 'md' ? `pin-size-${loc.pin_size}` : '',
                 loc.id === selectedId ? 'selected' : '',
                 !loc.discovered && !isDMMode ? 'undiscovered' : '',
                 override ? 'pin-dragging' : '',

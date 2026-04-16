@@ -55,6 +55,7 @@ _MIGRATIONS = [
     "ALTER TABLE character_paths ADD COLUMN distance REAL",
     "ALTER TABLE character_paths ADD COLUMN distance_unit VARCHAR(50)",
     "ALTER TABLE locations ADD COLUMN fog_data TEXT",
+    "ALTER TABLE locations ADD COLUMN pin_size VARCHAR(10) DEFAULT 'md'",
 ]
 
 

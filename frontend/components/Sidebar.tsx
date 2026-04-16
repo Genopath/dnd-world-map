@@ -233,6 +233,7 @@ export default function Sidebar({
               state={editState} isDMMode={isDMMode} locationId={location.id}
               onChange={setEditState} onSave={saveEdit} onCancel={cancelEdit} saving={saving}
               onUpdateLocation={onUpdate}
+              currentPinSize={location.pin_size ?? 'md'}
               currentIconUrl={location.icon_url} currentImageUrl={location.image_url} currentSubmapUrl={location.submap_image_url}
             />
           ) : (
@@ -510,12 +511,13 @@ interface EditFormProps {
   onChange: (s: EditState) => void;
   onSave: () => void; onCancel: () => void; saving: boolean;
   onUpdateLocation: (id: number, data: Partial<Location>) => Promise<void>;
+  currentPinSize?: 'sm' | 'md' | 'lg';
   currentIconUrl?: string | null;
   currentImageUrl?: string | null;
   currentSubmapUrl?: string | null;
 }
 
-function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentIconUrl, currentImageUrl, currentSubmapUrl }: EditFormProps) {
+function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentIconUrl, currentImageUrl, currentSubmapUrl }: EditFormProps) {
   const [libraryFor, setLibraryFor] = useState<'icon' | 'image' | 'submap' | null>(null);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -551,6 +553,18 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
             <input type="checkbox" id="disc-check" checked={state.discovered} onChange={e => onChange({ ...state, discovered: e.target.checked })} />
             <label htmlFor="disc-check">Discovered</label>
           </div>
+        </div>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Pin Size</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          {(['sm', 'md', 'lg'] as const).map(s => (
+            <button key={s} type="button"
+              className={`btn btn-sm${currentPinSize === s ? ' btn-active' : ''}`}
+              style={{ flex: 1 }}
+              onClick={() => onUpdateLocation(locationId, { pin_size: s })}
+            >{s === 'sm' ? 'Small' : s === 'md' ? 'Medium' : 'Large'}</button>
+          ))}
         </div>
       </div>
       <div className="form-group"><label className="form-label">Subtitle</label><input value={state.subtitle} onChange={set('subtitle')} placeholder="Short flavor text" /></div>

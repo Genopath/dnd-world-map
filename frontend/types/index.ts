@@ -16,6 +16,7 @@ export interface Location {
   image_url?: string | null;
   parent_id?: number | null;
   submap_image_url?: string | null;
+  pin_size?: 'sm' | 'md' | 'lg';
   created_at?: string;
 }
 

@@ -80,7 +80,6 @@ export default function Home() {
   const [error,         setError]         = useState<string | null>(null);
   const [showPinLabels,   setShowPinLabels]   = useState(() => typeof window !== 'undefined' && localStorage.getItem('show_pin_labels') === '1');
   const [showDistLabels,  setShowDistLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_dist_labels') !== '0' : true);
-  const [pinSize,         setPinSize]         = useState<'sm' | 'md' | 'lg'>(() => (typeof window !== 'undefined' ? (localStorage.getItem('pin_size') as 'sm' | 'md' | 'lg' | null) : null) ?? 'md');
   const [fitTrigger,      setFitTrigger]      = useState(0);
 
   // ── Phase-1 state ───────────────────────────────────────────────────────────
@@ -781,16 +780,6 @@ export default function Home() {
                 title="Toggle distance labels on paths"
                 onClick={() => setShowDistLabels(v => { const next = !v; localStorage.setItem('show_dist_labels', next ? '1' : '0'); return next; })}
               >📏 Distance</button>
-              <div style={{ display: 'flex', gap: '2px' }} title="Pin size">
-                {(['sm', 'md', 'lg'] as const).map(s => (
-                  <button
-                    key={s}
-                    className={`btn btn-sm ${pinSize === s ? 'btn-active' : ''}`}
-                    onClick={() => { setPinSize(s); localStorage.setItem('pin_size', s); }}
-                    title={`Pin size: ${s === 'sm' ? 'Small' : s === 'md' ? 'Medium' : 'Large'}`}
-                  >{s === 'sm' ? 'S' : s === 'md' ? 'M' : 'L'}</button>
-                ))}
-              </div>
               <label className="btn" style={{ cursor: 'pointer' }}>
                 {mapStack.length > 0 ? 'Upload Submap' : 'Upload Map'}
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
@@ -826,7 +815,6 @@ export default function Home() {
             showPartyPath={showPartyPath}
             showLabels={showPinLabels}
             showDistLabels={showDistLabels}
-            pinSize={pinSize}
             fitTrigger={fitTrigger}
             onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
             onDeselect={() => setSelectedId(null)}

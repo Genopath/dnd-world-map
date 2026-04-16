@@ -387,13 +387,13 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   text-shadow: none;
 }
 
-/* ── Pin size variants ─────────────────────────────────────────────────────── */
+/* ── Pin size variants — applied per-pin ───────────────────────────────────── */
 /* Default (md) is the current 38px size — no extra class needed. */
 
 /* Small */
-.pin-size-sm .pin-icon-default,
-.pin-size-sm .pin-icon-img { width: 26px; height: 26px; }
-.pin-size-sm .pin-icon-default {
+.pin.pin-size-sm .pin-icon-default,
+.pin.pin-size-sm .pin-icon-img { width: 26px; height: 26px; }
+.pin.pin-size-sm .pin-icon-default {
   box-shadow:
     inset 0 -3px 6px rgba(0,0,0,0.45),
     inset 0 1.5px 4px rgba(255,255,255,0.13),
@@ -401,20 +401,20 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
     0 0 0 3.5px var(--loc-color, var(--accent)),
     0 3px 12px rgba(0,0,0,0.85);
 }
-.pin-size-sm .pin-body::after {
+.pin.pin-size-sm .pin-body::after {
   border-left-width: 4px;
   border-right-width: 4px;
   border-top-width: 8px;
   margin-top: -3px;
 }
-.pin-size-sm .pin-dot { width: 10px; height: 10px; }
-.pin-size-sm .pin-label { font-size: 9px; padding: 2px 7px; }
-.pin-size-sm .pin-label-subtitle { font-size: 7.5px; }
+.pin.pin-size-sm .pin-dot { width: 10px; height: 10px; }
+.pin.pin-size-sm .pin-label { font-size: 9px; padding: 2px 7px; }
+.pin.pin-size-sm .pin-label-subtitle { font-size: 7.5px; }
 
 /* Large */
-.pin-size-lg .pin-icon-default,
-.pin-size-lg .pin-icon-img { width: 50px; height: 50px; }
-.pin-size-lg .pin-icon-default {
+.pin.pin-size-lg .pin-icon-default,
+.pin.pin-size-lg .pin-icon-img { width: 50px; height: 50px; }
+.pin.pin-size-lg .pin-icon-default {
   box-shadow:
     inset 0 -5px 10px rgba(0,0,0,0.45),
     inset 0 2.5px 6px rgba(255,255,255,0.13),
@@ -422,15 +422,15 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
     0 0 0 5.5px var(--loc-color, var(--accent)),
     0 5px 20px rgba(0,0,0,0.85);
 }
-.pin-size-lg .pin-body::after {
+.pin.pin-size-lg .pin-body::after {
   border-left-width: 8px;
   border-right-width: 8px;
   border-top-width: 14px;
   margin-top: -6px;
 }
-.pin-size-lg .pin-dot { width: 18px; height: 18px; }
-.pin-size-lg .pin-label { font-size: 12px; padding: 4px 11px; }
-.pin-size-lg .pin-label-subtitle { font-size: 10px; }
+.pin.pin-size-lg .pin-dot { width: 18px; height: 18px; }
+.pin.pin-size-lg .pin-label { font-size: 12px; padding: 4px 11px; }
+.pin.pin-size-lg .pin-label-subtitle { font-size: 10px; }
 
 /* Pin being dragged */
 .pin.pin-dragging { z-index: 20; cursor: grabbing; }

@@ -23,6 +23,7 @@ class Location(Base):
     parent_id = Column(Integer, nullable=True)            # null = root map level
     submap_image_url = Column(String(500), nullable=True) # interior map image
     fog_data         = Column(Text, nullable=True)         # per-submap fog (10000-char '0'/'1')
+    pin_size         = Column(String(10), default='md')    # 'sm' | 'md' | 'lg'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
