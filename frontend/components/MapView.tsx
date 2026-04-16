@@ -181,15 +181,14 @@ function ArrowAtMid({ pts, mapEl, color, direction }: {
 // ── Scale bar ─────────────────────────────────────────────────────────────────
 const SCALE_UNITS = ['miles', 'km', 'leagues', 'feet', 'yards', 'meters', 'AU', 'hexes', 'squares'];
 const NICE_SCALE  = [1,2,5,10,25,50,100,200,250,500,1000,2000,5000,10000,25000,50000];
-// Target visual width of the scale bar in screen pixels (fixed size, label updates on zoom)
-const SCALE_BAR_TARGET_PX = 120;
 
-function ScaleBar({ totalValue, unit, screenMapWidth, isDM, onSet }: {
-  totalValue:    number;
-  unit:          string;
-  screenMapWidth: number; // on-screen pixel width of the map image (includes zoom)
-  isDM:          boolean;
-  onSet?:        (v: number, u: string) => void;
+function ScaleBar({ totalValue, unit, screenMapWidth, containerWidth, isDM, onSet }: {
+  totalValue:     number;
+  unit:           string;
+  screenMapWidth: number; // on-screen px width of map image at current zoom
+  containerWidth: number; // px width of the map viewport (not zoom-dependent)
+  isDM:           boolean;
+  onSet?:         (v: number, u: string) => void;
 }) {
   const [editing,  setEditing]  = useState(false);
   const [editVal,  setEditVal]  = useState(String(totalValue));
@@ -198,14 +197,16 @@ function ScaleBar({ totalValue, unit, screenMapWidth, isDM, onSet }: {
   // Keep edit fields in sync when external value changes
   useEffect(() => { setEditVal(String(totalValue)); setEditUnit(unit); }, [totalValue, unit]);
 
-  // Google-Maps-style: fixed visual bar width, label updates with zoom.
-  // units-per-screen-pixel at current zoom:
-  const unitsPerPx = screenMapWidth > 0 ? totalValue / screenMapWidth : totalValue / 800;
-  // Max distance the target bar could represent, then snap down to a nice number
-  const maxDist = SCALE_BAR_TARGET_PX * unitsPerPx;
-  const niceDist = NICE_SCALE.filter(n => n <= maxDist).pop() ?? NICE_SCALE[0];
-  // Actual bar width in screen pixels for this nice distance
-  const barPx = Math.max(8, niceDist / unitsPerPx);
+  // Paper-map-legend style: fixed label (≈20% of total), bar grows/shrinks with zoom.
+  // Pick a nice reference distance close to 20% of the total map width.
+  const target  = totalValue * 0.20;
+  const refDist = NICE_SCALE.reduce((best, n) =>
+    n <= totalValue && Math.abs(n - target) < Math.abs(best - target) ? n : best,
+    NICE_SCALE[0]);
+  // Bar width = proportional fraction of the on-screen map width, capped at 40% of viewport.
+  const rawBarPx = screenMapWidth > 0 ? (refDist / totalValue) * screenMapWidth : 120;
+  const maxBarPx = (containerWidth || 800) * 0.40;
+  const barPx    = Math.max(20, Math.min(rawBarPx, maxBarPx));
 
   function save() {
     const v = parseFloat(editVal);
@@ -246,7 +247,7 @@ function ScaleBar({ totalValue, unit, screenMapWidth, isDM, onSet }: {
 
   return (
     <div data-no-draw style={barStyle} onMouseDown={e => e.stopPropagation()}>
-      {/* Bar — fixed visual size, updates label on zoom */}
+      {/* Bar — grows with zoom, capped at 40% of viewport width */}
       <div style={{
         width: barPx,
         height: 3, background: '#fff',
@@ -254,13 +255,13 @@ function ScaleBar({ totalValue, unit, screenMapWidth, isDM, onSet }: {
         boxShadow: '0 0 5px rgba(0,0,0,0.8)',
         marginBottom: 3,
       }} />
-      {/* Label */}
+      {/* Label — fixed reference distance, never changes */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{
           fontSize: 11, fontWeight: 700, color: '#fff',
           textShadow: '0 0 4px #000, 0 0 4px #000',
         }}>
-          {niceDist.toLocaleString()} {unit}
+          {refDist.toLocaleString()} {unit}
         </span>
         {isDM && onSet && (
           <button data-no-draw
@@ -659,12 +660,6 @@ export default function MapView({
       const y = ((e.clientY - rect.top) / rect.height) * 100;
       if (x < 0 || x > 100 || y < 0 || y > 100) return;
 
-      // ── Ruler: click sets/moves anchor ──────────────────────────────────
-      if (rulerActiveRef.current) {
-        setRulerAnchor([x, y]);
-        return;
-      }
-
       if (isAddingPin) {
         onAddPin(x, y);
       } else {
@@ -759,6 +754,20 @@ export default function MapView({
         setDragOverrides(new Map());
       }}
       onClick={handleContainerClick}
+      // Ruler: capture-phase click so we intercept before pin stopPropagation
+      onClickCapture={e => {
+        if (!rulerActiveRef.current) return;
+        if (hasDragged.current) return;
+        if ((e.target as HTMLElement).closest('[data-no-draw]')) return;
+        const mapEl: HTMLElement | null = imgRef.current ?? placeholderRef.current;
+        if (!mapEl) return;
+        const rect = mapEl.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        if (x < 0 || x > 100 || y < 0 || y > 100) return;
+        setRulerAnchor([x, y]);
+        e.stopPropagation(); // prevent pin selection / deselect while ruler is active
+      }}
     >
       {mapStack.length > 0 && (
         <div className="map-breadcrumb">
@@ -1087,13 +1096,15 @@ export default function MapView({
       {showScaleBar && (() => {
         const mapEl = imgRef.current ?? placeholderRef.current;
         // getBoundingClientRect includes CSS transform scale → real on-screen pixels
-        const screenMapWidth = mapEl ? mapEl.getBoundingClientRect().width : 0;
+        const screenMapWidth  = mapEl ? mapEl.getBoundingClientRect().width : 0;
+        const containerWidth  = containerRef.current?.offsetWidth ?? 0;
         if (mapScale && mapScale.value > 0) {
           return (
             <ScaleBar
               totalValue={mapScale.value}
               unit={mapScale.unit}
               screenMapWidth={screenMapWidth}
+              containerWidth={containerWidth}
               isDM={isDMMode}
               onSet={onSetMapScale}
             />
