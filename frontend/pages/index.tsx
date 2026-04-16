@@ -410,6 +410,15 @@ export default function Home() {
     return (loc?.parent_id ?? null) === currentMapId;
   });
 
+  // Debounced IDB backup — waits 3 s after the last change then fires a full export.
+  const scheduleIdbBackup = useCallback(() => {
+    if (!campaignSlug) return;
+    if (_idbBackupTimerRef.current) clearTimeout(_idbBackupTimerRef.current);
+    _idbBackupTimerRef.current = setTimeout(() => {
+      _idbBackupAsync(campaignSlug, true);
+    }, 3000);
+  }, [campaignSlug]);
+
   // ── Location handlers ───────────────────────────────────────────────────────
   const handleAddPin = useCallback(async (x: number, y: number) => {
     setIsAddingPin(false);
@@ -677,16 +686,6 @@ export default function Home() {
     // Trigger a fresh IndexedDB backup now that a map image changed.
     scheduleIdbBackup();
   }, [mapStack, campaignSlug]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Debounced IDB backup — waits 3 s after the last upload then fires a full export.
-  // Using a debounce avoids concurrent export calls when several images are uploaded in quick succession.
-  const scheduleIdbBackup = useCallback(() => {
-    if (!campaignSlug) return;
-    if (_idbBackupTimerRef.current) clearTimeout(_idbBackupTimerRef.current);
-    _idbBackupTimerRef.current = setTimeout(() => {
-      _idbBackupAsync(campaignSlug, true);
-    }, 3000);
-  }, [campaignSlug]);
 
   // ── Export / Import ───────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
