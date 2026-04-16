@@ -422,20 +422,23 @@ export default function Home() {
       setLocations(prev => [...prev, newLoc]);
       setSelectedId(newLoc.id);
       setSidebarTab('location');
+      scheduleIdbBackup();
     } catch (e) { console.error(e); }
-  }, [currentMapId]);
+  }, [currentMapId, scheduleIdbBackup]);
 
   const handleUpdateLocation = useCallback(async (id: number, data: Partial<Location>) => {
     const updated = await api.locations.update(id, data);
     setLocations(prev => prev.map(l => (l.id === id ? updated : l)));
-  }, []);
+    scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   const handleDeleteLocation = useCallback(async (id: number) => {
     await api.locations.remove(id);
     setLocations(prev => prev.filter(l => l.id !== id));
     setPlayerPath(prev => prev.filter(e => e.location_id !== id));
     if (selectedId === id) setSelectedId(null);
-  }, [selectedId]);
+    scheduleIdbBackup();
+  }, [selectedId, scheduleIdbBackup]);
 
   const handleDuplicateLocation = useCallback(async (loc: Location) => {
     const newLoc = await api.locations.create({
@@ -447,7 +450,8 @@ export default function Home() {
     setLocations(prev => [...prev, newLoc]);
     setSelectedId(newLoc.id);
     setSidebarTab('location');
-  }, []);
+    scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Path handlers ────────────────────────────────────────────────────────────
   const handleAddToPath           = useCallback(async (locationId: number) => { const e = await api.path.add(locationId); setPlayerPath(prev => [...prev, e]); }, []);
@@ -472,14 +476,14 @@ export default function Home() {
 
   // ── NPC handlers ─────────────────────────────────────────────────────────────
   const handleCreateNPC = useCallback(async (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>): Promise<NPC> => {
-    const npc = await api.npcs.create(data); setNpcs(prev => [...prev, npc]); return npc;
-  }, []);
+    const npc = await api.npcs.create(data); setNpcs(prev => [...prev, npc]); scheduleIdbBackup(); return npc;
+  }, [scheduleIdbBackup]);
   const handleUpdateNPC = useCallback(async (id: number, data: Partial<NPC>) => {
-    const updated = await api.npcs.update(id, data); setNpcs(prev => prev.map(n => (n.id === id ? updated : n)));
-  }, []);
+    const updated = await api.npcs.update(id, data); setNpcs(prev => prev.map(n => (n.id === id ? updated : n))); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleDeleteNPC = useCallback(async (id: number) => {
-    await api.npcs.remove(id); setNpcs(prev => prev.filter(n => n.id !== id));
-  }, []);
+    await api.npcs.remove(id); setNpcs(prev => prev.filter(n => n.id !== id)); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleUploadPortrait = useCallback(async (id: number, file: File) => {
     const { portrait_url } = await api.npcs.uploadPortrait(id, file);
     setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url } : n)));
@@ -488,56 +492,57 @@ export default function Home() {
   const handleDeleteNpcPortrait = useCallback(async (id: number) => {
     await api.npcs.deletePortrait(id);
     setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url: null } : n)));
-  }, []);
+    scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Quest handlers ────────────────────────────────────────────────────────────
   const handleCreateQuest = useCallback(async (data: Omit<Quest, 'id' | 'created_at'>) => {
-    const quest = await api.quests.create(data); setQuests(prev => [...prev, quest]);
-  }, []);
+    const quest = await api.quests.create(data); setQuests(prev => [...prev, quest]); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleUpdateQuest = useCallback(async (id: number, data: Partial<Quest>) => {
-    const updated = await api.quests.update(id, data); setQuests(prev => prev.map(q => (q.id === id ? updated : q)));
-  }, []);
+    const updated = await api.quests.update(id, data); setQuests(prev => prev.map(q => (q.id === id ? updated : q))); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleDeleteQuest = useCallback(async (id: number) => {
-    await api.quests.remove(id); setQuests(prev => prev.filter(q => q.id !== id));
-  }, []);
+    await api.quests.remove(id); setQuests(prev => prev.filter(q => q.id !== id)); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Session handlers ──────────────────────────────────────────────────────────
   const handleCreateSession = useCallback(async (data: Omit<SessionEntry, 'id' | 'created_at'>) => {
-    const session = await api.sessions.create(data); setSessions(prev => [...prev, session]);
-  }, []);
+    const session = await api.sessions.create(data); setSessions(prev => [...prev, session]); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleUpdateSession = useCallback(async (id: number, data: Partial<SessionEntry>) => {
-    const updated = await api.sessions.update(id, data); setSessions(prev => prev.map(s => (s.id === id ? updated : s)));
-  }, []);
+    const updated = await api.sessions.update(id, data); setSessions(prev => prev.map(s => (s.id === id ? updated : s))); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleDeleteSession = useCallback(async (id: number) => {
-    await api.sessions.remove(id); setSessions(prev => prev.filter(s => s.id !== id));
-  }, []);
+    await api.sessions.remove(id); setSessions(prev => prev.filter(s => s.id !== id)); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Party handlers ────────────────────────────────────────────────────────────
   const handleCreateParty = useCallback(async (data: Omit<PartyMember, 'id' | 'created_at'>): Promise<PartyMember> => {
-    const member = await api.party.create(data); setParty(prev => [...prev, member]); return member;
-  }, []);
+    const member = await api.party.create(data); setParty(prev => [...prev, member]); scheduleIdbBackup(); return member;
+  }, [scheduleIdbBackup]);
   const handleUpdateParty = useCallback(async (id: number, data: Partial<PartyMember>) => {
-    const updated = await api.party.update(id, data); setParty(prev => prev.map(m => (m.id === id ? updated : m)));
-  }, []);
+    const updated = await api.party.update(id, data); setParty(prev => prev.map(m => (m.id === id ? updated : m))); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleDeleteParty = useCallback(async (id: number) => {
-    await api.party.remove(id); setParty(prev => prev.filter(m => m.id !== id));
-  }, []);
+    await api.party.remove(id); setParty(prev => prev.filter(m => m.id !== id)); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Faction handlers ──────────────────────────────────────────────────────────
   const handleCreateFaction = useCallback(async (data: Omit<Faction, 'id' | 'created_at'>): Promise<Faction> => {
-    const faction = await api.factions.create(data); setFactions(prev => [...prev, faction]); return faction;
-  }, []);
+    const faction = await api.factions.create(data); setFactions(prev => [...prev, faction]); scheduleIdbBackup(); return faction;
+  }, [scheduleIdbBackup]);
   const handleUpdateFaction = useCallback(async (id: number, data: Partial<Faction>) => {
-    const updated = await api.factions.update(id, data); setFactions(prev => prev.map(f => (f.id === id ? updated : f)));
-  }, []);
+    const updated = await api.factions.update(id, data); setFactions(prev => prev.map(f => (f.id === id ? updated : f))); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
   const handleDeleteFaction = useCallback(async (id: number) => {
-    await api.factions.remove(id); setFactions(prev => prev.filter(f => f.id !== id));
-  }, []);
+    await api.factions.remove(id); setFactions(prev => prev.filter(f => f.id !== id)); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Campaign handler ──────────────────────────────────────────────────────────
   const handleUpdateCampaign = useCallback(async (data: Partial<Omit<CampaignSettings, 'id'>>) => {
-    const updated = await api.campaign.update(data); setCampaign(updated);
-  }, []);
+    const updated = await api.campaign.update(data); setCampaign(updated); scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────
   const handleEnterSubmap = useCallback(async (id: number) => {
@@ -562,7 +567,8 @@ export default function Home() {
   const handleUpdateCalendar = useCallback(async (data: Partial<Omit<CalendarConfig, 'id'>>) => {
     const updated = await api.calendar.update(data);
     setCalendarConfig(updated);
-  }, []);
+    scheduleIdbBackup();
+  }, [scheduleIdbBackup]);
 
   // ── Character path handlers ───────────────────────────────────────────────────
   const handleAddToCharPath    = useCallback(async (memberId: number, locationId: number) => {
