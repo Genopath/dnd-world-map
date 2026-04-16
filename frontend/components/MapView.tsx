@@ -39,6 +39,18 @@ const TYPE_DEFAULT_ICONS: Record<string, string> = {
   portal:     '/game-icons/portal.svg',
 };
 
+// Used in the type filter strip
+const TYPE_ICONS_EMOJI: Record<string, string> = {
+  city: '🏰', dungeon: '💀', wilderness: '🌲', landmark: '◈',
+  hazard: '⚠', shop: '🪙', inn: '🍺', temple: '⛩', port: '⚓',
+  bridge: '🌉', gate: '🚪', portal: '🌀',
+};
+const TYPE_LABELS_SHORT: Record<string, string> = {
+  city: 'City', dungeon: 'Dungeon', wilderness: 'Wild.', landmark: 'Landmark',
+  hazard: 'Hazard', shop: 'Shop', inn: 'Inn', temple: 'Temple', port: 'Port',
+  bridge: 'Bridge', gate: 'Gate', portal: 'Portal',
+};
+
 const CHAR_COLORS = ['#e05c5c', '#5c9fe0', '#60cc78', '#c05ce0', '#e0a040', '#40d4c8', '#e07840', '#a0c840'];
 
 type TravelType = 'foot' | 'horse' | 'boat' | 'fly' | 'portal';
@@ -80,6 +92,10 @@ interface Props {
   onFogChange:        (data: string) => void;
   onExitSubmap:       () => void;
   onUpdateLocation?:  (id: number, data: Partial<Location>) => Promise<void>;
+  onDeleteLocation?:  (id: number) => void;
+  onDuplicateLocation?: (loc: Location) => void;
+  onAddToPath?:       (locationId: number) => void;
+  onEnterSubmap?:     (id: number) => void;
 }
 
 export default function MapView({
@@ -109,6 +125,10 @@ export default function MapView({
   onFogChange,
   onExitSubmap,
   onUpdateLocation,
+  onDeleteLocation,
+  onDuplicateLocation,
+  onAddToPath,
+  onEnterSubmap,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +157,29 @@ export default function MapView({
   const pinDragRef     = useRef<{ id: number; startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
   const pinJustDragged = useRef(false);
   const [dragOverrides, setDragOverrides] = useState<Map<number, { x: number; y: number }>>(new Map());
+
+  // ── Context menu ──────────────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; loc: Location } | null>(null);
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('click', close);
+    document.addEventListener('contextmenu', close);
+    return () => { document.removeEventListener('click', close); document.removeEventListener('contextmenu', close); };
+  }, [contextMenu]);
+
+  // ── Type visibility filter ────────────────────────────────────────────────
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
+  const toggleType = useCallback((t: string) => {
+    setHiddenTypes(prev => { const n = new Set(prev); n.has(t) ? n.delete(t) : n.add(t); return n; });
+  }, []);
+  // Unique types present at this map level
+  const presentTypes = useMemo(() => [...new Set(locations.map(l => l.type))].sort(), [locations]);
+  // Filtered locations (apply type visibility)
+  const visibleLocations = useMemo(
+    () => locations.filter(l => !hiddenTypes.has(l.type)),
+    [locations, hiddenTypes],
+  );
 
   // ── Fit-to-pins ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -466,7 +509,7 @@ export default function MapView({
         </svg>
 
         {/* Pins */}
-        {locations.map(loc => {
+        {visibleLocations.map(loc => {
           const pathNum  = pathPositions[loc.id];
           const override = dragOverrides.get(loc.id);
           const px = override?.x ?? loc.x;
@@ -492,6 +535,12 @@ export default function MapView({
                 if (pinJustDragged.current) { pinJustDragged.current = false; return; }
                 if (!isAddingPin && !fogPaintMode) onSelectLocation(loc.id);
               }}
+              onContextMenu={isDMMode ? e => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (pinJustDragged.current) return;
+                setContextMenu({ x: e.clientX, y: e.clientY, loc });
+              } : undefined}
             >
               <div className="pin-body">
                 {loc.icon_url ? (
@@ -534,6 +583,65 @@ export default function MapView({
           );
         })}
       </div>
+
+      {/* ── Type filter strip ──────────────────────────────────────────────── */}
+      {presentTypes.length > 1 && (
+        <div className="pin-type-filter" onClick={e => e.stopPropagation()}>
+          {presentTypes.map(t => (
+            <button
+              key={t}
+              className={`pin-type-filter-btn${hiddenTypes.has(t) ? ' hidden' : ''}`}
+              style={{ '--filter-color': TYPE_COLORS[t] ?? TYPE_COLORS.city } as React.CSSProperties}
+              onClick={() => toggleType(t)}
+              title={`${hiddenTypes.has(t) ? 'Show' : 'Hide'} ${t} pins`}
+            >
+              {TYPE_ICONS_EMOJI[t] ?? '◈'} <span>{TYPE_LABELS_SHORT[t] ?? t}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Right-click context menu ───────────────────────────────────────── */}
+      {contextMenu && (
+        <div
+          className="pin-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="pin-context-name">{contextMenu.loc.name}</div>
+          <button onClick={() => { onSelectLocation(contextMenu.loc.id); setContextMenu(null); }}>
+            ✏️ Edit
+          </button>
+          {onDuplicateLocation && (
+            <button onClick={() => { onDuplicateLocation(contextMenu.loc); setContextMenu(null); }}>
+              📋 Duplicate
+            </button>
+          )}
+          {onAddToPath && (
+            <button onClick={() => { onAddToPath(contextMenu.loc.id); setContextMenu(null); }}>
+              🧭 Add to Path
+            </button>
+          )}
+          {contextMenu.loc.submap_image_url && onEnterSubmap && (
+            <button onClick={() => { onEnterSubmap(contextMenu.loc.id); setContextMenu(null); }}>
+              🗺 Enter Submap
+            </button>
+          )}
+          {onDeleteLocation && (
+            <button
+              className="pin-context-delete"
+              onClick={() => {
+                if (confirm(`Delete "${contextMenu.loc.name}"?`)) {
+                  onDeleteLocation(contextMenu.loc.id);
+                }
+                setContextMenu(null);
+              }}
+            >
+              🗑 Delete
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

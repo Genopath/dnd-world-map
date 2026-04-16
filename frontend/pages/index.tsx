@@ -662,6 +662,50 @@ export default function Home() {
   }, []);
   useWebSocket(handleWSRefresh, !isDMMode);
 
+  // ── Keyboard shortcuts + copy/paste ──────────────────────────────────────────
+  const [copiedLocation, setCopiedLocation] = useState<Location | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't fire when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement)?.isContentEditable) return;
+      if (!isDMMode) return;
+
+      // Escape — deselect / cancel add-pin
+      if (e.key === 'Escape') {
+        setSelectedId(null);
+        setIsAddingPin(false);
+        return;
+      }
+      // Delete / Backspace — delete selected pin
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        const loc = locations.find(l => l.id === selectedId);
+        if (loc && confirm(`Delete "${loc.name}"?`)) handleDeleteLocation(selectedId);
+        return;
+      }
+      // Ctrl+D — duplicate selected
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        const loc = locations.find(l => l.id === selectedId);
+        if (loc) handleDuplicateLocation(loc);
+        return;
+      }
+      // Ctrl+C — copy selected
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedId) {
+        const loc = locations.find(l => l.id === selectedId);
+        if (loc) setCopiedLocation(loc);
+        return;
+      }
+      // Ctrl+V — paste copied pin
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedLocation) {
+        e.preventDefault();
+        handleDuplicateLocation(copiedLocation);
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isDMMode, selectedId, locations, copiedLocation, handleDeleteLocation, handleDuplicateLocation]);
+
   // ── Fog handler ───────────────────────────────────────────────────────────────
   const handleFogChange = useCallback(async (data: string) => {
     if (currentMapId != null) {
@@ -904,6 +948,10 @@ export default function Home() {
             onFogChange={handleFogChange}
             onExitSubmap={handleExitSubmap}
             onUpdateLocation={handleUpdateLocation}
+            onDeleteLocation={handleDeleteLocation}
+            onDuplicateLocation={handleDuplicateLocation}
+            onAddToPath={handleAddToPath}
+            onEnterSubmap={handleEnterSubmap}
           />
           <Sidebar
             location={selectedLocation} isDMMode={isDMMode}
