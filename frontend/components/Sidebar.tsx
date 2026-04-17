@@ -112,6 +112,8 @@ interface Props {
   onNavigateToQuest:  (id: number) => void;
   npcJumpId:           number | null;
   questJumpId:         number | null;
+  partyJumpId?:        number | null;
+  onPingMarker?:       (kind: 'party' | 'char', memberId?: number) => void;
   hiddenCharIds:              Set<number>;
   hiddenSegmentIds?:          Set<number>;
   showPartyPath:              boolean;
@@ -161,7 +163,7 @@ export default function Sidebar({
   onLightbox,
   onAddToCharPath, onRemoveFromCharPath, onReorderCharPath, onClearCharPath,
   onLinkNpc, onUnlinkNpc, onNavigateToNpc, onNavigateToQuest,
-  npcJumpId, questJumpId,
+  npcJumpId, questJumpId, partyJumpId, onPingMarker,
   hiddenCharIds, hiddenSegmentIds, showPartyPath, onToggleCharPath, onTogglePartyPath, onToggleSegment,
   onUpdatePathTravelType, onUpdateCharPathTravelType,
   onUpdatePathDistance, onUpdateCharPathDistance,
@@ -320,6 +322,8 @@ export default function Sidebar({
             onCreate={onCreateParty} onUpdate={onUpdateParty} onDelete={onDeleteParty}
             onLightbox={onLightbox}
             onScheduleBackup={onScheduleBackup}
+            jumpToId={partyJumpId}
+            onPingMarker={onPingMarker}
           />
         )}
 

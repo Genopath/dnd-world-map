@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { PartyMember } from '../types';
 import LibraryPicker from './LibraryPicker';
@@ -61,9 +61,11 @@ interface Props {
   onDelete: (id: number) => Promise<void>;
   onLightbox: (url: string) => void;
   onScheduleBackup?: () => void;
+  jumpToId?: number | null;
+  onPingMarker?: (kind: 'party' | 'char', memberId?: number) => void;
 }
 
-export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDelete, onLightbox, onScheduleBackup }: Props) {
+export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDelete, onLightbox, onScheduleBackup, jumpToId, onPingMarker }: Props) {
   const [editingId,    setEditingId]    = useState<number | 'new' | null>(null);
   const [editState,    setEditState]    = useState<EditState | null>(null);
   const [saving,       setSaving]       = useState(false);
@@ -72,6 +74,21 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
   const [pendingUrl,   setPendingUrl]   = useState<string | null>(null);
   // Per-card HP input: memberId → raw input string
   const [hpInputs,  setHpInputs]   = useState<Record<number, string>>({});
+
+  // Jump-to: scroll member into view and briefly expand them
+  const jumpProcessed = useRef<number | null>(null);
+  const memberRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  useEffect(() => {
+    if (jumpToId != null && jumpToId !== jumpProcessed.current) {
+      jumpProcessed.current = jumpToId;
+      setEditingId(null); // close any open edit form
+      setTimeout(() => {
+        memberRefs.current[jumpToId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        memberRefs.current[jumpToId]?.classList.add('member-highlight');
+        setTimeout(() => memberRefs.current[jumpToId]?.classList.remove('member-highlight'), 1500);
+      }, 80);
+    }
+  }, [jumpToId]);
 
   const startNew  = () => { setEditState(blankEdit()); setEditingId('new'); setPendingFile(null); setPendingUrl(null); };
   const startEdit = (m: PartyMember) => { setEditState(toEdit(m)); setEditingId(m.id); };
@@ -127,9 +144,16 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {isDMMode && editingId === null && (
-        <button className="btn btn-primary btn-sm" onClick={startNew} style={{ alignSelf: 'flex-start' }}>+ Add Member</button>
-      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {isDMMode && editingId === null && (
+          <button className="btn btn-primary btn-sm" onClick={startNew}>+ Add Member</button>
+        )}
+        {onPingMarker && (
+          <button className="btn btn-sm btn-ghost" title="Locate party on map" onClick={() => onPingMarker('party')} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            📍 Locate Party
+          </button>
+        )}
+      </div>
 
       {/* Edit / Create form */}
       {editState && (
@@ -233,7 +257,7 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
         const pct = hpPct(m.hp_current, m.hp_max);
         const color = hpColor(m.hp_current, m.hp_max);
         return (
-          <div key={m.id} className="party-card">
+          <div key={m.id} className="party-card" ref={el => { memberRefs.current[m.id] = el; }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
                 {m.portrait_url ? (
@@ -261,6 +285,9 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <div className="ac-badge" title="Armor Class">🛡 {m.ac}</div>
+                {onPingMarker && m.marker_x != null && (
+                  <button className="btn btn-sm btn-ghost btn-icon" title="Locate on map" onClick={() => onPingMarker('char', m.id)}>📍</button>
+                )}
                 {isDMMode && editingId === null && (
                   <>
                     <button className="btn btn-sm btn-ghost btn-icon" onClick={() => startEdit(m)} title="Edit">✏</button>

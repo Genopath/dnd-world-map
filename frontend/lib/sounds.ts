@@ -462,6 +462,18 @@ export function playChime() {
   bell(c, mg, 1760, 0.07, now + 0.04, 0.35);
 }
 
+/** Soft magical sonar ping — locating a marker on the map */
+export function playPing() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.55);
+  const now = c.currentTime;
+  // Warm resonant pulse — like a scrying crystal
+  bell(c, mg, 660, 0.18, now, 0.55);
+  bell(c, mg, 990, 0.08, now + 0.06, 0.40);
+  // Soft echo repeat
+  bell(c, mg, 660, 0.06, now + 0.28, 0.35);
+}
+
 /** Soft felt-dampened thud + faint metallic ring when placing a party/char token */
 export function playTokenPlace() {
   const c = ac(); if (!c) return;

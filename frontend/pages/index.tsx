@@ -12,7 +12,7 @@ import {
   playPinSelect, playPinPlace, playPinDelete,
   playTabSwitch, playQuestComplete, playDMUnlock,
   playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
-  playCampaignSwitch, playChime, playTokenPlace, playTokenRemove,
+  playCampaignSwitch, playChime, playTokenPlace, playTokenRemove, playPing,
 } from '../lib/sounds';
 import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, MapConfig, NPC, PartyMember, PathEntry, Quest, SearchResults, SessionEntry, SidebarTab } from '../types';
 
@@ -242,6 +242,8 @@ export default function Home() {
   // ── Navigation jump state ────────────────────────────────────────────────────
   const [npcJumpId,   setNpcJumpId]   = useState<number | null>(null);
   const [questJumpId, setQuestJumpId] = useState<number | null>(null);
+  const [partyJumpId, setPartyJumpId] = useState<number | null>(null);
+  const [pingTarget,  setPingTarget]  = useState<{ kind: 'party' | 'char'; memberId?: number; seq: number } | null>(null);
 
   // ── Path visibility state ────────────────────────────────────────────────────
   // hiddenCharIds: Set of party_member IDs whose individual paths are hidden
@@ -736,6 +738,17 @@ export default function Home() {
     const updated = await api.party.update(memberId, { marker_x: x, marker_y: y });
     setParty(prev => prev.map(m => m.id === memberId ? updated : m));
     if (x == null) playTokenRemove(); else playTokenPlace();
+  }, []);
+
+  const handleNavigateToParty = useCallback((memberId?: number) => {
+    setSidebarTab('party');
+    if (memberId != null) setPartyJumpId(memberId);
+  }, []);
+
+  const pingSeq = useRef(0);
+  const handlePingMarker = useCallback((kind: 'party' | 'char', memberId?: number) => {
+    setPingTarget({ kind, memberId, seq: ++pingSeq.current });
+    playPing();
   }, []);
 
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────
@@ -1268,6 +1281,8 @@ export default function Home() {
             campaign={campaign}
             onUpdatePartyMarker={handleUpdatePartyMarker}
             onUpdateCharMarker={handleUpdateCharMarker}
+            onNavigateToParty={handleNavigateToParty}
+            pingTarget={pingTarget}
           />
           <div className={`sidebar-drawer ${mobileSidebarOpen ? 'sidebar-drawer--open' : ''}`}>
           <Sidebar
@@ -1303,6 +1318,8 @@ export default function Home() {
             onNavigateToQuest={handleNavigateToQuest}
             npcJumpId={npcJumpId}
             questJumpId={questJumpId}
+            partyJumpId={partyJumpId}
+            onPingMarker={handlePingMarker}
             hiddenCharIds={hiddenCharIds}
             hiddenSegmentIds={hiddenSegmentIds}
             showPartyPath={showPartyPath}

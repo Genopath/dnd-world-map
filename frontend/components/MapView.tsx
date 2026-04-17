@@ -117,6 +117,8 @@ interface Props {
   campaign?:             CampaignSettings | null;
   onUpdatePartyMarker?:  (x: number | null, y: number | null) => void;
   onUpdateCharMarker?:   (memberId: number, x: number | null, y: number | null) => void;
+  onNavigateToParty?:    (memberId?: number) => void;
+  pingTarget?:           { kind: 'party' | 'char'; memberId?: number; seq: number } | null;
 }
 
 // Parse waypoints JSON string to array of [x, y] pairs
@@ -382,6 +384,8 @@ export default function MapView({
   campaign,
   onUpdatePartyMarker,
   onUpdateCharMarker,
+  onNavigateToParty,
+  pingTarget,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -450,6 +454,64 @@ export default function MapView({
     curX?: number;  curY?: number;
   } | null>(null);
   const [tokenDragPos, setTokenDragPos] = useState<{ kind: 'party' | 'char'; memberId?: number; x: number; y: number } | null>(null);
+
+  // ── Token hover popup ─────────────────────────────────────────────────────
+  const [tokenHover, setTokenHover] = useState<{
+    screenX: number; screenY: number;
+    kind: 'party' | 'char'; memberId?: number;
+    partyX?: number | null; partyY?: number | null;
+  } | null>(null);
+  const tokenHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTokenHover = useCallback((
+    kind: 'party' | 'char', memberId: number | undefined,
+    partyX: number | null | undefined, partyY: number | null | undefined,
+    e: React.MouseEvent,
+  ) => {
+    if (tokenHoverTimer.current) clearTimeout(tokenHoverTimer.current);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setTokenHover({ screenX: rect.left + rect.width / 2, screenY: rect.top, kind, memberId, partyX, partyY });
+  }, []);
+  const hideTokenHoverSoon = useCallback(() => {
+    tokenHoverTimer.current = setTimeout(() => setTokenHover(null), 150);
+  }, []);
+  const cancelHide = useCallback(() => {
+    if (tokenHoverTimer.current) clearTimeout(tokenHoverTimer.current);
+  }, []);
+
+  // ── Ping: pan to marker + pulse it ───────────────────────────────────────
+  const [pingedToken, setPingedToken] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pingTarget) return;
+    const mapEl = imgRef.current ?? placeholderRef.current;
+    const container = containerRef.current;
+    let mx: number | null | undefined;
+    let my: number | null | undefined;
+    if (pingTarget.kind === 'party') {
+      mx = campaign?.party_marker_x;
+      my = campaign?.party_marker_y;
+    } else {
+      const m = party.find(p => p.id === pingTarget.memberId);
+      mx = m?.marker_x;
+      my = m?.marker_y;
+    }
+    if (mx != null && my != null && mapEl && container) {
+      const cw = container.offsetWidth;
+      const ch = container.offsetHeight;
+      const iw = mapEl.offsetWidth;
+      const ih = mapEl.offsetHeight;
+      const scale = transformRef.current.scale;
+      setTransform(prev => ({
+        ...prev,
+        x: cw / 2 - (mx! / 100) * iw * scale,
+        y: ch / 2 - (my! / 100) * ih * scale,
+      }));
+    }
+    const key = pingTarget.kind === 'party' ? 'party' : `char-${pingTarget.memberId}`;
+    setPingedToken(key);
+    const t = setTimeout(() => setPingedToken(null), 2000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pingTarget]);
 
   // Always-current ref so document listeners can call the latest callbacks / data
   const updateMarkersRef = useRef({ onUpdatePartyMarker, onUpdateCharMarker });
@@ -1483,11 +1545,13 @@ export default function MapView({
                     campaign.party_marker_x === loc.x && campaign.party_marker_y === loc.y &&
                     (isDMMode || campaign.party_marker_visible !== false)) {
                   baubles.push(
-                    <div key="party" className="party-bauble party-bauble--party"
+                    <div key="party" className={`party-bauble party-bauble--party${pingedToken === 'party' ? ' token-pinged' : ''}`}
                       onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, loc.x, loc.y, e.clientX, e.clientY); } : undefined}
+                      onMouseEnter={e => showTokenHover('party', undefined, loc.x, loc.y, e)}
+                      onMouseLeave={hideTokenHoverSoon}
                       onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: loc.x, mapY: loc.y, tokenKind: 'party' }); } : undefined}
-                      onClick={e => e.stopPropagation()}
-                      title="Party — drag to move, right-click to remove" data-no-draw
+                      onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
+                      data-no-draw
                     >⚔</div>
                   );
                 }
@@ -1495,13 +1559,16 @@ export default function MapView({
                   const charDragging = tokenDragPos?.kind === 'char' && tokenDragPos.memberId === m.id;
                   if (!charDragging && m.marker_x === loc.x && m.marker_y === loc.y &&
                       (isDMMode || m.marker_visible !== false)) {
+                    const bpingKey = `char-${m.id}`;
                     baubles.push(
-                      <div key={`char-${m.id}`} className="party-bauble party-bauble--char"
+                      <div key={`char-${m.id}`} className={`party-bauble party-bauble--char${pingedToken === bpingKey ? ' token-pinged' : ''}`}
                         style={{ '--bauble-color': m.path_color } as React.CSSProperties}
                         onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', m.id, loc.x, loc.y, e.clientX, e.clientY); } : undefined}
+                        onMouseEnter={e => showTokenHover('char', m.id, undefined, undefined, e)}
+                        onMouseLeave={hideTokenHoverSoon}
                         onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: loc.x, mapY: loc.y, tokenKind: 'char', memberId: m.id }); } : undefined}
-                        onClick={e => e.stopPropagation()}
-                        title={`${m.name} — drag to move, right-click to remove`} data-no-draw
+                        onClick={e => { e.stopPropagation(); onNavigateToParty?.(m.id); }}
+                        data-no-draw
                       >{m.name[0]?.toUpperCase()}</div>
                     );
                   }
@@ -1522,11 +1589,15 @@ export default function MapView({
           // If snapped to a visible pin and not mid-drag, render as bauble there instead
           if (!partyDragging && visibleLocations.some(l => l.x === campaign.party_marker_x && l.y === campaign.party_marker_y)) return null;
           return (
-            <div className="party-token" style={{ left: `${mx}%`, top: `${my}%` }}
+            <div
+              className={`party-token${pingedToken === 'party' ? ' token-pinged' : ''}`}
+              style={{ left: `${mx}%`, top: `${my}%` }}
               onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, mx, my, e.clientX, e.clientY); } : undefined}
-              onClick={e => e.stopPropagation()}
+              onMouseEnter={e => showTokenHover('party', undefined, mx, my, e)}
+              onMouseLeave={hideTokenHoverSoon}
+              onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
               onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'party' }); } : undefined}
-              title="Party — drag to reposition, right-click to remove" data-no-draw
+              data-no-draw
             >⚔</div>
           );
         })()}
@@ -1539,14 +1610,17 @@ export default function MapView({
           if (mx == null || my == null) return null;
           if (!isDMMode && member.marker_visible === false) return null;
           if (!charDragging && visibleLocations.some(l => l.x === member.marker_x && l.y === member.marker_y)) return null;
+          const pingKey = `char-${member.id}`;
           return (
             <div key={`char-token-${member.id}`}
-              className="party-token party-token--char"
+              className={`party-token party-token--char${pingedToken === pingKey ? ' token-pinged' : ''}`}
               style={{ left: `${mx}%`, top: `${my}%`, '--token-color': member.path_color } as React.CSSProperties}
               onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', member.id, mx, my, e.clientX, e.clientY); } : undefined}
-              onClick={e => e.stopPropagation()}
+              onMouseEnter={e => showTokenHover('char', member.id, undefined, undefined, e)}
+              onMouseLeave={hideTokenHoverSoon}
+              onClick={e => { e.stopPropagation(); onNavigateToParty?.(member.id); }}
               onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'char', memberId: member.id }); } : undefined}
-              title={`${member.name} — drag to reposition, right-click to remove`} data-no-draw
+              data-no-draw
             >{member.name[0]?.toUpperCase()}</div>
           );
         })}
@@ -1659,6 +1733,59 @@ export default function MapView({
           })}
         </div>
       )}
+
+      {/* ── Token hover popup ─────────────────────────────────────────────── */}
+      {tokenHover && (() => {
+        const together = party.filter(m => m.marker_x == null && m.marker_y == null);
+        const hoverMember = tokenHover.kind === 'char' ? party.find(m => m.id === tokenHover.memberId) : null;
+        return (
+          <div
+            className="token-hover-popup"
+            style={{ left: tokenHover.screenX, top: tokenHover.screenY }}
+            onMouseEnter={cancelHide}
+            onMouseLeave={hideTokenHoverSoon}
+            onClick={e => e.stopPropagation()}
+          >
+            {tokenHover.kind === 'party' ? (
+              <>
+                <div className="thp-header">⚔ Party <span className="thp-count">({together.length})</span></div>
+                {together.length === 0
+                  ? <div className="thp-empty">Everyone separated</div>
+                  : together.map(m => (
+                    <div key={m.id} className="thp-member">
+                      <span style={{ color: m.path_color }}>●</span>
+                      <span className="thp-name">{m.name}</span>
+                      {isDMMode && (
+                        <button className="thp-action" title="Give them their own marker" onClick={() => {
+                          onUpdateCharMarker?.(m.id, tokenHover.partyX ?? null, tokenHover.partyY ?? null);
+                          setTokenHover(null);
+                        }}>↗ Separate</button>
+                      )}
+                    </div>
+                  ))
+                }
+                <div className="thp-sep" />
+                <button className="thp-nav" onClick={() => { onNavigateToParty?.(); setTokenHover(null); }}>View party →</button>
+              </>
+            ) : (
+              <>
+                <div className="thp-header">
+                  <span style={{ color: hoverMember?.path_color }}>●</span> {hoverMember?.name ?? 'Character'}
+                </div>
+                {hoverMember?.class_name && <div className="thp-sub">{hoverMember.class_name}</div>}
+                {isDMMode && (
+                  <button className="thp-action thp-rejoin" onClick={() => {
+                    if (tokenHover.memberId != null) onUpdateCharMarker?.(tokenHover.memberId, null, null);
+                    setTokenHover(null);
+                  }}>↩ Rejoin Party</button>
+                )}
+                <div className="thp-sep" />
+                <button className="thp-nav" onClick={() => { onNavigateToParty?.(tokenHover.memberId); setTokenHover(null); }}>View character →</button>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Map / token context menu (outside map-transform to avoid CSS transform offset) ── */}
       {mapCtxMenu && (
