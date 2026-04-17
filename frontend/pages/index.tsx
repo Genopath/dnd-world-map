@@ -6,7 +6,7 @@ import Sidebar from '../components/Sidebar';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { api, API_BASE, setCurrentCampaign } from '../lib/api';
 import {
-  isSoundMuted, setSoundMuted,
+  isSoundMuted, setSoundMuted, preloadFairyFountain,
   playPinSelect, playPinPlace, playPinDelete,
   playTabSwitch, playQuestComplete, playDMUnlock, playDMLock,
   playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
@@ -205,6 +205,8 @@ export default function Home() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Campaign bootstrap ──────────────────────────────────────────────────────
+  useEffect(() => { preloadFairyFountain(); }, []);
+
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('campaign_slug') : null;
 

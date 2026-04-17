@@ -355,112 +355,63 @@ export function playCampaignSwitch() {
   noise(c, mg, 0.05, now, 0.15, 'lowpass', 700, 1);
 }
 
-// ── Fairy Fountain theme (looping) ───────────────────────────────────────────
-// One iteration is ~4.3 s; the loop restarts automatically.
-// Uses a module-level "active" flag + master gain so stopFairyFountain()
-// fades everything out cleanly on the next tick.
+// ── Fairy Fountain theme (real audio file, looping) ──────────────────────────
 
-let _fairyActive  = false;
-let _fairyLoop: ReturnType<typeof setTimeout> | null = null;
-let _fairyGain:  GainNode | null = null;
+let _fairyGain:   GainNode | null = null;
+let _fairySrc:    AudioBufferSourceNode | null = null;
+let _fairyBuffer: AudioBuffer | null = null;
 
-/** Stop and fade out the looping fairy fountain theme */
+/** Preload the audio buffer (call once on app start, no gesture needed) */
+export async function preloadFairyFountain(): Promise<void> {
+  if (_fairyBuffer) return;
+  try {
+    const res = await fetch('/great_fairy_fountain.ogg');
+    const arr = await res.arrayBuffer();
+    // Need a throw-away context just for decoding if _ctx not yet created
+    const c = _ctx ?? new AudioContext();
+    _fairyBuffer = await c.decodeAudioData(arr);
+  } catch { /* silently skip if file missing */ }
+}
+
+/** Stop and fade out the fairy fountain theme */
 export function stopFairyFountain() {
-  _fairyActive = false;
-  if (_fairyLoop) { clearTimeout(_fairyLoop); _fairyLoop = null; }
   if (_fairyGain && _ctx) {
     const g = _fairyGain;
     const t = _ctx.currentTime;
     g.gain.cancelScheduledValues(t);
-    g.gain.setValueAtTime(g.gain.value ?? 0.72, t);
-    g.gain.linearRampToValueAtTime(0.0001, t + 0.5);
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.6);
+    setTimeout(() => { try { _fairySrc?.stop(); } catch { /* already stopped */ } }, 650);
     _fairyGain = null;
+    _fairySrc  = null;
   }
-}
-
-function _fairyIteration() {
-  const c = ac();
-  if (!c || !_fairyActive) return;
-
-  // Shared master gain for this iteration — fade in on first pass
-  const mg = c.createGain();
-  mg.gain.setValueAtTime(0.72, c.currentTime);
-  mg.connect(c.destination);
-  _fairyGain = mg;
-
-  const now = c.currentTime;
-  const LOOP_MS = 4500; // restart interval (ms); slightly longer than content
-
-  // ── Soft ambient bass drone (D2) ────────────────────────────────────────
-  {
-    const g = c.createGain();
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.06, now + 0.6);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 4.2);
-    g.connect(mg);
-    const o = c.createOscillator();
-    o.type = 'sine'; o.frequency.setValueAtTime(73.42, now); // D2
-    o.connect(g); o.start(now); o.stop(now + 4.3);
-  }
-
-  // ── Opening harp arpeggio: D4 F#4 A4 D5 F#5 A5 ──────────────────────────
-  [293.66, 369.99, 440, 587.33, 739.99, 880].forEach((freq, i) => {
-    pluck(c, mg, freq, 0.18, now + i * 0.052, 1.1 - i * 0.08);
-  });
-
-  // ── Melody — triangle (warm flute) + octave shimmer ──────────────────────
-  const melodyNotes: [number, number, number][] = [
-    [587.33, 0.44, 0.40],   // D5
-    [554.37, 0.84, 0.16],   // C#5
-    [493.88, 1.00, 0.18],   // B4
-    [440,    1.18, 0.30],   // A4
-    [493.88, 1.48, 0.14],   // B4 turn
-    [392,    1.62, 0.28],   // G4
-    [369.99, 1.90, 0.55],   // F#4 resolve
-    [880,    2.52, 0.26],   // A5 sparkle
-    [783.99, 2.78, 0.18],   // G5
-    [739.99, 2.96, 0.20],   // F#5
-    [659.25, 3.16, 0.22],   // E5
-    [587.33, 3.38, 0.65],   // D5 final
-  ];
-  for (const [freq, t, dur] of melodyNotes) {
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, now + t);
-    g.gain.linearRampToValueAtTime(0.15, now + t + 0.035);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + t + dur);
-    g.connect(mg);
-    const o = c.createOscillator();
-    o.type = 'triangle'; o.frequency.setValueAtTime(freq, now + t);
-    o.connect(g); o.start(now + t); o.stop(now + t + dur + 0.02);
-
-    const g2 = c.createGain();
-    g2.gain.setValueAtTime(0.0001, now + t);
-    g2.gain.linearRampToValueAtTime(0.04, now + t + 0.04);
-    g2.gain.exponentialRampToValueAtTime(0.0001, now + t + dur * 0.6);
-    g2.connect(mg);
-    const o2 = c.createOscillator();
-    o2.type = 'sine'; o2.frequency.setValueAtTime(freq * 2, now + t);
-    o2.connect(g2); o2.start(now + t); o2.stop(now + t + dur + 0.02);
-  }
-
-  // ── Second harp sweep (D5-F#5-A5-D6) ────────────────────────────────────
-  [587.33, 739.99, 880, 1174.66].forEach((freq, i) => {
-    pluck(c, mg, freq, 0.10, now + 2.45 + i * 0.055, 0.70 - i * 0.06);
-  });
-
-  // Schedule next loop iteration
-  _fairyLoop = setTimeout(() => { if (_fairyActive) _fairyIteration(); }, LOOP_MS);
 }
 
 /**
- * Start the looping Great Fairy Fountain inspired theme.
+ * Play the Great Fairy Fountain theme on loop.
  * Must be called from a user-gesture context (click / keydown).
  * Call stopFairyFountain() to fade it out.
  */
-export function playFairyFountain() {
-  if (_fairyActive) return; // already playing
-  _fairyActive = true;
-  _fairyIteration();
+export async function playFairyFountain(): Promise<void> {
+  if (_fairySrc) return; // already playing
+  const c = ac(); if (!c) return;
+
+  // Decode buffer if not yet loaded
+  if (!_fairyBuffer) await preloadFairyFountain();
+  if (!_fairyBuffer) return;
+
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, c.currentTime);
+  g.gain.linearRampToValueAtTime(0.85, c.currentTime + 1.2); // gentle fade-in
+  g.connect(c.destination);
+  _fairyGain = g;
+
+  const src = c.createBufferSource();
+  src.buffer = _fairyBuffer;
+  src.loop   = true;
+  src.connect(g);
+  src.start();
+  _fairySrc = src;
 }
 
 /** Gentle bell strike for generic positive actions (save, export, etc.) */
