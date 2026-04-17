@@ -1391,15 +1391,14 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 .sidebar-backdrop { display: none; }
 .header-sidebar-toggle { display: none; }
-.header-row-main {
-  display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: nowrap;
-}
-.header-dm-tools {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  width: 100%; padding-top: 6px;
-  border-top: 1px solid rgba(201,168,76,0.12);
-}
-.header { flex-wrap: wrap; align-content: flex-start; }
+
+/*
+ * On desktop, header-row-main and header-dm-tools are display:contents —
+ * they're invisible to the flex layout so all children behave exactly as
+ * direct children of .header (restoring the original single-row layout).
+ */
+.header-row-main  { display: contents; }
+.header-dm-tools  { display: contents; }
 
 /* Campaign select app title */
 .cs-app-title { text-align: center; }

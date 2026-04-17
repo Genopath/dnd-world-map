@@ -215,17 +215,15 @@ export default function Home() {
 
     api.campaigns.list()
       .then(async list => {
-        // Normal path — campaigns exist on server
+        // Normal path — campaigns exist on server; always show selector so the
+        // full flow (campaign → login → map) is respected every time.
         if (list.length > 0) {
+          // Pre-seed the slug so the selector highlights the last-used campaign.
           if (saved && list.find((c: CampaignMeta) => c.slug === saved)) {
-            const c = list.find((c: CampaignMeta) => c.slug === saved)!;
-            handleSelectCampaign(c.slug, c.name);
-          } else if (list.length === 1) {
-            handleSelectCampaign(list[0].slug, list[0].name);
-          } else {
-            setShowCampaignSelector(true);
-            setLoading(false);
+            setCampaignSlug(saved);
           }
+          setShowCampaignSelector(true);
+          setLoading(false);
           return;
         }
 
@@ -280,12 +278,13 @@ export default function Home() {
           if (!firstSlug) { firstSlug = newCamp.slug; firstName = newCamp.name; }
         }
 
-        if (firstSlug && firstName) {
-          handleSelectCampaign(firstSlug, firstName);
-        } else {
-          setShowCampaignSelector(true);
-          setLoading(false);
+        if (firstSlug) {
+          // Restored from backup — highlight the first restored campaign in the
+          // selector so the user still goes through campaign → login → map.
+          setCampaignSlug(firstSlug);
         }
+        setShowCampaignSelector(true);
+        setLoading(false);
       })
       .catch(e => { setError(String(e)); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
