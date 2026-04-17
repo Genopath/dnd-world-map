@@ -1223,6 +1223,10 @@ export default function MapView({
               } : undefined}
             >
               <div className="pin-body">
+                {/* Border ring — animated ring around the pin icon */}
+                {loc.pin_border && loc.pin_border !== 'none' && (
+                  <div className={`pin-border-ring pin-border-ring--${loc.pin_border}`} />
+                )}
                 {/* Style badge — floats above the pin icon, doesn't replace it */}
                 {loc.pin_style && loc.pin_style !== 'default' && (
                   <div className={`pin-style-badge pin-style-badge--${loc.pin_style}`}>

@@ -128,6 +128,7 @@ def _loc_out(loc: models.Location) -> schemas.LocationOut:
         submap_image_url=getattr(loc, "submap_image_url", None),
         pin_size=getattr(loc, "pin_size", None) or "md",
         pin_style=getattr(loc, "pin_style", None) or "default",
+        pin_border=getattr(loc, "pin_border", None) or "none",
         is_visible=getattr(loc, "is_visible", True) if getattr(loc, "is_visible", None) is not None else True,
         created_at=loc.created_at,
     )
@@ -1473,6 +1474,11 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
             submap_image_url=submap_url,
             fog_data=d.get("fog_data"),
             pin_size=d.get("pin_size") or "md",
+            pin_style=d.get("pin_style") or "default",
+            pin_border=d.get("pin_border") or "none",
+            is_visible=d.get("is_visible", True),
+            scale_value=d.get("scale_value"),
+            scale_unit=d.get("scale_unit"),
         ))
 
     # ── Party members ──────────────────────────────────────────────────────────

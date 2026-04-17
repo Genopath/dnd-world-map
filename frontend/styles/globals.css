@@ -525,6 +525,108 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   50%  { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(220,38,38,0.6))  drop-shadow(0 0 8px rgba(153,27,27,0.4)); }
   100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(220,38,38,0.6))  drop-shadow(0 0 8px rgba(153,27,27,0.4)); }
 }
+/* ── Pin border ring — animated ring around the pin icon ─────────────────────── */
+.pin-border-ring {
+  position: absolute;
+  /* size/position set per pin-size below; default targets md icon (~38px) */
+  top: -5px; left: -5px; right: -5px; bottom: -5px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
+}
+/* Size adjustments for sm/lg pins */
+.pin.pin-size-sm .pin-border-ring { top: -4px; left: -4px; right: -4px; bottom: -4px; }
+.pin.pin-size-lg .pin-border-ring { top: -6px; left: -6px; right: -6px; bottom: -6px; }
+
+/* ── Siege — war beacon, location under attack ───────────────────────────────── */
+.pin-border-ring--siege {
+  animation: border-siege 0.7s ease-in-out infinite;
+}
+@keyframes border-siege {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(239,68,68,0.85), 0 0 10px rgba(239,68,68,0.5), 0 0 22px rgba(220,38,38,0.25); }
+  50%       { box-shadow: 0 0 0 5px rgba(248,113,113,1.0), 0 0 20px rgba(239,68,68,1.0), 0 0 38px rgba(220,38,38,0.7); }
+}
+
+/* ── Blessed — holy site, divine protection ──────────────────────────────────── */
+.pin-border-ring--blessed {
+  animation: border-blessed 2.2s ease-in-out infinite;
+}
+@keyframes border-blessed {
+  0%   { box-shadow: 0 0 0 2px rgba(251,191,36,0.8), 0 0 0 5px rgba(253,230,138,0.25), 0 0 14px rgba(251,191,36,0.4); }
+  33%  { box-shadow: 0 0 0 3.5px rgba(255,255,180,1.0), 0 0 0 8px rgba(251,191,36,0.15), 0 0 24px rgba(251,191,36,0.7); }
+  66%  { box-shadow: 0 0 0 2px rgba(251,191,36,0.9), 0 0 0 6px rgba(253,230,138,0.3), 0 0 18px rgba(255,255,200,0.5); }
+  100% { box-shadow: 0 0 0 2px rgba(251,191,36,0.8), 0 0 0 5px rgba(253,230,138,0.25), 0 0 14px rgba(251,191,36,0.4); }
+}
+
+/* ── Warded — arcane magical barrier, shifting protection ────────────────────── */
+.pin-border-ring--warded {
+  animation: border-warded 3s linear infinite;
+}
+@keyframes border-warded {
+  0%   { box-shadow: 0 0 0 2.5px rgba(139,92,246,0.9),  0 0 14px rgba(139,92,246,0.5); }
+  25%  { box-shadow: 0 0 0 2.5px rgba(217,70,239,0.9),  0 0 14px rgba(217,70,239,0.6); }
+  50%  { box-shadow: 0 0 0 2.5px rgba(99,102,241,0.9),  0 0 14px rgba(99,102,241,0.5); }
+  75%  { box-shadow: 0 0 0 2.5px rgba(168,85,247,1.0),  0 0 18px rgba(236,72,153,0.5); }
+  100% { box-shadow: 0 0 0 2.5px rgba(139,92,246,0.9),  0 0 14px rgba(139,92,246,0.5); }
+}
+
+/* ── Cursed — dark curse, corrupted ground ───────────────────────────────────── */
+.pin-border-ring--cursed {
+  animation: border-cursed 2.5s ease-in-out infinite;
+}
+@keyframes border-cursed {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(74,222,128,0.75), 0 0 12px rgba(21,128,61,0.5); }
+  30%       { box-shadow: 0 0 0 1.5px rgba(21,128,61,0.4), 0 0 6px rgba(0,0,0,0.9), 0 0 0 6px rgba(0,0,0,0.3); }
+  60%       { box-shadow: 0 0 0 4px rgba(74,222,128,0.9), 0 0 16px rgba(21,128,61,0.7), 0 0 28px rgba(0,0,0,0.6); }
+}
+
+/* ── Haunted — spectral undead presence ──────────────────────────────────────── */
+.pin-border-ring--haunted {
+  animation: border-haunted 1.8s ease-in-out infinite;
+}
+@keyframes border-haunted {
+  0%   { box-shadow: 0 0 0 2px rgba(186,230,253,0.7), 0 0 10px rgba(186,230,253,0.35); opacity: 1; }
+  20%  { box-shadow: 0 0 0 4px rgba(224,242,254,0.9), 0 0 20px rgba(186,230,253,0.7);  opacity: 0.6; }
+  40%  { box-shadow: 0 0 0 1px rgba(186,230,253,0.2), 0 0 4px rgba(147,197,253,0.1);   opacity: 0.25; }
+  60%  { box-shadow: 0 0 0 5px rgba(224,242,254,1.0), 0 0 24px rgba(186,230,253,0.8);  opacity: 0.85; }
+  80%  { box-shadow: 0 0 0 1.5px rgba(186,230,253,0.3), 0 0 6px rgba(147,197,253,0.2); opacity: 0.4; }
+  100% { box-shadow: 0 0 0 2px rgba(186,230,253,0.7), 0 0 10px rgba(186,230,253,0.35); opacity: 1; }
+}
+
+/* ── Plague — spreading blight, diseased land ────────────────────────────────── */
+.pin-border-ring--plague {
+  animation: border-plague 2s ease-in-out infinite;
+}
+@keyframes border-plague {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(163,230,53,0.8),  0 0 0 5px rgba(132,204,22,0.25), 0 0 14px rgba(101,163,13,0.4); }
+  50%       { box-shadow: 0 0 0 5px rgba(163,230,53,0.95), 0 0 0 10px rgba(163,230,53,0.12), 0 0 24px rgba(132,204,22,0.6); }
+}
+
+/* ── Frozen — magically encased in ice ───────────────────────────────────────── */
+.pin-border-ring--frozen {
+  animation: border-frozen 3.5s ease-in-out infinite;
+}
+@keyframes border-frozen {
+  0%, 100% { box-shadow: 0 0 0 2.5px rgba(186,230,253,0.9), 0 0 0 5px rgba(224,242,254,0.3), 0 0 16px rgba(56,189,248,0.6); }
+  40%       { box-shadow: 0 0 0 3.5px rgba(224,242,254,1.0), 0 0 0 7px rgba(186,230,253,0.15), 0 0 24px rgba(56,189,248,0.9); }
+  42%       { box-shadow: 0 0 0 2px   rgba(186,230,253,0.6), 0 0 0 3px rgba(224,242,254,0.5),  0 0 10px rgba(56,189,248,0.4); }
+  44%       { box-shadow: 0 0 0 3.5px rgba(224,242,254,1.0), 0 0 0 7px rgba(186,230,253,0.2),  0 0 22px rgba(56,189,248,0.8); }
+  80%       { box-shadow: 0 0 0 2.5px rgba(186,230,253,0.9), 0 0 0 5px rgba(224,242,254,0.3),  0 0 16px rgba(56,189,248,0.6); }
+}
+
+/* ── Burning — active fire, location aflame ──────────────────────────────────── */
+.pin-border-ring--burning {
+  animation: border-burning 0.5s ease-in-out infinite;
+}
+@keyframes border-burning {
+  0%   { box-shadow: 0 0 0 2px rgba(249,115,22,0.9),  0 0 12px rgba(239,68,68,0.6),  0 0 24px rgba(220,38,38,0.3); }
+  20%  { box-shadow: 0 0 0 4px rgba(253,186,116,1.0),  0 0 20px rgba(249,115,22,0.9),  0 0 36px rgba(239,68,68,0.6); }
+  40%  { box-shadow: 0 0 0 2.5px rgba(239,68,68,0.8),  0 0 10px rgba(220,38,38,0.5),  0 0 18px rgba(249,115,22,0.3); }
+  65%  { box-shadow: 0 0 0 5px rgba(251,146,60,1.0),   0 0 22px rgba(249,115,22,1.0),  0 0 40px rgba(239,68,68,0.7); }
+  85%  { box-shadow: 0 0 0 2px rgba(220,38,38,0.7),    0 0 8px rgba(239,68,68,0.4),   0 0 14px rgba(249,115,22,0.25); }
+  100% { box-shadow: 0 0 0 2px rgba(249,115,22,0.9),  0 0 12px rgba(239,68,68,0.6),  0 0 24px rgba(220,38,38,0.3); }
+}
+
 .pin:hover .pin-dot,
 .pin.selected .pin-dot { transform: scale(1.45); }
 .pin.selected .pin-dot {

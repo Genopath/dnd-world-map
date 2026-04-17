@@ -251,6 +251,7 @@ export default function Sidebar({
               onUpdateLocation={onUpdate}
               currentPinSize={location.pin_size ?? 'md'}
               currentPinStyle={location.pin_style ?? 'default'}
+              currentPinBorder={location.pin_border ?? 'none'}
               currentIsVisible={location.is_visible ?? true}
               currentIconUrl={location.icon_url} currentImageUrl={location.image_url} currentSubmapUrl={location.submap_image_url}
               onScheduleBackup={onScheduleBackup}
@@ -545,6 +546,7 @@ interface EditFormProps {
   onUpdateLocation: (id: number, data: Partial<Location>) => Promise<void>;
   currentPinSize?: 'sm' | 'md' | 'lg';
   currentPinStyle?: 'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane';
+  currentPinBorder?: 'none' | 'siege' | 'blessed' | 'warded' | 'cursed' | 'haunted' | 'plague' | 'frozen' | 'burning';
   currentIsVisible?: boolean;
   currentIconUrl?: string | null;
   currentImageUrl?: string | null;
@@ -552,7 +554,7 @@ interface EditFormProps {
   onScheduleBackup?: () => void;
 }
 
-function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentPinStyle = 'default', currentIsVisible = true, currentIconUrl, currentImageUrl, currentSubmapUrl, onScheduleBackup }: EditFormProps) {
+function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentPinStyle = 'default', currentPinBorder = 'none', currentIsVisible = true, currentIconUrl, currentImageUrl, currentSubmapUrl, onScheduleBackup }: EditFormProps) {
   const [libraryFor, setLibraryFor] = useState<'icon' | 'image' | 'submap' | null>(null);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -625,6 +627,30 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               className={`btn btn-sm${currentPinStyle === value ? ' btn-active' : ''}`}
               style={{ fontSize: 11 }}
               onClick={() => onUpdateLocation(locationId, { pin_style: value })}
+            >{emoji} {label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Pin border style */}
+      <div className="form-group">
+        <label className="form-label">Border Style</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginTop: 4 }}>
+          {([
+            { value: 'none',    label: 'None',    emoji: '○' },
+            { value: 'siege',   label: 'Siege',   emoji: '⚔️' },
+            { value: 'blessed', label: 'Blessed', emoji: '✦' },
+            { value: 'warded',  label: 'Warded',  emoji: '🔮' },
+            { value: 'cursed',  label: 'Cursed',  emoji: '🌑' },
+            { value: 'haunted', label: 'Haunted', emoji: '👻' },
+            { value: 'plague',  label: 'Plague',  emoji: '☣️' },
+            { value: 'frozen',  label: 'Frozen',  emoji: '❄️' },
+            { value: 'burning', label: 'Burning', emoji: '🔥' },
+          ] as const).map(({ value, label, emoji }) => (
+            <button key={value} type="button"
+              className={`btn btn-sm${currentPinBorder === value ? ' btn-active' : ''}`}
+              style={{ fontSize: 11 }}
+              onClick={() => onUpdateLocation(locationId, { pin_border: value })}
             >{emoji} {label}</button>
           ))}
         </div>

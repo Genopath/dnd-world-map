@@ -71,6 +71,7 @@ _MIGRATIONS = [
     "ALTER TABLE campaign_settings ADD COLUMN dm_passcode VARCHAR(255)",
     "ALTER TABLE locations ADD COLUMN pin_style VARCHAR(20) DEFAULT 'default'",
     "ALTER TABLE locations ADD COLUMN is_visible BOOLEAN DEFAULT 1",
+    "ALTER TABLE locations ADD COLUMN pin_border VARCHAR(20) DEFAULT 'none'",
 ]
 
 
