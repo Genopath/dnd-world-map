@@ -12,7 +12,7 @@ import {
   playPinSelect, playPinPlace, playPinDelete,
   playTabSwitch, playQuestComplete, playDMUnlock,
   playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
-  playCampaignSwitch, playChime,
+  playCampaignSwitch, playChime, playTokenPlace, playTokenRemove,
 } from '../lib/sounds';
 import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, MapConfig, NPC, PartyMember, PathEntry, Quest, SearchResults, SessionEntry, SidebarTab } from '../types';
 
@@ -730,12 +730,12 @@ export default function Home() {
   const handleUpdatePartyMarker = useCallback(async (x: number | null, y: number | null) => {
     const updated = await api.campaign.update({ party_marker_x: x, party_marker_y: y });
     setCampaign(updated);
-    if (x == null) playPinDelete(); else playChime();
+    if (x == null) playTokenRemove(); else playTokenPlace();
   }, []);
   const handleUpdateCharMarker = useCallback(async (memberId: number, x: number | null, y: number | null) => {
     const updated = await api.party.update(memberId, { marker_x: x, marker_y: y });
     setParty(prev => prev.map(m => m.id === memberId ? updated : m));
-    if (x == null) playPinDelete(); else playChime();
+    if (x == null) playTokenRemove(); else playTokenPlace();
   }, []);
 
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────

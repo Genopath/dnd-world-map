@@ -461,3 +461,27 @@ export function playChime() {
   // Quiet octave harmony
   bell(c, mg, 1760, 0.07, now + 0.04, 0.35);
 }
+
+/** Soft felt-dampened thud + faint metallic ring when placing a party/char token */
+export function playTokenPlace() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.55);
+  const now = c.currentTime;
+  // Muffled thud — like a wooden/leather token set on a table
+  noise(c, mg, 0.13, now, 0.07, 'bandpass', 200, 7);
+  noise(c, mg, 0.05, now, 0.06, 'lowpass', 380, 1);
+  // Tiny metallic shimmer — barely audible coin ring
+  bell(c, mg, 1320, 0.04, now + 0.025, 0.20);
+}
+
+/** Gentle swish-lift when removing a party/char token */
+export function playTokenRemove() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.42);
+  const now = c.currentTime;
+  // Soft cloth-sweep upward
+  noise(c, mg, 0.07, now, 0.11, 'bandpass', 1200, 2);
+  noise(c, mg, 0.04, now + 0.02, 0.08, 'bandpass', 600, 2);
+  // Quiet descending sigh
+  tone(c, mg, 'sine', 420, 310, 0.045, now, 0.15);
+}
