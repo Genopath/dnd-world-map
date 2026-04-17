@@ -879,6 +879,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-context-menu button:hover { background: var(--surface3); }
 .pin-context-menu .pin-context-delete { color: #e07070; }
 .pin-context-menu .pin-context-delete:hover { background: rgba(180,50,50,0.18); }
+.pin-context-sep { height: 1px; background: var(--border); margin: 4px 0; }
 
 /* ── Party / character map tokens ─────────────────────────────────────────── */
 .party-token {

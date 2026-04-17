@@ -452,9 +452,36 @@ export default function MapView({
     if (!mapCtxMenu) return;
     const close = () => setMapCtxMenu(null);
     document.addEventListener('click', close);
-    document.addEventListener('contextmenu', close);
-    return () => { document.removeEventListener('click', close); document.removeEventListener('contextmenu', close); };
+    // Do NOT close on contextmenu — that would kill the menu the instant it opens
+    return () => { document.removeEventListener('click', close); };
   }, [mapCtxMenu]);
+
+  // Refs so the native listener always reads current props/state without re-registering
+  const _ctxStateRef = useRef({ isDMMode, fogPaintMode, isAddingPin });
+  _ctxStateRef.current = { isDMMode, fogPaintMode, isAddingPin };
+
+  // Native contextmenu listener — more reliable than React synthetic for <img> elements
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handler = (e: MouseEvent) => {
+      const { isDMMode, fogPaintMode, isAddingPin } = _ctxStateRef.current;
+      if (!isDMMode || fogPaintMode || isAddingPin) return;
+      // Let pins & tokens handle their own right-click via React synthetic events
+      const target = e.target as HTMLElement;
+      if (target.closest('.pin') || target.closest('.party-token')) return;
+      e.preventDefault();
+      const mapEl = imgRef.current ?? placeholderRef.current;
+      if (!mapEl) return;
+      const rect = mapEl.getBoundingClientRect();
+      const mapX = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+      const mapY = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+      setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX, mapY });
+    };
+    container.addEventListener('contextmenu', handler);
+    return () => container.removeEventListener('contextmenu', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Context menu ──────────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; loc: Location } | null>(null);
@@ -888,15 +915,6 @@ export default function MapView({
         setTokenDragPos(null);
       }}
       onClick={handleContainerClick}
-      onContextMenu={isDMMode && !fogPaintMode && !isAddingPin ? e => {
-        e.preventDefault();
-        const mapEl = imgRef.current ?? placeholderRef.current;
-        if (!mapEl) return;
-        const rect = mapEl.getBoundingClientRect();
-        const mapX = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-        const mapY = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-        setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX, mapY });
-      } : undefined}
       // Ruler: capture-phase click so we intercept before pin stopPropagation
       onClickCapture={e => {
         if (!rulerActiveRef.current) return;
@@ -1570,6 +1588,22 @@ export default function MapView({
               🗑 Delete
             </button>
           )}
+          {/* ── Party / char token snap-to-pin ─────────────────────────── */}
+          {(onUpdatePartyMarker || onUpdateCharMarker) && (
+            <div className="pin-context-sep" />
+          )}
+          {onUpdatePartyMarker && (
+            <button onClick={() => {
+              onUpdatePartyMarker(contextMenu.loc.x, contextMenu.loc.y);
+              setContextMenu(null);
+            }}>⚔ Party Here</button>
+          )}
+          {onUpdateCharMarker && party.map(m => (
+            <button key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={() => { onUpdateCharMarker(m.id, contextMenu.loc.x, contextMenu.loc.y); setContextMenu(null); }}>
+              <span style={{ color: m.path_color, fontSize: 10 }}>●</span> {m.name}
+            </button>
+          ))}
         </div>
       )}
 
