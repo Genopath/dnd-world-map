@@ -395,7 +395,22 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   50%       { filter: drop-shadow(0 0 8px rgba(220,140,255,1.0)) drop-shadow(0 0 20px rgba(180,80,255,0.9)); }
 }
 
-/* Arcane badge — reuse ring + eye animations inside badge wrapper */
+/* ── Pin style badge — upper-right corner of pin icon, clear of the label ──── */
+.pin-style-badge {
+  position: absolute;
+  top: -6px;
+  right: -14px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  z-index: 6;
+}
+.pin-style-badge svg {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+}
+
+/* Arcane badge */
 .pin-style-badge--arcane {
   animation: arcane-float 3.2s ease-in-out infinite;
 }
@@ -410,124 +425,105 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   inset: 0;
 }
 
-/* ── Pin style badge — floats above/offset the existing pin icon ─────────────── */
-.pin-style-badge {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 18px; height: 18px;
-  display: flex; align-items: center; justify-content: center;
-  pointer-events: none;
-  z-index: 6;
-}
-.pin-style-badge svg {
-  width: 16px; height: 16px;
-  flex-shrink: 0;
-}
-
-/* ── Flame ───────────────────────────────────────────────────────────────────── */
+/* ── Flame — hellfire, violent whipping inferno ──────────────────────────────── */
 .pin-style-badge--flame svg {
-  color: #f97316;
-  filter: drop-shadow(0 0 4px rgba(249,115,22,0.9)) drop-shadow(0 0 10px rgba(239,68,68,0.7));
-  animation: flame-flicker 0.9s ease-in-out infinite, flame-float 2.8s ease-in-out infinite;
+  color: #fb923c;
+  filter: drop-shadow(0 0 6px rgba(239,68,68,1.0)) drop-shadow(0 0 14px rgba(220,38,38,0.8));
+  animation: flame-whip 0.55s ease-in-out infinite;
   transform-origin: center bottom;
 }
-@keyframes flame-flicker {
-  0%, 100% { transform: scaleY(1)    scaleX(1); }
-  25%       { transform: scaleY(0.94) scaleX(1.04); }
-  50%       { transform: scaleY(1.06) scaleX(0.96); }
-  75%       { transform: scaleY(0.97) scaleX(1.02); }
-}
-@keyframes flame-float {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(249,115,22,0.9)) drop-shadow(0 0 10px rgba(239,68,68,0.7)); }
-  50%       { filter: drop-shadow(0 0 8px rgba(249,115,22,1.0)) drop-shadow(0 0 18px rgba(239,68,68,0.9)); }
+@keyframes flame-whip {
+  0%   { transform: scaleY(1)    scaleX(1)    rotate(0deg);   filter: drop-shadow(0 0 6px rgba(239,68,68,1.0)) drop-shadow(0 0 14px rgba(220,38,38,0.8)); }
+  20%  { transform: scaleY(1.15) scaleX(0.88) rotate(-4deg);  filter: drop-shadow(0 0 10px rgba(249,115,22,1.0)) drop-shadow(0 0 22px rgba(239,68,68,1.0)); }
+  40%  { transform: scaleY(0.88) scaleX(1.1)  rotate(3deg);   filter: drop-shadow(0 0 4px rgba(239,68,68,0.7)) drop-shadow(0 0 8px rgba(220,38,38,0.5)); }
+  65%  { transform: scaleY(1.2)  scaleX(0.85) rotate(-2deg);  filter: drop-shadow(0 0 12px rgba(249,115,22,1.0)) drop-shadow(0 0 24px rgba(239,68,68,1.0)); }
+  85%  { transform: scaleY(0.92) scaleX(1.06) rotate(4deg);   filter: drop-shadow(0 0 5px rgba(239,68,68,0.8)) drop-shadow(0 0 10px rgba(220,38,38,0.6)); }
+  100% { transform: scaleY(1)    scaleX(1)    rotate(0deg);   filter: drop-shadow(0 0 6px rgba(239,68,68,1.0)) drop-shadow(0 0 14px rgba(220,38,38,0.8)); }
 }
 
-/* ── Frost ───────────────────────────────────────────────────────────────────── */
+/* ── Frost — biting arctic freeze, crystalline snap ─────────────────────────── */
 .pin-style-badge--frost svg {
-  color: #67e8f9;
-  filter: drop-shadow(0 0 4px rgba(103,232,249,0.85)) drop-shadow(0 0 10px rgba(165,243,252,0.6));
-  animation: frost-spin 6s linear infinite, frost-shimmer 2.5s ease-in-out infinite;
+  color: #e0f7ff;
+  filter: drop-shadow(0 0 5px rgba(186,230,253,1.0)) drop-shadow(0 0 12px rgba(56,189,248,0.8));
+  animation: frost-snap 4s linear infinite;
 }
-@keyframes frost-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes frost-shimmer {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(103,232,249,0.85)) drop-shadow(0 0 10px rgba(165,243,252,0.6)); }
-  50%       { filter: drop-shadow(0 0 8px rgba(103,232,249,1.0))  drop-shadow(0 0 18px rgba(165,243,252,0.9)); }
+@keyframes frost-snap {
+  0%   { transform: rotate(0deg)   scale(1);    filter: drop-shadow(0 0 5px rgba(186,230,253,1.0)) drop-shadow(0 0 12px rgba(56,189,248,0.8)); }
+  40%  { transform: rotate(144deg) scale(0.82); filter: drop-shadow(0 0 10px rgba(224,247,255,1.0)) drop-shadow(0 0 20px rgba(56,189,248,1.0)); }
+  42%  { transform: rotate(145deg) scale(1.12); }
+  70%  { transform: rotate(252deg) scale(0.88); filter: drop-shadow(0 0 6px rgba(186,230,253,0.7)) drop-shadow(0 0 10px rgba(56,189,248,0.5)); }
+  72%  { transform: rotate(253deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(1);    filter: drop-shadow(0 0 5px rgba(186,230,253,1.0)) drop-shadow(0 0 12px rgba(56,189,248,0.8)); }
 }
 
-/* ── Cursed ──────────────────────────────────────────────────────────────────── */
+/* ── Cursed — necrotic blight, spreading corruption ─────────────────────────── */
 .pin-style-badge--cursed svg {
-  color: #4ade80;
-  filter: drop-shadow(0 0 4px rgba(74,222,128,0.85)) drop-shadow(0 0 10px rgba(34,197,94,0.6));
-  animation: cursed-float 3s ease-in-out infinite, cursed-pulse 2s ease-in-out infinite;
+  color: #86efac;
+  animation: cursed-blight 2.8s ease-in-out infinite;
 }
-@keyframes cursed-float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-5px); }
-}
-@keyframes cursed-pulse {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(74,222,128,0.85)) drop-shadow(0 0 10px rgba(34,197,94,0.6)); }
-  50%       { filter: drop-shadow(0 0 8px rgba(74,222,128,1.0))  drop-shadow(0 0 20px rgba(34,197,94,0.9)); }
+@keyframes cursed-blight {
+  0%   { transform: scale(1)    translateY(0);   opacity: 1;    filter: drop-shadow(0 0 5px rgba(74,222,128,0.9)) drop-shadow(0 0 12px rgba(21,128,61,0.7)); }
+  25%  { transform: scale(1.18) translateY(-2px); opacity: 0.7;  filter: drop-shadow(0 0 10px rgba(74,222,128,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.8)); }
+  50%  { transform: scale(0.85) translateY(1px);  opacity: 0.95; filter: drop-shadow(0 0 8px rgba(74,222,128,1.0)) drop-shadow(0 0 18px rgba(21,128,61,0.9)); }
+  75%  { transform: scale(1.12) translateY(-1px); opacity: 0.6;  filter: drop-shadow(0 0 3px rgba(74,222,128,0.3)) drop-shadow(0 0 8px rgba(0,0,0,0.9)); }
+  100% { transform: scale(1)    translateY(0);   opacity: 1;    filter: drop-shadow(0 0 5px rgba(74,222,128,0.9)) drop-shadow(0 0 12px rgba(21,128,61,0.7)); }
 }
 
-/* ── Divine ──────────────────────────────────────────────────────────────────── */
-.pin-style-badge--divine {
-  animation: divine-halo 2.5s ease-in-out infinite;
-}
+/* ── Divine — celestial radiance, blinding holy light ───────────────────────── */
 .pin-style-badge--divine svg {
-  color: #fcd34d;
-  filter: drop-shadow(0 0 5px rgba(252,211,77,0.9)) drop-shadow(0 0 12px rgba(251,191,36,0.7));
-  animation: divine-rotate 8s linear infinite;
+  color: #fde68a;
+  animation: divine-radiance 3s ease-in-out infinite;
 }
-@keyframes divine-rotate {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes divine-halo {
-  0%, 100% { box-shadow: none; }
-  50%       { box-shadow: 0 0 14px 4px rgba(252,211,77,0.35); }
+@keyframes divine-radiance {
+  0%   { transform: rotate(0deg)   scale(1);    filter: drop-shadow(0 0 6px rgba(253,230,138,1.0)) drop-shadow(0 0 14px rgba(251,191,36,0.8)) drop-shadow(0 0 28px rgba(245,158,11,0.5)); }
+  25%  { transform: rotate(90deg)  scale(1.22); filter: drop-shadow(0 0 12px rgba(255,255,200,1.0)) drop-shadow(0 0 26px rgba(251,191,36,1.0)) drop-shadow(0 0 40px rgba(245,158,11,0.9)); }
+  50%  { transform: rotate(180deg) scale(0.92); filter: drop-shadow(0 0 5px rgba(253,230,138,0.7)) drop-shadow(0 0 10px rgba(251,191,36,0.5)); }
+  75%  { transform: rotate(270deg) scale(1.18); filter: drop-shadow(0 0 14px rgba(255,255,200,1.0)) drop-shadow(0 0 28px rgba(251,191,36,1.0)) drop-shadow(0 0 44px rgba(245,158,11,1.0)); }
+  100% { transform: rotate(360deg) scale(1);    filter: drop-shadow(0 0 6px rgba(253,230,138,1.0)) drop-shadow(0 0 14px rgba(251,191,36,0.8)) drop-shadow(0 0 28px rgba(245,158,11,0.5)); }
 }
 
-/* ── Storm ───────────────────────────────────────────────────────────────────── */
+/* ── Storm — raw lightning, electrical discharge ────────────────────────────── */
 .pin-style-badge--storm svg {
-  color: #e2e8f0;
-  filter: drop-shadow(0 0 4px rgba(96,165,250,0.85)) drop-shadow(0 0 10px rgba(147,197,253,0.6));
-  animation: storm-crackle 1.6s ease-in-out infinite;
+  color: #f0f9ff;
+  animation: storm-discharge 0.7s steps(1) infinite;
 }
-@keyframes storm-crackle {
-  0%, 100%  { opacity: 1;   transform: translateY(0); }
-  10%        { opacity: 0.55; }
-  11%        { opacity: 1; }
-  45%        { opacity: 0.8;  transform: translateY(-2px); }
-  50%        { opacity: 0.25; transform: translateY(1px); }
-  51%        { opacity: 1;   transform: translateY(-1px); }
-  52%        { opacity: 1;   transform: translateY(0); }
-  90%        { opacity: 0.9; }
+@keyframes storm-discharge {
+  0%   { opacity: 1;    transform: scale(1)    translateX(0);    filter: drop-shadow(0 0 8px rgba(186,230,253,1.0)) drop-shadow(0 0 18px rgba(96,165,250,0.9)); }
+  14%  { opacity: 0.15; transform: scale(0.9)  translateX(-1px); filter: none; }
+  15%  { opacity: 1;    transform: scale(1.2)  translateX(1px);  filter: drop-shadow(0 0 16px rgba(224,242,254,1.0)) drop-shadow(0 0 32px rgba(96,165,250,1.0)); }
+  16%  { opacity: 0.6;  transform: scale(1);                     filter: drop-shadow(0 0 6px rgba(186,230,253,0.8)); }
+  50%  { opacity: 1;    transform: scale(1.1)  translateX(0);    filter: drop-shadow(0 0 12px rgba(186,230,253,1.0)) drop-shadow(0 0 24px rgba(96,165,250,0.9)); }
+  64%  { opacity: 0.1;  transform: scale(0.85) translateX(1px);  filter: none; }
+  65%  { opacity: 1;    transform: scale(1.25) translateX(-1px); filter: drop-shadow(0 0 20px rgba(224,242,254,1.0)) drop-shadow(0 0 40px rgba(96,165,250,1.0)); }
+  66%  { opacity: 0.7;                                           filter: drop-shadow(0 0 8px rgba(186,230,253,0.9)); }
+  100% { opacity: 1;    transform: scale(1)    translateX(0);    filter: drop-shadow(0 0 8px rgba(186,230,253,1.0)) drop-shadow(0 0 18px rgba(96,165,250,0.9)); }
 }
 
-/* ── Shadow ──────────────────────────────────────────────────────────────────── */
+/* ── Shadow — void presence, Shadowfell lurking ─────────────────────────────── */
 .pin-style-badge--shadow svg {
-  color: #a5b4fc;
-  animation: shadow-drift 3.5s ease-in-out infinite;
+  color: #c4b5fd;
+  animation: shadow-void 5s ease-in-out infinite;
 }
-@keyframes shadow-drift {
-  0%, 100% { opacity: 0.35; transform: translateY(0px);  filter: drop-shadow(0 0 3px rgba(165,180,252,0.4)); }
-  50%       { opacity: 0.85; transform: translateY(-6px); filter: drop-shadow(0 0 8px rgba(165,180,252,0.9)) drop-shadow(0 0 16px rgba(129,140,248,0.6)); }
+@keyframes shadow-void {
+  0%   { opacity: 0.15; transform: scale(0.75) translateY(2px);  filter: drop-shadow(0 0 2px rgba(139,92,246,0.3)); }
+  30%  { opacity: 0.9;  transform: scale(1.05) translateY(-3px); filter: drop-shadow(0 0 10px rgba(167,139,250,0.9)) drop-shadow(0 0 22px rgba(109,40,217,0.7)); }
+  50%  { opacity: 0.6;  transform: scale(0.9)  translateY(0);    filter: drop-shadow(0 0 6px rgba(139,92,246,0.5)); }
+  70%  { opacity: 0.95; transform: scale(1.08) translateY(-4px); filter: drop-shadow(0 0 12px rgba(167,139,250,1.0)) drop-shadow(0 0 26px rgba(109,40,217,0.8)); }
+  100% { opacity: 0.15; transform: scale(0.75) translateY(2px);  filter: drop-shadow(0 0 2px rgba(139,92,246,0.3)); }
 }
 
-/* ── Lair ────────────────────────────────────────────────────────────────────── */
+/* ── Lair — monstrous heartbeat, predator's lair ────────────────────────────── */
 .pin-style-badge--lair svg {
-  color: #f87171;
-  filter: drop-shadow(0 0 4px rgba(248,113,113,0.85)) drop-shadow(0 0 10px rgba(220,38,38,0.6));
-  animation: lair-throb 1.4s ease-in-out infinite;
+  color: #fca5a5;
+  animation: lair-heartbeat 1.1s ease-in-out infinite;
 }
-@keyframes lair-throb {
-  0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(248,113,113,0.85)) drop-shadow(0 0 10px rgba(220,38,38,0.6)); }
-  50%       { transform: scale(1.12); filter: drop-shadow(0 0 8px rgba(248,113,113,1.0))  drop-shadow(0 0 20px rgba(220,38,38,0.9)); }
+@keyframes lair-heartbeat {
+  0%   { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(220,38,38,0.6))  drop-shadow(0 0 8px rgba(153,27,27,0.4)); }
+  12%  { transform: scale(1.35); filter: drop-shadow(0 0 14px rgba(248,113,113,1.0)) drop-shadow(0 0 28px rgba(220,38,38,1.0)) drop-shadow(0 0 40px rgba(153,27,27,0.8)); }
+  22%  { transform: scale(1.0);  filter: drop-shadow(0 0 4px rgba(220,38,38,0.5)); }
+  35%  { transform: scale(1.2);  filter: drop-shadow(0 0 10px rgba(248,113,113,0.9)) drop-shadow(0 0 20px rgba(220,38,38,0.8)); }
+  50%  { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(220,38,38,0.6))  drop-shadow(0 0 8px rgba(153,27,27,0.4)); }
+  100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(220,38,38,0.6))  drop-shadow(0 0 8px rgba(153,27,27,0.4)); }
 }
 .pin:hover .pin-dot,
 .pin.selected .pin-dot { transform: scale(1.45); }
