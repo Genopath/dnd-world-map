@@ -921,6 +921,7 @@ export default function Home() {
         <Head><title>D&amp;D World Map</title></Head>
         <CampaignSelector
           currentSlug={campaignSlug}
+          showSplash={!campaignSlug}
           onSelect={handleSelectCampaign}
           onRename={(slug, name) => { if (slug === campaignSlug) setCampaignName(name); }}
         />
