@@ -872,12 +872,12 @@ export default function MapView({
           for (let c = 0; c <= cols; c++) {
             const x = c * cellPctX;
             lines.push(<line key={`gc${c}`} x1={`${x}%`} y1="0%" x2={`${x}%`} y2="100%"
-              stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />);
+              stroke="rgba(255,255,255,0.45)" strokeWidth="0.8" />);
           }
           for (let r = 0; r <= rows; r++) {
             const y = r * cellPctY;
             lines.push(<line key={`gr${r}`} x1="0%" y1={`${y}%`} x2="100%" y2={`${y}%`}
-              stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />);
+              stroke="rgba(255,255,255,0.45)" strokeWidth="0.8" />);
           }
           return (
             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 3, overflow: 'visible' }}>
