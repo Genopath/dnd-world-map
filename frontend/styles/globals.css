@@ -924,15 +924,19 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   transform: translate(-50%, -50%) scale(1.15);
 }
 
-/* Baubles — rendered inside a pin element when a token is snapped to it */
+/* Baubles — absolutely positioned below the pin so they don't affect pin layout */
 .pin-baubles {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
   display: flex;
   gap: 3px;
   justify-content: center;
-  margin-top: 3px;
   pointer-events: none;
-  position: relative;
   z-index: 6;
+  white-space: nowrap;
 }
 .party-bauble {
   pointer-events: auto;

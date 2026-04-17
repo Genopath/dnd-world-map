@@ -730,10 +730,12 @@ export default function Home() {
   const handleUpdatePartyMarker = useCallback(async (x: number | null, y: number | null) => {
     const updated = await api.campaign.update({ party_marker_x: x, party_marker_y: y });
     setCampaign(updated);
+    if (x == null) playPinDelete(); else playChime();
   }, []);
   const handleUpdateCharMarker = useCallback(async (memberId: number, x: number | null, y: number | null) => {
     const updated = await api.party.update(memberId, { marker_x: x, marker_y: y });
     setParty(prev => prev.map(m => m.id === memberId ? updated : m));
+    if (x == null) playPinDelete(); else playChime();
   }, []);
 
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────

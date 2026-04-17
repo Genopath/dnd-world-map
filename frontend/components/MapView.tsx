@@ -451,9 +451,11 @@ export default function MapView({
   } | null>(null);
   const [tokenDragPos, setTokenDragPos] = useState<{ kind: 'party' | 'char'; memberId?: number; x: number; y: number } | null>(null);
 
-  // Always-current ref so document listeners can call the latest callbacks
+  // Always-current ref so document listeners can call the latest callbacks / data
   const updateMarkersRef = useRef({ onUpdatePartyMarker, onUpdateCharMarker });
   updateMarkersRef.current = { onUpdatePartyMarker, onUpdateCharMarker };
+  const locationsRef = useRef(locations);
+  locationsRef.current = locations;
 
   // Document-level drag — more reliable than relying on React synthetic mousemove
   const startTokenDrag = useCallback((
@@ -482,12 +484,23 @@ export default function MapView({
       }
     };
 
+    const SNAP_PX_THRESHOLD = 3.5; // % units — snap if dropped within this distance of a pin
     const onUp = () => {
       const td = tokenDragRef.current;
       if (td?.moved && td.curX != null && td.curY != null) {
         const { onUpdatePartyMarker, onUpdateCharMarker } = updateMarkersRef.current;
-        if (td.kind === 'party') onUpdatePartyMarker?.(td.curX, td.curY);
-        else if (td.kind === 'char' && td.memberId != null) onUpdateCharMarker?.(td.memberId, td.curX, td.curY);
+        // Snap to nearest visible pin if close enough
+        let finalX = td.curX;
+        let finalY = td.curY;
+        for (const loc of locationsRef.current) {
+          if (Math.abs(loc.x - finalX) <= SNAP_PX_THRESHOLD && Math.abs(loc.y - finalY) <= SNAP_PX_THRESHOLD) {
+            finalX = loc.x;
+            finalY = loc.y;
+            break;
+          }
+        }
+        if (td.kind === 'party') onUpdatePartyMarker?.(finalX, finalY);
+        else if (td.kind === 'char' && td.memberId != null) onUpdateCharMarker?.(td.memberId, finalX, finalY);
       }
       tokenDragRef.current = null;
       setTokenDragPos(null);
@@ -1620,22 +1633,30 @@ export default function MapView({
               🗑 Delete
             </button>
           )}
-          {/* ── Party / char token snap-to-pin ─────────────────────────── */}
+          {/* ── Party / char token snap-to-pin (toggle place/remove) ─────── */}
           {(onUpdatePartyMarker || onUpdateCharMarker) && (
             <div className="pin-context-sep" />
           )}
-          {onUpdatePartyMarker && (
-            <button onClick={() => {
-              onUpdatePartyMarker(contextMenu.loc.x, contextMenu.loc.y);
-              setContextMenu(null);
-            }}>⚔ Party Here</button>
-          )}
-          {onUpdateCharMarker && party.map(m => (
-            <button key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-              onClick={() => { onUpdateCharMarker(m.id, contextMenu.loc.x, contextMenu.loc.y); setContextMenu(null); }}>
-              <span style={{ color: m.path_color, fontSize: 10 }}>●</span> {m.name}
-            </button>
-          ))}
+          {onUpdatePartyMarker && (() => {
+            const isHere = campaign?.party_marker_x === contextMenu.loc.x && campaign?.party_marker_y === contextMenu.loc.y;
+            return (
+              <button
+                className={isHere ? 'pin-context-delete' : undefined}
+                onClick={() => { onUpdatePartyMarker(isHere ? null : contextMenu.loc.x, isHere ? null : contextMenu.loc.y); setContextMenu(null); }}
+              >{isHere ? '⚔ Remove Party' : '⚔ Party Here'}</button>
+            );
+          })()}
+          {onUpdateCharMarker && party.map(m => {
+            const isHere = m.marker_x === contextMenu.loc.x && m.marker_y === contextMenu.loc.y;
+            return (
+              <button key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                className={isHere ? 'pin-context-delete' : undefined}
+                onClick={() => { onUpdateCharMarker(m.id, isHere ? null : contextMenu.loc.x, isHere ? null : contextMenu.loc.y); setContextMenu(null); }}>
+                <span style={{ color: m.path_color, fontSize: 10 }}>●</span>
+                {isHere ? `Remove ${m.name}` : m.name}
+              </button>
+            );
+          })}
         </div>
       )}
 
