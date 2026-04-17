@@ -1888,22 +1888,12 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Login screen (DM / Player role selection) ──────────────────────────────── */
-.login-overlay {
-  position: fixed; inset: 0; z-index: 1000;
-  background: #05050c;
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
-}
-.login-bg {
-  position: absolute; inset: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse at 50% 40%, rgba(201,168,76,0.10) 0%, transparent 60%),
-    radial-gradient(ellipse at 20% 80%, rgba(90,60,160,0.06) 0%, transparent 50%);
-}
+/* Login screen — sits inside cs-overlay (starfield bg) */
 .login-card {
   position: relative; z-index: 1;
   display: flex; flex-direction: column; align-items: center; gap: 20px;
   width: 100%; max-width: 480px;
+  padding: 20px;
   animation: cs-screen-in 0.4s ease both;
 }
 .login-campaign-name {
@@ -1928,7 +1918,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 .login-role-btn {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 28px 16px;
+  padding: 28px 16px; position: relative;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface2);
@@ -1937,6 +1927,12 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 .login-role-btn:hover {
   transform: translateY(-2px);
+}
+/* FF7 hand — absolute on left edge of the role card */
+.login-hand-col {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  width: 24px; text-align: center; pointer-events: none;
+  font-size: 20px; color: var(--accent);
 }
 .login-role-dm {
   border-color: rgba(201,168,76,0.35);
@@ -1989,6 +1985,13 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .login-passcode-actions {
   display: flex; gap: 8px; justify-content: center;
 }
+.login-reset-link {
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: var(--text-dim);
+  text-decoration: underline; text-underline-offset: 3px;
+  padding: 0; margin-top: 2px; transition: color 0.15s;
+}
+.login-reset-link:hover { color: var(--accent); }
 
 @media (max-width: 480px) {
   .login-role-btns { flex-direction: column; }

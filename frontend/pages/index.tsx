@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CampaignSelector from '../components/CampaignSelector';
-import LoginScreen, { passcodeKey } from '../components/LoginScreen';
+import LoginScreen from '../components/LoginScreen';
 import MapView from '../components/MapView';
 import Sidebar from '../components/Sidebar';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -9,7 +9,7 @@ import { api, API_BASE, setCurrentCampaign } from '../lib/api';
 import {
   isSoundMuted, setSoundMuted, preloadFairyFountain,
   playPinSelect, playPinPlace, playPinDelete,
-  playTabSwitch, playQuestComplete, playDMUnlock, playDMLock,
+  playTabSwitch, playQuestComplete, playDMUnlock,
   playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
   playCampaignSwitch, playChime,
 } from '../lib/sounds';
@@ -192,11 +192,6 @@ export default function Home() {
   // showPartyPath: whether the shared party path line is shown
   const [hiddenCharIds, setHiddenCharIds] = useState<Set<number>>(new Set());
   const [showPartyPath,  setShowPartyPath]  = useState(true);
-
-  // ── Passcode state ──────────────────────────────────────────────────────────
-  const [passcodeModal, setPasscodeModal] = useState<'enter' | 'set' | null>(null);
-  const [passcodeInput, setPasscodeInput] = useState('');
-  const [passcodeError, setPasscodeError] = useState('');
 
   // ── Lightbox state ──────────────────────────────────────────────────────────
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -882,27 +877,6 @@ export default function Home() {
     }
   }, []);
 
-  // ── DM Passcode ──────────────────────────────────────────────────────────────
-  const handleDMModeClick = useCallback(() => {
-    if (isDMMode) return;
-    const key    = campaignSlug ? passcodeKey(campaignSlug) : 'dm_passcode';
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-    if (stored) { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('enter'); }
-    else { setIsDMMode(true); playDMUnlock(); }
-  }, [isDMMode, campaignSlug]);
-
-  const handlePasscodeSubmit = useCallback(() => {
-    const key = campaignSlug ? passcodeKey(campaignSlug) : 'dm_passcode';
-    if (passcodeModal === 'enter') {
-      if (passcodeInput === (localStorage.getItem(key) ?? '')) { setIsDMMode(true); setPasscodeModal(null); playDMUnlock(); }
-      else { setPasscodeError('Incorrect passcode'); }
-    } else if (passcodeModal === 'set') {
-      if (passcodeInput.trim()) localStorage.setItem(key, passcodeInput);
-      else localStorage.removeItem(key);
-      setPasscodeModal(null);
-    }
-  }, [passcodeModal, passcodeInput, campaignSlug]);
-
   // ── Loading / error ───────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -974,11 +948,6 @@ export default function Home() {
               >⇄</button>
             </div>
 
-            <div className="mode-toggle">
-              <button className={`mode-btn ${isDMMode ? 'active' : ''}`} onClick={handleDMModeClick}>DM Mode</button>
-              <button className={`mode-btn ${!isDMMode ? 'active' : ''}`} onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); playDMLock(); }}>Player View</button>
-            </div>
-
             {/* Always-visible tools */}
             <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
             <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); playSearchOpen(); }}>🔍</button>
@@ -1000,8 +969,6 @@ export default function Home() {
           {isDMMode && (
             <div className="header-dm-tools">
               <>
-              <button className="btn btn-sm btn-icon" title="Set / change DM passcode" onClick={() => { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('set'); }}>🔒</button>
-
               {/* Fog toolbar — world map and submaps */}
               <div className="fog-toolbar">
                 <button
@@ -1275,34 +1242,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── Passcode modal ───────────────────────────────────────────── */}
-      {passcodeModal && (
-        <div className="modal-overlay" onClick={() => setPasscodeModal(null)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>
-              {passcodeModal === 'enter' ? '🔒 Enter DM Passcode' : '🔒 Set DM Passcode'}
-            </div>
-            {passcodeModal === 'set' && (
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
-                Protects DM Mode with a passcode. Leave blank to remove the passcode.
-              </div>
-            )}
-            <input
-              type="password"
-              value={passcodeInput}
-              onChange={e => { setPasscodeInput(e.target.value); setPasscodeError(''); }}
-              onKeyDown={e => { if (e.key === 'Enter') handlePasscodeSubmit(); if (e.key === 'Escape') setPasscodeModal(null); }}
-              placeholder={passcodeModal === 'enter' ? 'Passcode' : 'New passcode (blank to remove)'}
-              autoFocus
-            />
-            {passcodeError && <div style={{ fontSize: 12, color: 'var(--danger-text)', marginTop: 6 }}>{passcodeError}</div>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-              <button className="btn btn-sm" onClick={() => setPasscodeModal(null)}>Cancel</button>
-              <button className="btn btn-primary btn-sm" onClick={handlePasscodeSubmit}>{passcodeModal === 'enter' ? 'Unlock' : 'Save'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

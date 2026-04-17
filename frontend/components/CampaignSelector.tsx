@@ -84,8 +84,20 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
 
   // Music lifecycle
   useEffect(() => {
-    if (!showSplash) playFairyFountain();
-    return () => stopFairyFountain();
+    if (!showSplash) {
+      // Autoplay policy: AudioContext requires a user gesture.
+      // When there's no splash, wait for first interaction then start music.
+      const startOnGesture = () => playFairyFountain();
+      window.addEventListener('click',   startOnGesture, { once: true });
+      window.addEventListener('keydown', startOnGesture, { once: true });
+      return () => {
+        window.removeEventListener('click',   startOnGesture);
+        window.removeEventListener('keydown', startOnGesture);
+        // Don't stop music on unmount — LoginScreen inherits the stream
+      };
+    }
+    // Splash mode: music starts in advanceSplash() after first user gesture.
+    return () => { /* LoginScreen inherits the music stream */ };
   }, []);
 
   useEffect(() => {
