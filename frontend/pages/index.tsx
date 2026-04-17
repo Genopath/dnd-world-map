@@ -117,9 +117,31 @@ async function _idbLoad(key: string): Promise<{ _saved_at?: string; [k: string]:
   } catch { return null; }
 }
 
+// Returns up to 5 recent auto-backup entries for a campaign, newest first.
+// Each entry: { key, savedAt, locationCount }
+export interface IdbBackupMeta { key: string; savedAt: string; locationCount: number; }
+async function _idbListBackups(slug: string): Promise<IdbBackupMeta[]> {
+  if (typeof window === 'undefined' || !window.indexedDB) return [];
+  try {
+    const indexKey = `export_${slug}_auto_index`;
+    const index = await _idbLoad(indexKey) as { keys?: string[] } | null;
+    const keys: string[] = index?.keys ?? [];
+    const metas: IdbBackupMeta[] = [];
+    for (const k of keys) {
+      const entry = await _idbLoad(k);
+      if (!entry) continue;
+      const locs = (entry.locations as unknown[]) ?? [];
+      metas.push({ key: k, savedAt: entry._saved_at ?? '', locationCount: locs.length });
+    }
+    return metas;
+  } catch { return []; }
+}
+
 // Calls /export and saves the result (images and all) to IndexedDB.
 // Throttled to once per browser session per campaign; pass force=true to
 // bypass the throttle (e.g. right after a map is uploaded).
+const _IDB_MAX_SNAPSHOTS = 5;
+
 function _idbBackupAsync(slug: string, force = false): void {
   if (typeof window === 'undefined') return;
   const key = `idb_saved_${slug}`;
@@ -135,7 +157,24 @@ function _idbBackupAsync(slug: string, force = false): void {
         sessionStorage.removeItem(key); // allow retry once server has real data
         return;
       }
-      await _idbSave(`export_${slug}`, { ...d, _saved_at: new Date().toISOString() });
+      const savedAt = new Date().toISOString();
+      const payload = { ...d, _saved_at: savedAt };
+      // 1. Overwrite the "latest" key used by the restore-on-empty flow
+      await _idbSave(`export_${slug}`, payload);
+      // 2. Write a timestamped snapshot and rotate (keep last N)
+      const snapKey = `export_${slug}_auto_${Date.now()}`;
+      await _idbSave(snapKey, payload);
+      const indexKey = `export_${slug}_auto_index`;
+      const existing = await _idbLoad(indexKey) as { keys?: string[] } | null;
+      const keys = [snapKey, ...(existing?.keys ?? [])].slice(0, _IDB_MAX_SNAPSHOTS);
+      // Delete any snapshots that rolled off
+      const removed = (existing?.keys ?? []).slice(_IDB_MAX_SNAPSHOTS - 1);
+      for (const old of removed) {
+        const db = await _idbOpen();
+        const tx = db.transaction(_IDB_STORE, 'readwrite');
+        tx.objectStore(_IDB_STORE).delete(old);
+      }
+      await _idbSave(indexKey, { keys });
     })
     .catch(() => { /* best-effort */ });
 }
@@ -148,6 +187,7 @@ export default function Home() {
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
   const [showLoginScreen,      setShowLoginScreen]      = useState(false);
   const [mobileSidebarOpen,    setMobileSidebarOpen]    = useState(false);
+  const [backupMetas,          setBackupMetas]          = useState<IdbBackupMeta[] | null>(null); // null = modal closed
   // Last-used slug read once at startup — used only for highlighting in the
   // campaign selector. Never triggers a data load (campaignSlug does that).
   const [savedSlug] = useState<string | null>(
@@ -913,6 +953,41 @@ export default function Home() {
     }
   }, []);
 
+  // Shared reload helper — used after restoring from an auto-backup
+  const _reloadAll = useCallback(async () => {
+    const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg] =
+      await Promise.all([
+        api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
+        api.sessions.list(), api.party.list(), api.factions.list(),
+        api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
+        api.fog.get(), api.map.config(),
+      ]);
+    setLocations(locs); setPlayerPath(path); setNpcs(npcList); setQuests(questList);
+    setSessions(sessionList); setParty(partyList); setFactions(factionList);
+    setCampaign(campData); setCalendarConfig(calCfg); setCharacterPaths(charPaths);
+    setFogData(fogResult.data ?? ''); setMapConfig(mapCfg); setSelectedId(null);
+  }, []);
+
+  const handleOpenBackupModal = useCallback(async () => {
+    if (!campaignSlug) return;
+    const metas = await _idbListBackups(campaignSlug);
+    setBackupMetas(metas);
+  }, [campaignSlug]);
+
+  const handleRestoreBackup = useCallback(async (meta: IdbBackupMeta) => {
+    if (!confirm(`Restore auto-backup from ${new Date(meta.savedAt).toLocaleString()}?\nThis will overwrite ALL current campaign data.`)) return;
+    try {
+      const data = await _idbLoad(meta.key);
+      if (!data) { alert('Backup data not found.'); return; }
+      const file = new File([JSON.stringify(data)], 'auto-backup.json', { type: 'application/json' });
+      await api.data.import(file);
+      await _reloadAll();
+      setBackupMetas(null);
+    } catch (err) {
+      alert(`Restore failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [_reloadAll]);
+
   // ── Loading / error ───────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -1119,6 +1194,7 @@ export default function Home() {
                 Import
                 <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) await handleImport(f); }} />
               </label>
+              <button className="btn" onClick={handleOpenBackupModal} title="Restore from an automatic backup saved in this browser">⟳ Auto-backups</button>
             </>
             </div>
           )}
@@ -1293,6 +1369,40 @@ export default function Home() {
             {!searchQuery.trim() && (
               <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Type to search across all locations, NPCs, and quests</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Auto-backup restore modal ────────────────────────────────── */}
+      {backupMetas !== null && (
+        <div className="modal-overlay" onClick={() => setBackupMetas(null)}>
+          <div className="modal-box" style={{ maxWidth: 420, width: '90%' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>⟳ Auto-backups</div>
+            {backupMetas.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '8px 0' }}>
+                No automatic backups found in this browser yet.<br />
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, display: 'block' }}>
+                  Backups are saved automatically after each change (up to {_IDB_MAX_SNAPSHOTS} kept).
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {backupMetas.map(meta => (
+                  <button
+                    key={meta.key}
+                    className="btn btn-sm"
+                    style={{ justifyContent: 'space-between', textAlign: 'left', display: 'flex', gap: 8 }}
+                    onClick={() => handleRestoreBackup(meta)}
+                  >
+                    <span>{new Date(meta.savedAt).toLocaleString()}</span>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 11, flexShrink: 0 }}>
+                      {meta.locationCount} pin{meta.locationCount !== 1 ? 's' : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className="btn btn-sm" style={{ marginTop: 14, width: '100%' }} onClick={() => setBackupMetas(null)}>Close</button>
           </div>
         </div>
       )}
