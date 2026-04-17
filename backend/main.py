@@ -127,6 +127,8 @@ def _loc_out(loc: models.Location) -> schemas.LocationOut:
         parent_id=getattr(loc, "parent_id", None),
         submap_image_url=getattr(loc, "submap_image_url", None),
         pin_size=getattr(loc, "pin_size", None) or "md",
+        pin_style=getattr(loc, "pin_style", None) or "default",
+        is_visible=getattr(loc, "is_visible", True) if getattr(loc, "is_visible", None) is not None else True,
         created_at=loc.created_at,
     )
 

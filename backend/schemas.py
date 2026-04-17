@@ -34,6 +34,8 @@ class LocationUpdate(BaseModel):
     image_url: Optional[str] = None
     submap_image_url: Optional[str] = None
     pin_size:    Optional[str]   = None
+    pin_style:   Optional[str]   = None
+    is_visible:  Optional[bool]  = None
     scale_value: Optional[float] = None
     scale_unit:  Optional[str]   = None
 
@@ -54,7 +56,9 @@ class LocationOut(BaseModel):
     image_url: Optional[str] = None
     parent_id: Optional[int] = None
     submap_image_url: Optional[str] = None
-    pin_size: str = 'md'
+    pin_size:   str  = 'md'
+    pin_style:  str  = 'default'
+    is_visible: bool = True
     scale_value: Optional[float] = None
     scale_unit:  Optional[str]   = None
     created_at: Optional[datetime] = None
