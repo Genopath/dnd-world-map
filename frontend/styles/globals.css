@@ -399,7 +399,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-style-badge {
   position: absolute;
   top: -6px;
-  right: -14px;
+  right: -28px;
   width: 18px; height: 18px;
   display: flex; align-items: center; justify-content: center;
   pointer-events: none;
