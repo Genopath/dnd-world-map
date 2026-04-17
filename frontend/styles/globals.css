@@ -882,12 +882,14 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-context-sep { height: 1px; background: var(--border); margin: 4px 0; }
 
 /* ── Party / character map tokens ─────────────────────────────────────────── */
+
+/* Floating token (free position, not snapped to a pin) */
 .party-token {
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 12;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #f5d78a, #b8730f);
   border: 2px solid rgba(255, 230, 160, 0.85);
@@ -895,7 +897,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1;
   cursor: grab;
   user-select: none;
@@ -904,24 +906,63 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 .party-token:hover {
   box-shadow: 0 3px 14px rgba(0,0,0,0.75), 0 0 22px rgba(201,134,26,0.75);
-  transform: translate(-50%, -50%) scale(1.18);
+  transform: translate(-50%, -50%) scale(1.15);
 }
 .party-token:active { cursor: grabbing; }
-
 .party-token--char {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   background: var(--token-color, #c9a84c);
   border-color: rgba(255,255,255,0.65);
-  box-shadow: 0 2px 7px rgba(0,0,0,0.6), 0 0 10px color-mix(in srgb, var(--token-color, #c9a84c) 55%, transparent);
-  font-size: 12px;
+  box-shadow: 0 2px 7px rgba(0,0,0,0.6);
+  font-size: 11px;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.75);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.75);
 }
 .party-token--char:hover {
-  box-shadow: 0 3px 12px rgba(0,0,0,0.7), 0 0 16px color-mix(in srgb, var(--token-color, #c9a84c) 70%, transparent);
-  transform: translate(-50%, -50%) scale(1.18);
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+/* Baubles — rendered inside a pin element when a token is snapped to it */
+.pin-baubles {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  margin-top: 3px;
+  pointer-events: none;
+  position: relative;
+  z-index: 6;
+}
+.party-bauble {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f5d78a, #b8730f);
+  border: 1.5px solid rgba(255, 220, 130, 0.8);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.6), 0 0 7px rgba(201,134,26,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.party-bauble:hover {
+  transform: scale(1.25);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.7), 0 0 12px rgba(201,134,26,0.7);
+}
+.party-bauble:active { cursor: grabbing; }
+.party-bauble--char {
+  background: var(--bauble-color, #c9a84c);
+  border-color: rgba(255,255,255,0.6);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.6);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
 /* ── Type filter strip ────────────────────────────────────────────────────── */

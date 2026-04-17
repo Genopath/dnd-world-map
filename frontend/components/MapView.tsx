@@ -442,9 +442,63 @@ export default function MapView({
   const [dragOverrides, setDragOverrides] = useState<Map<number, { x: number; y: number }>>(new Map());
 
   // ── Token drag state (party / char markers) ───────────────────────────────
-  const tokenDragRef     = useRef<{ kind: 'party' | 'char'; memberId?: number; startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
-  const tokenJustDragged = useRef(false);
-  const [tokenDragPos,   setTokenDragPos] = useState<{ kind: 'party' | 'char'; memberId?: number; x: number; y: number } | null>(null);
+  const tokenDragRef = useRef<{
+    kind: 'party' | 'char'; memberId?: number;
+    startX: number; startY: number;
+    origX: number;  origY: number;
+    moved: boolean;
+    curX?: number;  curY?: number;
+  } | null>(null);
+  const [tokenDragPos, setTokenDragPos] = useState<{ kind: 'party' | 'char'; memberId?: number; x: number; y: number } | null>(null);
+
+  // Always-current ref so document listeners can call the latest callbacks
+  const updateMarkersRef = useRef({ onUpdatePartyMarker, onUpdateCharMarker });
+  updateMarkersRef.current = { onUpdatePartyMarker, onUpdateCharMarker };
+
+  // Document-level drag — more reliable than relying on React synthetic mousemove
+  const startTokenDrag = useCallback((
+    kind: 'party' | 'char', memberId: number | undefined,
+    origX: number, origY: number,
+    startClientX: number, startClientY: number,
+  ) => {
+    tokenDragRef.current = { kind, memberId, startX: startClientX, startY: startClientY, origX, origY, moved: false };
+
+    const onMove = (e: MouseEvent) => {
+      const td = tokenDragRef.current;
+      if (!td) return;
+      const dx = e.clientX - td.startX;
+      const dy = e.clientY - td.startY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) {
+        td.moved = true;
+        const mapEl = imgRef.current ?? placeholderRef.current;
+        if (mapEl) {
+          const scale = transformRef.current.scale;
+          const newX = Math.max(0, Math.min(100, td.origX + (dx / (mapEl.offsetWidth  * scale)) * 100));
+          const newY = Math.max(0, Math.min(100, td.origY + (dy / (mapEl.offsetHeight * scale)) * 100));
+          td.curX = newX;
+          td.curY = newY;
+          setTokenDragPos({ kind: td.kind, memberId: td.memberId, x: newX, y: newY });
+        }
+      }
+    };
+
+    const onUp = () => {
+      const td = tokenDragRef.current;
+      if (td?.moved && td.curX != null && td.curY != null) {
+        const { onUpdatePartyMarker, onUpdateCharMarker } = updateMarkersRef.current;
+        if (td.kind === 'party') onUpdatePartyMarker?.(td.curX, td.curY);
+        else if (td.kind === 'char' && td.memberId != null) onUpdateCharMarker?.(td.memberId, td.curX, td.curY);
+      }
+      tokenDragRef.current = null;
+      setTokenDragPos(null);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Map context menu (right-click on empty map / tokens) ─────────────────
   const [mapCtxMenu, setMapCtxMenu] = useState<{ screenX: number; screenY: number; mapX: number; mapY: number; tokenKind?: 'party' | 'char'; memberId?: number } | null>(null);
@@ -636,24 +690,6 @@ export default function MapView({
       return; // block map pan while drawing
     }
 
-    // ── Token drag (party / char markers) ─────────────────────────────────
-    if (tokenDragRef.current) {
-      const td = tokenDragRef.current;
-      const dx = e.clientX - td.startX;
-      const dy = e.clientY - td.startY;
-      if (Math.abs(dx) + Math.abs(dy) > 3) {
-        td.moved = true;
-        const mapEl = imgRef.current ?? placeholderRef.current;
-        if (mapEl) {
-          const scale = transformRef.current.scale;
-          const newX = Math.max(0, Math.min(100, td.origX + (dx / (mapEl.offsetWidth  * scale)) * 100));
-          const newY = Math.max(0, Math.min(100, td.origY + (dy / (mapEl.offsetHeight * scale)) * 100));
-          setTokenDragPos({ kind: td.kind, memberId: td.memberId, x: newX, y: newY });
-        }
-      }
-      return;
-    }
-
     // ── Pin drag takes priority ────────────────────────────────────────────
     if (pinDragRef.current) {
       const pd = pinDragRef.current;
@@ -707,22 +743,6 @@ export default function MapView({
       freehandBuf.current = [];
       return;
     }
-    // ── Finish token drag ─────────────────────────────────────────────────
-    if (tokenDragRef.current) {
-      const td = tokenDragRef.current;
-      if (td.moved && tokenDragPos) {
-        tokenJustDragged.current = true;
-        if (td.kind === 'party') {
-          onUpdatePartyMarker?.(tokenDragPos.x, tokenDragPos.y);
-        } else if (td.kind === 'char' && td.memberId != null) {
-          onUpdateCharMarker?.(td.memberId, tokenDragPos.x, tokenDragPos.y);
-        }
-      }
-      tokenDragRef.current = null;
-      setTokenDragPos(null);
-      return;
-    }
-
     // ── Finish pin drag ────────────────────────────────────────────────────
     if (pinDragRef.current) {
       const pd = pinDragRef.current;
@@ -911,8 +931,6 @@ export default function MapView({
         }
         pinDragRef.current = null;
         setDragOverrides(new Map());
-        tokenDragRef.current = null;
-        setTokenDragPos(null);
       }}
       onClick={handleContainerClick}
       // Ruler: capture-phase click so we intercept before pin stopPropagation
@@ -1443,68 +1461,82 @@ export default function MapView({
                   {loc.subtitle && <span className="pin-label-subtitle">{loc.subtitle}</span>}
                 </div>
               </div>
+              {/* ── Party / char baubles snapped to this pin ─────────────── */}
+              {(() => {
+                const baubles: React.ReactNode[] = [];
+                const partyDragging = tokenDragPos?.kind === 'party';
+                if (campaign &&
+                    !partyDragging &&
+                    campaign.party_marker_x === loc.x && campaign.party_marker_y === loc.y &&
+                    (isDMMode || campaign.party_marker_visible !== false)) {
+                  baubles.push(
+                    <div key="party" className="party-bauble party-bauble--party"
+                      onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, loc.x, loc.y, e.clientX, e.clientY); } : undefined}
+                      onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: loc.x, mapY: loc.y, tokenKind: 'party' }); } : undefined}
+                      onClick={e => e.stopPropagation()}
+                      title="Party — drag to move, right-click to remove" data-no-draw
+                    >⚔</div>
+                  );
+                }
+                for (const m of party) {
+                  const charDragging = tokenDragPos?.kind === 'char' && tokenDragPos.memberId === m.id;
+                  if (!charDragging && m.marker_x === loc.x && m.marker_y === loc.y &&
+                      (isDMMode || m.marker_visible !== false)) {
+                    baubles.push(
+                      <div key={`char-${m.id}`} className="party-bauble party-bauble--char"
+                        style={{ '--bauble-color': m.path_color } as React.CSSProperties}
+                        onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', m.id, loc.x, loc.y, e.clientX, e.clientY); } : undefined}
+                        onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: loc.x, mapY: loc.y, tokenKind: 'char', memberId: m.id }); } : undefined}
+                        onClick={e => e.stopPropagation()}
+                        title={`${m.name} — drag to move, right-click to remove`} data-no-draw
+                      >{m.name[0]?.toUpperCase()}</div>
+                    );
+                  }
+                }
+                return baubles.length > 0 ? <div className="pin-baubles">{baubles}</div> : null;
+              })()}
             </div>
           );
         })}
 
-        {/* ── Party marker token ─────────────────────────────────────────── */}
+        {/* ── Floating party token (not snapped to any pin) ──────────────── */}
         {campaign != null && (() => {
-          const mx = tokenDragPos?.kind === 'party' ? tokenDragPos.x : campaign.party_marker_x;
-          const my = tokenDragPos?.kind === 'party' ? tokenDragPos.y : campaign.party_marker_y;
+          const partyDragging = tokenDragPos?.kind === 'party';
+          const mx = partyDragging ? tokenDragPos!.x : campaign.party_marker_x;
+          const my = partyDragging ? tokenDragPos!.y : campaign.party_marker_y;
           if (mx == null || my == null) return null;
           if (!isDMMode && campaign.party_marker_visible === false) return null;
+          // If snapped to a visible pin and not mid-drag, render as bauble there instead
+          if (!partyDragging && visibleLocations.some(l => l.x === campaign.party_marker_x && l.y === campaign.party_marker_y)) return null;
           return (
-            <div
-              className="party-token"
-              style={{ left: `${mx}%`, top: `${my}%` }}
-              onMouseDown={isDMMode ? e => {
-                e.stopPropagation();
-                tokenDragRef.current = { kind: 'party', startX: e.clientX, startY: e.clientY, origX: mx, origY: my, moved: false };
-              } : undefined}
-              onClick={e => { e.stopPropagation(); if (tokenJustDragged.current) { tokenJustDragged.current = false; } }}
-              onContextMenu={isDMMode ? e => {
-                e.preventDefault(); e.stopPropagation();
-                if (tokenJustDragged.current) { tokenJustDragged.current = false; return; }
-                setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'party' });
-              } : undefined}
-              title="Party — drag to reposition, right-click to remove"
-              data-no-draw
-            >
-              ⚔
-            </div>
+            <div className="party-token" style={{ left: `${mx}%`, top: `${my}%` }}
+              onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, mx, my, e.clientX, e.clientY); } : undefined}
+              onClick={e => e.stopPropagation()}
+              onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'party' }); } : undefined}
+              title="Party — drag to reposition, right-click to remove" data-no-draw
+            >⚔</div>
           );
         })()}
 
-        {/* ── Per-character tokens ───────────────────────────────────────── */}
+        {/* ── Floating char tokens (not snapped to any pin) ─────────────── */}
         {party.map(member => {
-          const isDraggedChar = tokenDragPos?.kind === 'char' && tokenDragPos.memberId === member.id;
-          const mx = isDraggedChar ? tokenDragPos!.x : member.marker_x;
-          const my = isDraggedChar ? tokenDragPos!.y : member.marker_y;
+          const charDragging = tokenDragPos?.kind === 'char' && tokenDragPos.memberId === member.id;
+          const mx = charDragging ? tokenDragPos!.x : member.marker_x;
+          const my = charDragging ? tokenDragPos!.y : member.marker_y;
           if (mx == null || my == null) return null;
           if (!isDMMode && member.marker_visible === false) return null;
+          if (!charDragging && visibleLocations.some(l => l.x === member.marker_x && l.y === member.marker_y)) return null;
           return (
-            <div
-              key={`char-token-${member.id}`}
+            <div key={`char-token-${member.id}`}
               className="party-token party-token--char"
               style={{ left: `${mx}%`, top: `${my}%`, '--token-color': member.path_color } as React.CSSProperties}
-              onMouseDown={isDMMode ? e => {
-                e.stopPropagation();
-                tokenDragRef.current = { kind: 'char', memberId: member.id, startX: e.clientX, startY: e.clientY, origX: mx, origY: my, moved: false };
-              } : undefined}
-              onClick={e => { e.stopPropagation(); if (tokenJustDragged.current) { tokenJustDragged.current = false; } }}
-              onContextMenu={isDMMode ? e => {
-                e.preventDefault(); e.stopPropagation();
-                if (tokenJustDragged.current) { tokenJustDragged.current = false; return; }
-                setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'char', memberId: member.id });
-              } : undefined}
-              title={`${member.name} — drag to reposition, right-click to remove`}
-              data-no-draw
-            >
-              {member.name[0]?.toUpperCase()}
-            </div>
+              onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', member.id, mx, my, e.clientX, e.clientY); } : undefined}
+              onClick={e => e.stopPropagation()}
+              onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'char', memberId: member.id }); } : undefined}
+              title={`${member.name} — drag to reposition, right-click to remove`} data-no-draw
+            >{member.name[0]?.toUpperCase()}</div>
           );
         })}
-
 
       </div>
 
