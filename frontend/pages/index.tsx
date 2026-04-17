@@ -137,6 +137,11 @@ export default function Home() {
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
   const [showLoginScreen,      setShowLoginScreen]      = useState(false);
   const [mobileSidebarOpen,    setMobileSidebarOpen]    = useState(false);
+  // Last-used slug read once at startup — used only for highlighting in the
+  // campaign selector. Never triggers a data load (campaignSlug does that).
+  const [savedSlug] = useState<string | null>(
+    () => typeof window !== 'undefined' ? localStorage.getItem('campaign_slug') : null
+  );
 
   // ── Core state ──────────────────────────────────────────────────────────────
   const [locations,   setLocations]   = useState<Location[]>([]);
@@ -212,11 +217,10 @@ export default function Home() {
       .then(async list => {
         // Normal path — campaigns exist on server; always show selector so the
         // full flow (campaign → login → map) is respected every time.
+        // Do NOT call setCampaignSlug here — that would trigger the data-load
+        // useEffect before setCurrentCampaign is called, loading from the wrong
+        // campaign. Highlighting is handled via the savedSlug state below.
         if (list.length > 0) {
-          // Pre-seed the slug so the selector highlights the last-used campaign.
-          if (saved && list.find((c: CampaignMeta) => c.slug === saved)) {
-            setCampaignSlug(saved);
-          }
           setShowCampaignSelector(true);
           setLoading(false);
           return;
@@ -273,13 +277,15 @@ export default function Home() {
           if (!firstSlug) { firstSlug = newCamp.slug; firstName = newCamp.name; }
         }
 
-        if (firstSlug) {
-          // Restored from backup — highlight the first restored campaign in the
-          // selector so the user still goes through campaign → login → map.
-          setCampaignSlug(firstSlug);
+        if (firstSlug && firstName) {
+          // Restored from backup — go through the normal campaign → login → map
+          // flow. handleSelectCampaign calls setCurrentCampaign first so the
+          // data-load useEffect uses the correct campaign.
+          handleSelectCampaign(firstSlug, firstName);
+        } else {
+          setShowCampaignSelector(true);
+          setLoading(false);
         }
-        setShowCampaignSelector(true);
-        setLoading(false);
       })
       .catch(e => { setError(String(e)); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -902,7 +908,7 @@ export default function Home() {
       <>
         <Head><title>D&amp;D World Map</title></Head>
         <CampaignSelector
-          currentSlug={campaignSlug}
+          currentSlug={campaignSlug ?? savedSlug}
           showSplash={!campaignSlug}
           onSelect={handleSelectCampaign}
           onRename={(slug, name) => { if (slug === campaignSlug) setCampaignName(name); }}
@@ -920,6 +926,7 @@ export default function Home() {
           campaignSlug={campaignSlug}
           onDM={() => { setIsDMMode(true); setShowLoginScreen(false); playDMUnlock(); }}
           onPlayer={() => { setIsDMMode(false); setShowLoginScreen(false); }}
+          onBack={() => { setShowLoginScreen(false); setShowCampaignSelector(true); }}
         />
       </>
     );

@@ -6,6 +6,7 @@ interface Props {
   campaignSlug: string;
   onDM:     () => void;
   onPlayer: () => void;
+  onBack:   () => void;
 }
 
 type Phase = 'role' | 'dm-auth' | 'dm-set';
@@ -44,7 +45,7 @@ function RuneDivider({ small = false }: { small?: boolean }) {
   );
 }
 
-export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer }: Props) {
+export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer, onBack }: Props) {
   const [phase,     setPhase]     = useState<Phase>('role');
   const [input,     setInput]     = useState('');
   const [error,     setError]     = useState('');
@@ -160,6 +161,10 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
                 <span className="login-role-hint">View-only mode</span>
               </button>
             </div>
+
+            <button className="login-back-link" onClick={onBack}>
+              ← Back to campaign select
+            </button>
           </>
         )}
 

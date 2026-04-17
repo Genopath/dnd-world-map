@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import {
-  playFairyFountain, stopFairyFountain,
+  playFairyFountain, stopFairyFountain, resumeAudio,
   getFairyVolume, setFairyVolume,
   isSoundMuted, setSoundMuted,
   playMenuCursor, playPinSelect,
@@ -85,18 +85,20 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
   // Music lifecycle
   useEffect(() => {
     if (!showSplash) {
-      // Autoplay policy: AudioContext requires a user gesture.
-      // When there's no splash, wait for first interaction then start music.
-      const startOnGesture = () => playFairyFountain();
-      window.addEventListener('click',   startOnGesture, { once: true });
-      window.addEventListener('keydown', startOnGesture, { once: true });
+      // Start the source immediately — it will silently queue if the AudioContext
+      // is suspended (autoplay policy). On the first user gesture, resumeAudio()
+      // unpauses the context and the music begins playing.
+      playFairyFountain();
+      const onGesture = () => resumeAudio();
+      window.addEventListener('click',   onGesture, { once: true });
+      window.addEventListener('keydown', onGesture, { once: true });
       return () => {
-        window.removeEventListener('click',   startOnGesture);
-        window.removeEventListener('keydown', startOnGesture);
-        // Don't stop music on unmount — LoginScreen inherits the stream
+        window.removeEventListener('click',   onGesture);
+        window.removeEventListener('keydown', onGesture);
+        // Don't stop music — LoginScreen inherits the stream
       };
     }
-    // Splash mode: music starts in advanceSplash() after first user gesture.
+    // Splash mode: music starts in advanceSplash() after the first click/key.
     return () => { /* LoginScreen inherits the music stream */ };
   }, []);
 

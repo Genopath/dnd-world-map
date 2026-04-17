@@ -397,13 +397,25 @@ export function stopFairyFountain() {
   }
 }
 
+/** Resume the AudioContext if suspended — safe to call from any user-gesture handler */
+export function resumeAudio(): void {
+  if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
+}
+
 /**
  * Play the Great Fairy Fountain theme on loop.
- * Must be called from a user-gesture context (click / keydown).
+ * Safe to call on mount — the source starts immediately; if the AudioContext is
+ * still suspended (autoplay policy), call resumeAudio() from the first click/key
+ * handler to unpause it.
  * Call stopFairyFountain() to fade it out.
  */
 export async function playFairyFountain(): Promise<void> {
-  if (_fairySrc) return; // already playing
+  if (_fairySrc) {
+    // Already started — just make sure the context is running (handles the case
+    // where we started while suspended and a user gesture just unlocked it).
+    resumeAudio();
+    return;
+  }
   const c = ac(); if (!c) return;
 
   // Decode buffer if not yet loaded
