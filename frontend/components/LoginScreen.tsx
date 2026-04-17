@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { playFairyFountain, stopFairyFountain } from '../lib/sounds';
 
 interface Props {
   campaignName: string;
@@ -59,11 +58,7 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
     ? !!localStorage.getItem(passcodeKey(campaignSlug))
     : false;
 
-  // Keep music playing from CampaignSelector; stop it when entering the map
-  useEffect(() => {
-    playFairyFountain(); // no-op if already playing
-    return () => stopFairyFountain();
-  }, []);
+  // Music is managed by index.tsx — no lifecycle here.
 
   useEffect(() => {
     if ((phase === 'dm-auth' || phase === 'dm-set') && inputRef.current) {

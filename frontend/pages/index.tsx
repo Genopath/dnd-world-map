@@ -8,6 +8,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { api, API_BASE, setCurrentCampaign } from '../lib/api';
 import {
   isSoundMuted, setSoundMuted, preloadFairyFountain,
+  playFairyFountain, stopFairyFountain, resumeAudio,
   playPinSelect, playPinPlace, playPinDelete,
   playTabSwitch, playQuestComplete, playDMUnlock,
   playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
@@ -209,6 +210,25 @@ export default function Home() {
 
   // ── Campaign bootstrap ──────────────────────────────────────────────────────
   useEffect(() => { preloadFairyFountain(); }, []);
+
+  // ── Music: play on selector / login, stop when entering the map ─────────────
+  // Centralized here so transitions between screens never cause gaps or doubles.
+  useEffect(() => {
+    const onScreen = showCampaignSelector || showLoginScreen;
+    if (onScreen) {
+      playFairyFountain(); // queues source; silent until context is resumed
+      const onGesture = () => resumeAudio();
+      window.addEventListener('click',   onGesture, { once: true });
+      window.addEventListener('keydown', onGesture, { once: true });
+      return () => {
+        window.removeEventListener('click',   onGesture);
+        window.removeEventListener('keydown', onGesture);
+        // Don't stop here — the next effect run decides whether to keep or stop
+      };
+    } else {
+      stopFairyFountain(); // user entered the map
+    }
+  }, [showCampaignSelector, showLoginScreen]);
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('campaign_slug') : null;

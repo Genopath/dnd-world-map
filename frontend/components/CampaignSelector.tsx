@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import {
-  playFairyFountain, stopFairyFountain, resumeAudio,
   getFairyVolume, setFairyVolume,
   isSoundMuted, setSoundMuted,
+  playFairyFountain, stopFairyFountain,
   playMenuCursor, playPinSelect,
 } from '../lib/sounds';
 import type { CampaignMeta } from '../types';
@@ -82,25 +82,7 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
 
   useEffect(() => { load(); }, []);
 
-  // Music lifecycle
-  useEffect(() => {
-    if (!showSplash) {
-      // Start the source immediately — it will silently queue if the AudioContext
-      // is suspended (autoplay policy). On the first user gesture, resumeAudio()
-      // unpauses the context and the music begins playing.
-      playFairyFountain();
-      const onGesture = () => resumeAudio();
-      window.addEventListener('click',   onGesture, { once: true });
-      window.addEventListener('keydown', onGesture, { once: true });
-      return () => {
-        window.removeEventListener('click',   onGesture);
-        window.removeEventListener('keydown', onGesture);
-        // Don't stop music — LoginScreen inherits the stream
-      };
-    }
-    // Splash mode: music starts in advanceSplash() after the first click/key.
-    return () => { /* LoginScreen inherits the music stream */ };
-  }, []);
+  // Music is managed by index.tsx — no lifecycle here.
 
   useEffect(() => {
     if (renamingSlug && renameRef.current) renameRef.current.focus();
@@ -112,7 +94,7 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
 
   // ── Splash advance ───────────────────────────────────────────────────────────
   const advanceSplash = () => {
-    playFairyFountain();
+    // Music is managed by index.tsx; just advance the phase.
     setPhase('splash-out');
     setTimeout(() => setPhase('select'), 550);
   };
