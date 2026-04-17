@@ -24,6 +24,8 @@ class Location(Base):
     submap_image_url = Column(String(500), nullable=True) # interior map image
     fog_data         = Column(Text, nullable=True)         # per-submap fog (10000-char '0'/'1')
     pin_size         = Column(String(10), default='md')    # 'sm' | 'md' | 'lg'
+    pin_style        = Column(String(20), default='default') # 'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane'
+    is_visible       = Column(Boolean, default=True)         # shown to players?
     scale_value      = Column(Float, nullable=True)         # per-submap scale: map is X units wide
     scale_unit       = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -250,6 +250,8 @@ export default function Sidebar({
               onChange={setEditState} onSave={saveEdit} onCancel={cancelEdit} saving={saving}
               onUpdateLocation={onUpdate}
               currentPinSize={location.pin_size ?? 'md'}
+              currentPinStyle={location.pin_style ?? 'default'}
+              currentIsVisible={location.is_visible ?? true}
               currentIconUrl={location.icon_url} currentImageUrl={location.image_url} currentSubmapUrl={location.submap_image_url}
               onScheduleBackup={onScheduleBackup}
             />
@@ -542,13 +544,15 @@ interface EditFormProps {
   onSave: () => void; onCancel: () => void; saving: boolean;
   onUpdateLocation: (id: number, data: Partial<Location>) => Promise<void>;
   currentPinSize?: 'sm' | 'md' | 'lg';
+  currentPinStyle?: 'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane';
+  currentIsVisible?: boolean;
   currentIconUrl?: string | null;
   currentImageUrl?: string | null;
   currentSubmapUrl?: string | null;
   onScheduleBackup?: () => void;
 }
 
-function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentIconUrl, currentImageUrl, currentSubmapUrl, onScheduleBackup }: EditFormProps) {
+function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentPinStyle = 'default', currentIsVisible = true, currentIconUrl, currentImageUrl, currentSubmapUrl, onScheduleBackup }: EditFormProps) {
   const [libraryFor, setLibraryFor] = useState<'icon' | 'image' | 'submap' | null>(null);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -602,6 +606,46 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
             >{s === 'sm' ? 'Small' : s === 'md' ? 'Medium' : 'Large'}</button>
           ))}
         </div>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Pin Style</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginTop: 4 }}>
+          {([
+            { value: 'default', label: 'Default',  emoji: '📍' },
+            { value: 'flame',   label: 'Flame',    emoji: '🔥' },
+            { value: 'frost',   label: 'Frost',    emoji: '❄️' },
+            { value: 'cursed',  label: 'Cursed',   emoji: '☠️' },
+            { value: 'divine',  label: 'Divine',   emoji: '✦' },
+            { value: 'storm',   label: 'Storm',    emoji: '⚡' },
+            { value: 'shadow',  label: 'Shadow',   emoji: '👻' },
+            { value: 'lair',    label: 'Lair',     emoji: '💀' },
+            { value: 'arcane',  label: 'Arcane',   emoji: '👁' },
+          ] as const).map(({ value, label, emoji }) => (
+            <button key={value} type="button"
+              className={`btn btn-sm${currentPinStyle === value ? ' btn-active' : ''}`}
+              style={{ fontSize: 11 }}
+              onClick={() => onUpdateLocation(locationId, { pin_style: value })}
+            >{emoji} {label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Player visibility toggle */}
+      <div className="form-group">
+        <label className="form-label">Player Visibility</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <button type="button"
+            className={`btn btn-sm${currentIsVisible ? ' btn-active' : ''}`}
+            style={{ flex: 1 }}
+            onClick={() => onUpdateLocation(locationId, { is_visible: true })}
+          >👁 Visible</button>
+          <button type="button"
+            className={`btn btn-sm${!currentIsVisible ? ' btn-active' : ''}`}
+            style={{ flex: 1 }}
+            onClick={() => onUpdateLocation(locationId, { is_visible: false })}
+          >🙈 Hidden</button>
+        </div>
+        {!currentIsVisible && <span className="form-hint">Hidden from players — DM eyes only</span>}
       </div>
       <div className="form-group"><label className="form-label">Subtitle</label><input value={state.subtitle} onChange={set('subtitle')} placeholder="Short flavor text" /></div>
       <div className="form-group"><label className="form-label">Description</label><textarea value={state.description} onChange={set('description')} placeholder="Visible to players… (supports **bold**, - lists)" rows={4} /></div>

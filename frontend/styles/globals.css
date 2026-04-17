@@ -353,6 +353,168 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   transition: transform 0.15s, box-shadow 0.15s;
   flex-shrink: 0;
 }
+
+/* ── Arcane pin — glowing floating eye ──────────────────────────────────────── */
+.pin-arcane {
+  position: relative;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  animation: arcane-float 3.2s ease-in-out infinite;
+}
+.pin-arcane-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(180, 100, 255, 0.55);
+  animation: arcane-pulse 2.4s ease-in-out infinite;
+}
+.pin-arcane-ring--2 {
+  inset: -6px;
+  border-color: rgba(180, 100, 255, 0.25);
+  animation-delay: 1.2s;
+}
+.pin-arcane-eye {
+  width: 22px; height: 22px;
+  color: #c084fc;
+  filter:
+    drop-shadow(0 0 4px rgba(192, 100, 255, 0.9))
+    drop-shadow(0 0 10px rgba(160, 60, 255, 0.6));
+  animation: arcane-glow 2.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes arcane-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+@keyframes arcane-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.6; }
+  50%       { transform: scale(1.35); opacity: 0;   }
+}
+@keyframes arcane-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(192,100,255,0.9)) drop-shadow(0 0 10px rgba(160,60,255,0.6)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(220,140,255,1.0)) drop-shadow(0 0 20px rgba(180,80,255,0.9)); }
+}
+
+/* Override the pin stem/needle for arcane — no needle needed */
+.pin:has(.pin-arcane) .pin-body::after { display: none; }
+
+/* ── Animated pin styles — shared base ──────────────────────────────────────── */
+.pin-anim {
+  position: relative;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pin-anim svg {
+  width: 22px; height: 22px;
+  flex-shrink: 0;
+}
+/* No pin needle for any animated style */
+.pin:has(.pin-anim) .pin-body::after { display: none; }
+
+/* ── Flame ───────────────────────────────────────────────────────────────────── */
+.pin-anim--flame svg {
+  color: #f97316;
+  filter: drop-shadow(0 0 4px rgba(249,115,22,0.9)) drop-shadow(0 0 10px rgba(239,68,68,0.7));
+  animation: flame-flicker 0.9s ease-in-out infinite, flame-float 2.8s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+@keyframes flame-flicker {
+  0%, 100% { transform: scaleY(1)    scaleX(1); }
+  25%       { transform: scaleY(0.94) scaleX(1.04); }
+  50%       { transform: scaleY(1.06) scaleX(0.96); }
+  75%       { transform: scaleY(0.97) scaleX(1.02); }
+}
+@keyframes flame-float {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(249,115,22,0.9)) drop-shadow(0 0 10px rgba(239,68,68,0.7)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(249,115,22,1.0)) drop-shadow(0 0 18px rgba(239,68,68,0.9)); }
+}
+
+/* ── Frost ───────────────────────────────────────────────────────────────────── */
+.pin-anim--frost svg {
+  color: #67e8f9;
+  filter: drop-shadow(0 0 4px rgba(103,232,249,0.85)) drop-shadow(0 0 10px rgba(165,243,252,0.6));
+  animation: frost-spin 6s linear infinite, frost-shimmer 2.5s ease-in-out infinite;
+}
+@keyframes frost-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes frost-shimmer {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(103,232,249,0.85)) drop-shadow(0 0 10px rgba(165,243,252,0.6)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(103,232,249,1.0))  drop-shadow(0 0 18px rgba(165,243,252,0.9)); }
+}
+
+/* ── Cursed ──────────────────────────────────────────────────────────────────── */
+.pin-anim--cursed svg {
+  color: #4ade80;
+  filter: drop-shadow(0 0 4px rgba(74,222,128,0.85)) drop-shadow(0 0 10px rgba(34,197,94,0.6));
+  animation: cursed-float 3s ease-in-out infinite, cursed-pulse 2s ease-in-out infinite;
+}
+@keyframes cursed-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+@keyframes cursed-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(74,222,128,0.85)) drop-shadow(0 0 10px rgba(34,197,94,0.6)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(74,222,128,1.0))  drop-shadow(0 0 20px rgba(34,197,94,0.9)); }
+}
+
+/* ── Divine ──────────────────────────────────────────────────────────────────── */
+.pin-anim--divine {
+  animation: divine-halo 2.5s ease-in-out infinite;
+}
+.pin-anim--divine svg {
+  color: #fcd34d;
+  filter: drop-shadow(0 0 5px rgba(252,211,77,0.9)) drop-shadow(0 0 12px rgba(251,191,36,0.7));
+  animation: divine-rotate 8s linear infinite;
+}
+@keyframes divine-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes divine-halo {
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 14px 4px rgba(252,211,77,0.35); }
+}
+
+/* ── Storm ───────────────────────────────────────────────────────────────────── */
+.pin-anim--storm svg {
+  color: #e2e8f0;
+  filter: drop-shadow(0 0 4px rgba(96,165,250,0.85)) drop-shadow(0 0 10px rgba(147,197,253,0.6));
+  animation: storm-crackle 1.6s ease-in-out infinite;
+}
+@keyframes storm-crackle {
+  0%, 100%  { opacity: 1;   transform: translateY(0); }
+  10%        { opacity: 0.55; }
+  11%        { opacity: 1; }
+  45%        { opacity: 0.8;  transform: translateY(-2px); }
+  50%        { opacity: 0.25; transform: translateY(1px); }
+  51%        { opacity: 1;   transform: translateY(-1px); }
+  52%        { opacity: 1;   transform: translateY(0); }
+  90%        { opacity: 0.9; }
+}
+
+/* ── Shadow ──────────────────────────────────────────────────────────────────── */
+.pin-anim--shadow svg {
+  color: #a5b4fc;
+  animation: shadow-drift 3.5s ease-in-out infinite;
+}
+@keyframes shadow-drift {
+  0%, 100% { opacity: 0.35; transform: translateY(0px);  filter: drop-shadow(0 0 3px rgba(165,180,252,0.4)); }
+  50%       { opacity: 0.85; transform: translateY(-6px); filter: drop-shadow(0 0 8px rgba(165,180,252,0.9)) drop-shadow(0 0 16px rgba(129,140,248,0.6)); }
+}
+
+/* ── Lair ────────────────────────────────────────────────────────────────────── */
+.pin-anim--lair svg {
+  color: #f87171;
+  filter: drop-shadow(0 0 4px rgba(248,113,113,0.85)) drop-shadow(0 0 10px rgba(220,38,38,0.6));
+  animation: lair-throb 1.4s ease-in-out infinite;
+}
+@keyframes lair-throb {
+  0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(248,113,113,0.85)) drop-shadow(0 0 10px rgba(220,38,38,0.6)); }
+  50%       { transform: scale(1.12); filter: drop-shadow(0 0 8px rgba(248,113,113,1.0))  drop-shadow(0 0 20px rgba(220,38,38,0.9)); }
+}
 .pin:hover .pin-dot,
 .pin.selected .pin-dot { transform: scale(1.45); }
 .pin.selected .pin-dot {

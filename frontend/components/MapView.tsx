@@ -455,10 +455,13 @@ export default function MapView({
     for (const l of locations) seen[l.type] = true;
     return Object.keys(seen).sort();
   }, [locations]);
-  // Filtered locations (apply type visibility)
+  // Filtered locations (type visibility + player visibility toggle)
   const visibleLocations = useMemo(
-    () => locations.filter(l => !hiddenTypes.has(l.type)),
-    [locations, hiddenTypes],
+    () => locations.filter(l =>
+      !hiddenTypes.has(l.type) &&
+      (isDMMode || l.is_visible !== false)
+    ),
+    [locations, hiddenTypes, isDMMode],
   );
 
   // ── Fit-to-pins ───────────────────────────────────────────────────────────
@@ -1220,7 +1223,75 @@ export default function MapView({
               } : undefined}
             >
               <div className="pin-body">
-                {loc.icon_url ? (
+                {loc.pin_style === 'arcane' ? (
+                  <div className="pin-arcane">
+                    <div className="pin-arcane-ring" />
+                    <div className="pin-arcane-ring pin-arcane-ring--2" />
+                    <svg className="pin-arcane-eye" viewBox="0 0 24 24" fill="none">
+                      <ellipse cx="12" cy="12" rx="9" ry="5.5" stroke="currentColor" strokeWidth="1.5"/>
+                      <circle cx="12" cy="12" r="2.8" fill="currentColor"/>
+                      <ellipse cx="12" cy="12" rx="1.1" ry="2.8" fill="#07070d"/>
+                    </svg>
+                  </div>
+                ) : loc.pin_style === 'flame' ? (
+                  <div className="pin-anim pin-anim--flame">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2C10 6 7 9 7 13C7 17.4 9.1 21 12 21C14.9 21 17 17.4 17 13C17 9 14 6 12 2Z" fill="currentColor"/>
+                      <path d="M12 11C11 13 11 15 12 16.5C13 15 13 13 12 11Z" fill="rgba(0,0,0,0.35)"/>
+                    </svg>
+                  </div>
+                ) : loc.pin_style === 'frost' ? (
+                  <div className="pin-anim pin-anim--frost">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <line x1="5.6" y1="5.6" x2="18.4" y2="18.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <line x1="18.4" y1="5.6" x2="5.6" y2="18.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+                    </svg>
+                  </div>
+                ) : loc.pin_style === 'cursed' ? (
+                  <div className="pin-anim pin-anim--cursed">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M12 4C8.7 4 6 6.7 6 10C6 12.3 7.2 14.3 9 15.4V17C9 17.6 9.4 18 10 18H14C14.6 18 15 17.6 15 17V15.4C16.8 14.3 18 12.3 18 10C18 6.7 15.3 4 12 4Z" fill="currentColor"/>
+                      <rect x="9.5" y="18" width="5" height="2" rx="1" fill="currentColor"/>
+                      <circle cx="9.5" cy="10" r="1.5" fill="#07070d"/>
+                      <circle cx="14.5" cy="10" r="1.5" fill="#07070d"/>
+                    </svg>
+                  </div>
+                ) : loc.pin_style === 'divine' ? (
+                  <div className="pin-anim pin-anim--divine">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="3.5" fill="currentColor"/>
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                ) : loc.pin_style === 'storm' ? (
+                  <div className="pin-anim pin-anim--storm">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M13 2L4 14h7l-2 8 11-12h-7z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                ) : loc.pin_style === 'shadow' ? (
+                  <div className="pin-anim pin-anim--shadow">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2C8.1 2 5 5.1 5 9V19L7 17.5L9 19L11 17.5L12 19L13 17.5L15 19L17 17.5L19 19V9C19 5.1 15.9 2 12 2Z" fill="currentColor"/>
+                      <circle cx="9.5" cy="9" r="1.5" fill="rgba(0,0,0,0.4)"/>
+                      <circle cx="14.5" cy="9" r="1.5" fill="rgba(0,0,0,0.4)"/>
+                    </svg>
+                  </div>
+                ) : loc.pin_style === 'lair' ? (
+                  <div className="pin-anim pin-anim--lair">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M7 5L8.5 9M17 5L15.5 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <path d="M12 5C8.7 5 6 7.7 6 11C6 13.3 7.2 15.3 9 16.4V18H15V16.4C16.8 15.3 18 13.3 18 11C18 7.7 15.3 5 12 5Z" fill="currentColor"/>
+                      <circle cx="9.5" cy="11" r="1.5" fill="#07070d"/>
+                      <circle cx="14.5" cy="11" r="1.5" fill="#07070d"/>
+                      <path d="M10 14.5C10.5 15.5 11.2 16 12 16C12.8 16 13.5 15.5 14 14.5" stroke="#07070d" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                ) : loc.icon_url ? (
                   <img
                     src={`${API_BASE}${loc.icon_url}`}
                     className="pin-icon-img"

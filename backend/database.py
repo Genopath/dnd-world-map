@@ -69,6 +69,8 @@ _MIGRATIONS = [
     "ALTER TABLE locations ADD COLUMN scale_value REAL",
     "ALTER TABLE locations ADD COLUMN scale_unit VARCHAR(50)",
     "ALTER TABLE campaign_settings ADD COLUMN dm_passcode VARCHAR(255)",
+    "ALTER TABLE locations ADD COLUMN pin_style VARCHAR(20) DEFAULT 'default'",
+    "ALTER TABLE locations ADD COLUMN is_visible BOOLEAN DEFAULT 1",
 ]
 
 
