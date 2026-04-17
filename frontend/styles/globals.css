@@ -532,7 +532,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   width:  50px; height: 50px;
   top:  -6px;
   left: 50%;
-  transform: translateX(-50%) scale(0.6);
+  transform: translateX(-50%) scale(0.85);
   transform-origin: center center;
   border-radius: 50%;
   pointer-events: none;
@@ -545,8 +545,8 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   opacity: 1;
 }
 /* Auto-scale with pin size — icon sm=26px → ring 38px; lg=50px → ring 62px */
-.pin.pin-size-sm .pin-border-ring { width: 38px; height: 38px; top: -6px; transform: translateX(-50%) scale(0.6); }
-.pin.pin-size-lg .pin-border-ring { width: 62px; height: 62px; top: -6px; transform: translateX(-50%) scale(0.6); }
+.pin.pin-size-sm .pin-border-ring { width: 38px; height: 38px; top: -6px; transform: translateX(-50%) scale(0.85); }
+.pin.pin-size-lg .pin-border-ring { width: 62px; height: 62px; top: -6px; transform: translateX(-50%) scale(0.85); }
 /* Size-specific hover rules — higher specificity (4 classes) ensures hover always wins */
 .pin.pin-size-sm:hover .pin-border-ring,
 .pin.pin-size-lg:hover .pin-border-ring { transform: translateX(-50%) scale(1); opacity: 1; }
