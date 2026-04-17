@@ -102,6 +102,10 @@ interface Props {
   mapScale?:          { value: number; unit: string } | null;
   showScaleBar?:      boolean;
   onSetMapScale?:     (value: number, unit: string) => void;
+  // Grid overlay
+  showGrid?:          boolean;
+  gridCellSize?:      number | null;   // how many map-units per grid cell
+  onSetGridCell?:     (size: number) => void;
   // Ruler tool
   rulerActive?:       boolean;
   // Waypoint drawing — freehand drag on map
@@ -363,6 +367,9 @@ export default function MapView({
   mapScale,
   showScaleBar = true,
   onSetMapScale,
+  showGrid = false,
+  gridCellSize,
+  onSetGridCell,
   rulerActive = false,
   waypointMode,
   onSaveWaypoints,
@@ -710,11 +717,17 @@ export default function MapView({
           direction: (e.direction ?? 'forward') as 'forward' | 'backward' | 'both',
           waypoints: parseWaypoints(e.waypoints),
           entryId: e.id,
+          distance: e.distance,
+          distance_unit: e.distance_unit,
+          travel_time: e.travel_time,
+          travel_time_unit: e.travel_time_unit,
         }))
         .filter((s): s is {
           loc: Location; travelType: string | undefined;
           direction: 'forward' | 'backward' | 'both'; waypoints: [number, number][];
           entryId: number;
+          distance: number | null | undefined; distance_unit: string | null | undefined;
+          travel_time: number | null | undefined; travel_time_unit: string | null | undefined;
         } => s.loc !== undefined);
       return { member, color, segments };
     })
@@ -844,6 +857,35 @@ export default function MapView({
           onFogChange={onFogChange}
         />
 
+        {/* ── Grid overlay ─────────────────────────────────────────────── */}
+        {showGrid && mapScale && mapScale.value > 0 && gridCellSize && gridCellSize > 0 && (() => {
+          const mapEl = imgRef.current;
+          if (!mapEl) return null;
+          // Cell size as % of map width (x) and % of map height (y, aspect-ratio-corrected)
+          const natW = mapEl.naturalWidth  || mapEl.offsetWidth  || 1;
+          const natH = mapEl.naturalHeight || mapEl.offsetHeight || 1;
+          const cellPctX = (gridCellSize / mapScale.value) * 100;
+          const cellPctY = cellPctX * (natW / natH); // correct for non-square maps
+          const cols = Math.ceil(100 / cellPctX) + 1;
+          const rows = Math.ceil(100 / cellPctY) + 1;
+          const lines: React.ReactNode[] = [];
+          for (let c = 0; c <= cols; c++) {
+            const x = c * cellPctX;
+            lines.push(<line key={`gc${c}`} x1={`${x}%`} y1="0%" x2={`${x}%`} y2="100%"
+              stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />);
+          }
+          for (let r = 0; r <= rows; r++) {
+            const y = r * cellPctY;
+            lines.push(<line key={`gr${r}`} x1="0%" y1={`${y}%`} x2="100%" y2={`${y}%`}
+              stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />);
+          }
+          return (
+            <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 3, overflow: 'visible' }}>
+              {lines}
+            </svg>
+          );
+        })()}
+
         {/* SVG path lines overlay */}
         <svg
           style={{
@@ -879,6 +921,10 @@ export default function MapView({
               const allPts: [number, number][] = [[prev.loc.x, prev.loc.y], ...wp, [seg.loc.x, seg.loc.y]];
               const mx = (prev.loc.x + seg.loc.x) / 2;
               const my = (prev.loc.y + seg.loc.y) / 2;
+              const distLabel = showDistLabels && seg.distance != null
+                ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
+              const timeLabel = showTimeLabels && seg.travel_time != null
+                ? `${seg.travel_time}${seg.travel_time_unit ? ' ' + seg.travel_time_unit : ''}` : null;
               const pts = (mapEl && allPts.length >= 2) ? ptsToPolyline(allPts, mapEl) : null;
               return (
                 <g key={`char-${member.id}-${i}`}>
@@ -899,6 +945,14 @@ export default function MapView({
                   <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="middle"
                     fontSize="11" style={{ userSelect: 'none', pointerEvents: 'none' }}>
                     {style.symbol}
+                    {distLabel && (
+                      <tspan x={`${mx}%`} dy="13" fontSize="9"
+                        style={{ fill: '#ffe58a', stroke: '#000', strokeWidth: '2.5', paintOrder: 'stroke' }}>{distLabel}</tspan>
+                    )}
+                    {timeLabel && (
+                      <tspan x={`${mx}%`} dy={distLabel ? '12' : '13'} fontSize="9"
+                        style={{ fill: '#80d8ff', stroke: '#000', strokeWidth: '2.5', paintOrder: 'stroke' }}>{timeLabel}</tspan>
+                    )}
                   </text>
                 </g>
               );

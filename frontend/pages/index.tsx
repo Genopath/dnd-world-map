@@ -143,6 +143,12 @@ export default function Home() {
   const [showTimeLabels,  setShowTimeLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_time_labels') !== '0' : true);
   const [showScaleBar,    setShowScaleBar]    = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_scale_bar') !== '0' : true);
   const [rulerMode,       setRulerMode]       = useState(false);
+  const [showGrid,        setShowGrid]        = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_grid') === '1' : false);
+  const [gridCellSize,    setGridCellSize]    = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const v = localStorage.getItem('grid_cell_size');
+    return v ? parseFloat(v) : null;
+  });
   const [fitTrigger,      setFitTrigger]      = useState(0);
 
   // ── Phase-1 state ───────────────────────────────────────────────────────────
@@ -1001,6 +1007,28 @@ export default function Home() {
                 title={currentMapScale ? 'Ruler tool — click map to set anchor, move to measure' : 'Ruler tool (set map scale first for distance readout)'}
                 onClick={() => setRulerMode(v => !v)}
               >📐 Ruler</button>
+              <button
+                className={`btn btn-sm ${showGrid ? 'btn-active' : ''}`}
+                title={currentMapScale ? 'Toggle grid overlay' : 'Toggle grid (set map scale first)'}
+                onClick={() => setShowGrid(v => { const next = !v; localStorage.setItem('show_grid', next ? '1' : '0'); return next; })}
+              >⊞ Grid</button>
+              {showGrid && currentMapScale && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>cell=</span>
+                  <input
+                    type="number" min="1"
+                    value={gridCellSize ?? ''}
+                    placeholder={String(Math.round(currentMapScale.value / 10))}
+                    style={{ width: 52, fontSize: 12, padding: '2px 4px', borderRadius: 3, background: 'var(--surface2)', border: '1px solid var(--border-light)', color: 'var(--text)' }}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value);
+                      if (!isNaN(v) && v > 0) { setGridCellSize(v); localStorage.setItem('grid_cell_size', String(v)); }
+                      else if (e.target.value === '') { setGridCellSize(null); localStorage.removeItem('grid_cell_size'); }
+                    }}
+                  />
+                  <span style={{ color: 'var(--text-muted)' }}>{currentMapScale.unit}</span>
+                </span>
+              )}
               <label className="btn" style={{ cursor: 'pointer' }}>
                 {mapStack.length > 0 ? 'Upload Submap' : 'Upload Map'}
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
@@ -1055,6 +1083,8 @@ export default function Home() {
             mapScale={currentMapScale}
             showScaleBar={showScaleBar}
             onSetMapScale={handleSetMapScale}
+            showGrid={showGrid}
+            gridCellSize={gridCellSize}
             rulerActive={rulerMode}
           />
           <Sidebar

@@ -917,8 +917,8 @@ def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     )
     return {
         "locations": [_loc_out(l) for l in locations],
-        "npcs": npcs,
-        "quests": quests,
+        "npcs":      [_npc_out(n, db) for n in npcs],
+        "quests":    [_quest_out(q, db) for q in quests],
     }
 
 
