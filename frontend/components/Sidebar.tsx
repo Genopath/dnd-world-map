@@ -613,7 +613,7 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
         <label className="form-label">Pin Style</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginTop: 4 }}>
           {([
-            { value: 'default', label: 'Default',  emoji: '📍' },
+            { value: 'default', label: 'None',     emoji: '○' },
             { value: 'flame',   label: 'Flame',    emoji: '🔥' },
             { value: 'frost',   label: 'Frost',    emoji: '❄️' },
             { value: 'cursed',  label: 'Cursed',   emoji: '☠️' },
