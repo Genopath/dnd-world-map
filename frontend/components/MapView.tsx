@@ -919,8 +919,9 @@ export default function MapView({
               const wp = (waypointMode?.entryId === seg.entryId && freehandPts.length >= 2)
                 ? freehandPts : seg.waypoints;
               const allPts: [number, number][] = [[prev.loc.x, prev.loc.y], ...wp, [seg.loc.x, seg.loc.y]];
-              const mx = (prev.loc.x + seg.loc.x) / 2;
-              const my = (prev.loc.y + seg.loc.y) / 2;
+              const midPt = allPts[Math.floor(allPts.length / 2)];
+              const mx = midPt[0];
+              const my = midPt[1];
               const distLabel = showDistLabels && seg.distance != null
                 ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
               const timeLabel = showTimeLabels && seg.travel_time != null
@@ -968,8 +969,9 @@ export default function MapView({
             const wp = (waypointMode?.entryId === seg.entryId && freehandPts.length >= 2)
               ? freehandPts : seg.waypoints;
             const allPts: [number, number][] = [[prev.loc.x, prev.loc.y], ...wp, [seg.loc.x, seg.loc.y]];
-            const mx = (prev.loc.x + seg.loc.x) / 2;
-            const my = (prev.loc.y + seg.loc.y) / 2;
+            const midPt = allPts[Math.floor(allPts.length / 2)];
+            const mx = midPt[0];
+            const my = midPt[1];
             const distLabel = showDistLabels && seg.distance != null
               ? `${seg.distance}${seg.distance_unit ? ' ' + seg.distance_unit : ''}` : null;
             const timeLabel = showTimeLabels && seg.travel_time != null
