@@ -726,6 +726,16 @@ export default function Home() {
     const updated = await api.campaign.update(data); setCampaign(updated); scheduleIdbBackup();
   }, [scheduleIdbBackup]);
 
+  // ── Party marker handlers ─────────────────────────────────────────────────────
+  const handleUpdatePartyMarker = useCallback(async (x: number | null, y: number | null) => {
+    const updated = await api.campaign.update({ party_marker_x: x, party_marker_y: y });
+    setCampaign(updated);
+  }, []);
+  const handleUpdateCharMarker = useCallback(async (memberId: number, x: number | null, y: number | null) => {
+    const updated = await api.party.update(memberId, { marker_x: x, marker_y: y });
+    setParty(prev => prev.map(m => m.id === memberId ? updated : m));
+  }, []);
+
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────
   const handleEnterSubmap = useCallback(async (id: number) => {
     // Fetch fog before updating mapStack so the first render already has
@@ -1253,6 +1263,9 @@ export default function Home() {
             showGrid={showGrid}
             gridCellSize={gridCellSize}
             rulerActive={rulerMode}
+            campaign={campaign}
+            onUpdatePartyMarker={handleUpdatePartyMarker}
+            onUpdateCharMarker={handleUpdateCharMarker}
           />
           <div className={`sidebar-drawer ${mobileSidebarOpen ? 'sidebar-drawer--open' : ''}`}>
           <Sidebar

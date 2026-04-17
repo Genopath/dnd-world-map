@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { CharacterPathEntry, Location, PartyMember, PathEntry, Quest } from '../types';
+import type { CampaignSettings, CharacterPathEntry, Location, PartyMember, PathEntry, Quest } from '../types';
 import { API_BASE } from '../lib/api';
 import { playRulerTick } from '../lib/sounds';
 import FogCanvas from './FogCanvas';
@@ -113,6 +113,10 @@ interface Props {
   waypointMode?:      { entryId: number; isChar: boolean } | null;
   onSaveWaypoints?:   (entryId: number, pts: [number, number][], isChar: boolean) => void;
   onCancelWaypoints?: () => void;
+  // Party / character map tokens
+  campaign?:             CampaignSettings | null;
+  onUpdatePartyMarker?:  (x: number | null, y: number | null) => void;
+  onUpdateCharMarker?:   (memberId: number, x: number | null, y: number | null) => void;
 }
 
 // Parse waypoints JSON string to array of [x, y] pairs
@@ -375,6 +379,9 @@ export default function MapView({
   waypointMode,
   onSaveWaypoints,
   onCancelWaypoints,
+  campaign,
+  onUpdatePartyMarker,
+  onUpdateCharMarker,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -433,6 +440,21 @@ export default function MapView({
   const pinDragRef     = useRef<{ id: number; startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
   const pinJustDragged = useRef(false);
   const [dragOverrides, setDragOverrides] = useState<Map<number, { x: number; y: number }>>(new Map());
+
+  // ── Token drag state (party / char markers) ───────────────────────────────
+  const tokenDragRef     = useRef<{ kind: 'party' | 'char'; memberId?: number; startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
+  const tokenJustDragged = useRef(false);
+  const [tokenDragPos,   setTokenDragPos] = useState<{ kind: 'party' | 'char'; memberId?: number; x: number; y: number } | null>(null);
+
+  // ── Map context menu (right-click on empty map / tokens) ─────────────────
+  const [mapCtxMenu, setMapCtxMenu] = useState<{ screenX: number; screenY: number; mapX: number; mapY: number; tokenKind?: 'party' | 'char'; memberId?: number } | null>(null);
+  useEffect(() => {
+    if (!mapCtxMenu) return;
+    const close = () => setMapCtxMenu(null);
+    document.addEventListener('click', close);
+    document.addEventListener('contextmenu', close);
+    return () => { document.removeEventListener('click', close); document.removeEventListener('contextmenu', close); };
+  }, [mapCtxMenu]);
 
   // ── Context menu ──────────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; loc: Location } | null>(null);
@@ -587,6 +609,24 @@ export default function MapView({
       return; // block map pan while drawing
     }
 
+    // ── Token drag (party / char markers) ─────────────────────────────────
+    if (tokenDragRef.current) {
+      const td = tokenDragRef.current;
+      const dx = e.clientX - td.startX;
+      const dy = e.clientY - td.startY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) {
+        td.moved = true;
+        const mapEl = imgRef.current ?? placeholderRef.current;
+        if (mapEl) {
+          const scale = transformRef.current.scale;
+          const newX = Math.max(0, Math.min(100, td.origX + (dx / (mapEl.offsetWidth  * scale)) * 100));
+          const newY = Math.max(0, Math.min(100, td.origY + (dy / (mapEl.offsetHeight * scale)) * 100));
+          setTokenDragPos({ kind: td.kind, memberId: td.memberId, x: newX, y: newY });
+        }
+      }
+      return;
+    }
+
     // ── Pin drag takes priority ────────────────────────────────────────────
     if (pinDragRef.current) {
       const pd = pinDragRef.current;
@@ -640,6 +680,22 @@ export default function MapView({
       freehandBuf.current = [];
       return;
     }
+    // ── Finish token drag ─────────────────────────────────────────────────
+    if (tokenDragRef.current) {
+      const td = tokenDragRef.current;
+      if (td.moved && tokenDragPos) {
+        tokenJustDragged.current = true;
+        if (td.kind === 'party') {
+          onUpdatePartyMarker?.(tokenDragPos.x, tokenDragPos.y);
+        } else if (td.kind === 'char' && td.memberId != null) {
+          onUpdateCharMarker?.(td.memberId, tokenDragPos.x, tokenDragPos.y);
+        }
+      }
+      tokenDragRef.current = null;
+      setTokenDragPos(null);
+      return;
+    }
+
     // ── Finish pin drag ────────────────────────────────────────────────────
     if (pinDragRef.current) {
       const pd = pinDragRef.current;
@@ -828,8 +884,19 @@ export default function MapView({
         }
         pinDragRef.current = null;
         setDragOverrides(new Map());
+        tokenDragRef.current = null;
+        setTokenDragPos(null);
       }}
       onClick={handleContainerClick}
+      onContextMenu={isDMMode && !fogPaintMode && !isAddingPin ? e => {
+        e.preventDefault();
+        const mapEl = imgRef.current ?? placeholderRef.current;
+        if (!mapEl) return;
+        const rect = mapEl.getBoundingClientRect();
+        const mapX = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+        const mapY = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+        setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX, mapY });
+      } : undefined}
       // Ruler: capture-phase click so we intercept before pin stopPropagation
       onClickCapture={e => {
         if (!rulerActiveRef.current) return;
@@ -1362,6 +1429,65 @@ export default function MapView({
           );
         })}
 
+        {/* ── Party marker token ─────────────────────────────────────────── */}
+        {campaign != null && (() => {
+          const mx = tokenDragPos?.kind === 'party' ? tokenDragPos.x : campaign.party_marker_x;
+          const my = tokenDragPos?.kind === 'party' ? tokenDragPos.y : campaign.party_marker_y;
+          if (mx == null || my == null) return null;
+          if (!isDMMode && campaign.party_marker_visible === false) return null;
+          return (
+            <div
+              className="party-token"
+              style={{ left: `${mx}%`, top: `${my}%` }}
+              onMouseDown={isDMMode ? e => {
+                e.stopPropagation();
+                tokenDragRef.current = { kind: 'party', startX: e.clientX, startY: e.clientY, origX: mx, origY: my, moved: false };
+              } : undefined}
+              onClick={e => { e.stopPropagation(); if (tokenJustDragged.current) { tokenJustDragged.current = false; } }}
+              onContextMenu={isDMMode ? e => {
+                e.preventDefault(); e.stopPropagation();
+                if (tokenJustDragged.current) { tokenJustDragged.current = false; return; }
+                setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'party' });
+              } : undefined}
+              title="Party — drag to reposition, right-click to remove"
+              data-no-draw
+            >
+              ⚔
+            </div>
+          );
+        })()}
+
+        {/* ── Per-character tokens ───────────────────────────────────────── */}
+        {party.map(member => {
+          const isDraggedChar = tokenDragPos?.kind === 'char' && tokenDragPos.memberId === member.id;
+          const mx = isDraggedChar ? tokenDragPos!.x : member.marker_x;
+          const my = isDraggedChar ? tokenDragPos!.y : member.marker_y;
+          if (mx == null || my == null) return null;
+          if (!isDMMode && member.marker_visible === false) return null;
+          return (
+            <div
+              key={`char-token-${member.id}`}
+              className="party-token party-token--char"
+              style={{ left: `${mx}%`, top: `${my}%`, '--token-color': member.path_color } as React.CSSProperties}
+              onMouseDown={isDMMode ? e => {
+                e.stopPropagation();
+                tokenDragRef.current = { kind: 'char', memberId: member.id, startX: e.clientX, startY: e.clientY, origX: mx, origY: my, moved: false };
+              } : undefined}
+              onClick={e => { e.stopPropagation(); if (tokenJustDragged.current) { tokenJustDragged.current = false; } }}
+              onContextMenu={isDMMode ? e => {
+                e.preventDefault(); e.stopPropagation();
+                if (tokenJustDragged.current) { tokenJustDragged.current = false; return; }
+                setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'char', memberId: member.id });
+              } : undefined}
+              title={`${member.name} — drag to reposition, right-click to remove`}
+              data-no-draw
+            >
+              {member.name[0]?.toUpperCase()}
+            </div>
+          );
+        })}
+
+
       </div>
 
       {/* ── Scale bar (fixed in map-container corner, outside map-transform) ── */}
@@ -1443,6 +1569,52 @@ export default function MapView({
             >
               🗑 Delete
             </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Map / token context menu (outside map-transform to avoid CSS transform offset) ── */}
+      {mapCtxMenu && (
+        <div
+          className="pin-context-menu"
+          style={{ left: mapCtxMenu.screenX, top: mapCtxMenu.screenY }}
+          onClick={e => e.stopPropagation()}
+        >
+          {mapCtxMenu.tokenKind === 'party' ? (
+            <>
+              <div className="pin-context-name">Party Marker</div>
+              <button className="pin-context-delete" onClick={() => {
+                onUpdatePartyMarker?.(null, null);
+                setMapCtxMenu(null);
+              }}>🗑 Remove Marker</button>
+            </>
+          ) : mapCtxMenu.tokenKind === 'char' ? (
+            <>
+              <div className="pin-context-name">
+                {party.find(m => m.id === mapCtxMenu.memberId)?.name ?? 'Character'} Marker
+              </div>
+              <button className="pin-context-delete" onClick={() => {
+                if (mapCtxMenu.memberId != null) onUpdateCharMarker?.(mapCtxMenu.memberId, null, null);
+                setMapCtxMenu(null);
+              }}>🗑 Remove Marker</button>
+            </>
+          ) : (
+            <>
+              <div className="pin-context-name">Place Marker</div>
+              {onUpdatePartyMarker && (
+                <button onClick={() => { onUpdatePartyMarker(mapCtxMenu.mapX, mapCtxMenu.mapY); setMapCtxMenu(null); }}>
+                  ⚔ Party Here
+                </button>
+              )}
+              {onUpdateCharMarker && party.map(m => (
+                <button key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => {
+                  onUpdateCharMarker(m.id, mapCtxMenu.mapX, mapCtxMenu.mapY);
+                  setMapCtxMenu(null);
+                }}>
+                  <span style={{ color: m.path_color, fontSize: 10 }}>●</span> {m.name}
+                </button>
+              ))}
+            </>
           )}
         </div>
       )}

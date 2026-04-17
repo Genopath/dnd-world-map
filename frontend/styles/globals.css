@@ -842,26 +842,27 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-context-menu {
   position: fixed;
   z-index: 1000;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: var(--surface2);
+  border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 4px 0;
-  min-width: 160px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  min-width: 170px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04);
   pointer-events: auto;
 }
 .pin-context-name {
-  padding: 6px 14px 4px;
+  padding: 6px 14px 5px;
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim);
-  letter-spacing: 0.03em;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 220px;
 }
 .pin-context-menu button {
   display: block;
@@ -873,11 +874,54 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   font-size: 13px;
   color: var(--text);
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background 0.12s;
 }
-.pin-context-menu button:hover { background: var(--surface-3); }
+.pin-context-menu button:hover { background: var(--surface3); }
 .pin-context-menu .pin-context-delete { color: #e07070; }
-.pin-context-menu .pin-context-delete:hover { background: rgba(180,50,50,0.15); }
+.pin-context-menu .pin-context-delete:hover { background: rgba(180,50,50,0.18); }
+
+/* ── Party / character map tokens ─────────────────────────────────────────── */
+.party-token {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f5d78a, #b8730f);
+  border: 2px solid rgba(255, 230, 160, 0.85);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.65), 0 0 14px rgba(201,134,26,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  pointer-events: all;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.party-token:hover {
+  box-shadow: 0 3px 14px rgba(0,0,0,0.75), 0 0 22px rgba(201,134,26,0.75);
+  transform: translate(-50%, -50%) scale(1.18);
+}
+.party-token:active { cursor: grabbing; }
+
+.party-token--char {
+  width: 28px;
+  height: 28px;
+  background: var(--token-color, #c9a84c);
+  border-color: rgba(255,255,255,0.65);
+  box-shadow: 0 2px 7px rgba(0,0,0,0.6), 0 0 10px color-mix(in srgb, var(--token-color, #c9a84c) 55%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.75);
+}
+.party-token--char:hover {
+  box-shadow: 0 3px 12px rgba(0,0,0,0.7), 0 0 16px color-mix(in srgb, var(--token-color, #c9a84c) 70%, transparent);
+  transform: translate(-50%, -50%) scale(1.18);
+}
 
 /* ── Type filter strip ────────────────────────────────────────────────────── */
 .pin-type-filter {

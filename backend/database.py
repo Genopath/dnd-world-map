@@ -72,6 +72,12 @@ _MIGRATIONS = [
     "ALTER TABLE locations ADD COLUMN pin_style VARCHAR(20) DEFAULT 'default'",
     "ALTER TABLE locations ADD COLUMN is_visible BOOLEAN DEFAULT 1",
     "ALTER TABLE locations ADD COLUMN pin_border VARCHAR(20) DEFAULT 'none'",
+    "ALTER TABLE campaign_settings ADD COLUMN party_marker_x REAL",
+    "ALTER TABLE campaign_settings ADD COLUMN party_marker_y REAL",
+    "ALTER TABLE campaign_settings ADD COLUMN party_marker_visible BOOLEAN DEFAULT 1",
+    "ALTER TABLE party_members ADD COLUMN marker_x REAL",
+    "ALTER TABLE party_members ADD COLUMN marker_y REAL",
+    "ALTER TABLE party_members ADD COLUMN marker_visible BOOLEAN DEFAULT 1",
 ]
 
 

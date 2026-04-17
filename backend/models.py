@@ -129,7 +129,10 @@ class CampaignSettings(Base):
     cal_day   = Column(Integer, default=1)
     cal_month = Column(Integer, default=1)
     cal_year  = Column(Integer, default=1)
-    dm_passcode = Column(String(255), nullable=True, default=None)
+    dm_passcode          = Column(String(255), nullable=True, default=None)
+    party_marker_x       = Column(Float, nullable=True)
+    party_marker_y       = Column(Float, nullable=True)
+    party_marker_visible = Column(Boolean, default=True)
 
 
 class PartyMember(Base):
@@ -146,9 +149,12 @@ class PartyMember(Base):
     ac = Column(Integer, default=10)
     conditions = Column(Text, default="[]")   # JSON array of strings
     notes = Column(Text, default="")
-    portrait_url = Column(String(500), nullable=True)
-    path_color = Column(String(7), default="#c9a84c")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    portrait_url   = Column(String(500), nullable=True)
+    path_color     = Column(String(7), default="#c9a84c")
+    marker_x       = Column(Float, nullable=True)
+    marker_y       = Column(Float, nullable=True)
+    marker_visible = Column(Boolean, default=True)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Faction(Base):

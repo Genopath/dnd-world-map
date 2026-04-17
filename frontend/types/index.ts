@@ -140,6 +140,9 @@ export interface PartyMember {
   notes: string;
   portrait_url?: string | null;
   path_color: string;
+  marker_x?: number | null;
+  marker_y?: number | null;
+  marker_visible?: boolean;
   created_at?: string;
 }
 
@@ -166,6 +169,9 @@ export interface CampaignSettings {
   cal_day: number;
   cal_month: number;
   cal_year: number;
+  party_marker_x?: number | null;
+  party_marker_y?: number | null;
+  party_marker_visible?: boolean;
 }
 
 export interface CalendarConfig {

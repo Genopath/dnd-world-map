@@ -251,6 +251,9 @@ class CampaignUpdate(BaseModel):
     cal_day:   Optional[int] = None
     cal_month: Optional[int] = None
     cal_year:  Optional[int] = None
+    party_marker_x:       Optional[float] = None
+    party_marker_y:       Optional[float] = None
+    party_marker_visible: Optional[bool]  = None
 
 class CampaignOut(BaseModel):
     id: int
@@ -263,6 +266,9 @@ class CampaignOut(BaseModel):
     cal_day:   int
     cal_month: int
     cal_year:  int
+    party_marker_x:       Optional[float] = None
+    party_marker_y:       Optional[float] = None
+    party_marker_visible: bool = True
     model_config = {"from_attributes": True}
 
 
@@ -294,6 +300,9 @@ class PartyMemberUpdate(BaseModel):
     notes: Optional[str] = None
     path_color: Optional[str] = None
     portrait_url: Optional[str] = None
+    marker_x:       Optional[float] = None
+    marker_y:       Optional[float] = None
+    marker_visible: Optional[bool]  = None
 
 class PartyMemberOut(BaseModel):
     id: int
@@ -309,6 +318,9 @@ class PartyMemberOut(BaseModel):
     notes: str
     portrait_url: Optional[str] = None
     path_color: str = "#c9a84c"
+    marker_x:       Optional[float] = None
+    marker_y:       Optional[float] = None
+    marker_visible: bool = True
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
