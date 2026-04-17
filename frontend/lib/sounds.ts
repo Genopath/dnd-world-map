@@ -361,6 +361,16 @@ let _fairyGain:   GainNode | null = null;
 let _fairySrc:    AudioBufferSourceNode | null = null;
 let _fairyBuffer: AudioBuffer | null = null;
 
+export function getFairyVolume(): number {
+  if (typeof window === 'undefined') return 0.85;
+  return parseFloat(localStorage.getItem('fairy_volume') ?? '0.85');
+}
+
+export function setFairyVolume(v: number): void {
+  if (typeof window !== 'undefined') localStorage.setItem('fairy_volume', String(v));
+  if (_fairyGain && _ctx) _fairyGain.gain.setValueAtTime(v, _ctx.currentTime);
+}
+
 /** Preload the audio buffer (call once on app start, no gesture needed) */
 export async function preloadFairyFountain(): Promise<void> {
   if (_fairyBuffer) return;
@@ -400,9 +410,10 @@ export async function playFairyFountain(): Promise<void> {
   if (!_fairyBuffer) await preloadFairyFountain();
   if (!_fairyBuffer) return;
 
+  const vol = getFairyVolume();
   const g = c.createGain();
   g.gain.setValueAtTime(0.0001, c.currentTime);
-  g.gain.linearRampToValueAtTime(0.85, c.currentTime + 1.2); // gentle fade-in
+  g.gain.linearRampToValueAtTime(vol, c.currentTime + 1.2); // gentle fade-in
   g.connect(c.destination);
   _fairyGain = g;
 
@@ -412,6 +423,21 @@ export async function playFairyFountain(): Promise<void> {
   src.connect(g);
   src.start();
   _fairySrc = src;
+}
+
+/** Soft FF7-style menu cursor tick when moving between campaign slots */
+export function playMenuCursor() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.28);
+  const now = c.currentTime;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.linearRampToValueAtTime(0.22, now + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.065);
+  g.connect(mg);
+  const o = c.createOscillator();
+  o.type = 'triangle'; o.frequency.setValueAtTime(780, now);
+  o.connect(g); o.start(now); o.stop(now + 0.08);
 }
 
 /** Gentle bell strike for generic positive actions (save, export, etc.) */

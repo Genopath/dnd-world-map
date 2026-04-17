@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import { playFairyFountain, stopFairyFountain } from '../lib/sounds';
+import {
+  playFairyFountain, stopFairyFountain,
+  getFairyVolume, setFairyVolume,
+  isSoundMuted, setSoundMuted,
+  playMenuCursor, playPinSelect,
+} from '../lib/sounds';
 import type { CampaignMeta } from '../types';
 
 interface Props {
@@ -12,9 +17,9 @@ interface Props {
 
 type Phase = 'splash' | 'splash-out' | 'select';
 
-interface Star { id: number; x: number; y: number; size: number; delay: number; dur: number; }
+interface Particle { id: number; x: number; y: number; size: number; delay: number; dur: number; }
 
-function makeStars(n: number): Star[] {
+function makeStars(n: number): Particle[] {
   return Array.from({ length: n }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
@@ -25,7 +30,17 @@ function makeStars(n: number): Star[] {
   }));
 }
 
-// Decorative SVG rune divider
+function makeSparkles(n: number): Particle[] {
+  return Array.from({ length: n }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: 40 + Math.random() * 60,   // lower half only — float upward
+    size: Math.random() * 4 + 2,
+    delay: Math.random() * 8,
+    dur: Math.random() * 5 + 6,
+  }));
+}
+
 function RuneDivider({ small = false }: { small?: boolean }) {
   const w = small ? 180 : 320;
   return (
@@ -43,7 +58,7 @@ function RuneDivider({ small = false }: { small?: boolean }) {
 }
 
 export default function CampaignSelector({ currentSlug, showSplash = false, onSelect, onRename }: Props) {
-  const [phase, setPhase] = useState<Phase>(showSplash ? 'splash' : 'select');
+  const [phase,        setPhase]        = useState<Phase>(showSplash ? 'splash' : 'select');
   const [campaigns,    setCampaigns]    = useState<CampaignMeta[]>([]);
   const [newName,      setNewName]      = useState('');
   const [creating,     setCreating]     = useState(false);
@@ -53,18 +68,22 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
   const [renameInput,  setRenameInput]  = useState('');
   const [renaming,     setRenaming]     = useState(false);
   const [showNew,      setShowNew]      = useState(false);
+  const [activeIdx,    setActiveIdx]    = useState(-1);
+  const [muted,        setMuted]        = useState(() => isSoundMuted());
+  const [volume,       setVolume]       = useState(() => getFairyVolume());
+
   const renameRef  = useRef<HTMLInputElement>(null);
   const newNameRef = useRef<HTMLInputElement>(null);
-  const stars = useMemo(() => makeStars(90), []);
+  const stars    = useMemo(() => makeStars(90), []);
+  const sparkles = useMemo(() => makeSparkles(28), []);
 
   const load = () =>
     api.campaigns.list().then(list => { setCampaigns(list); setLoading(false); });
 
   useEffect(() => { load(); }, []);
 
-  // Stop fairy fountain when component unmounts (campaign selected)
+  // Music lifecycle
   useEffect(() => {
-    // If there's no splash (switching campaigns), we already have a user gesture — start immediately
     if (!showSplash) playFairyFountain();
     return () => stopFairyFountain();
   }, []);
@@ -77,9 +96,8 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
     if (showNew && newNameRef.current) newNameRef.current.focus();
   }, [showNew]);
 
-  // ── Splash phase: advance on any key or click, auto after 3.5 s
+  // ── Splash advance ───────────────────────────────────────────────────────────
   const advanceSplash = () => {
-    // First user gesture — start the music (keeps playing through campaign select)
     playFairyFountain();
     setPhase('splash-out');
     setTimeout(() => setPhase('select'), 550);
@@ -93,16 +111,49 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
     return () => { clearTimeout(timer); window.removeEventListener('keydown', onKey); };
   }, [phase]);
 
-  // ── Campaign actions ─────────────────────────────────────────────────────────
+  // ── Keyboard navigation on select screen ────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'select') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (renamingSlug || showNew) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIdx(i => { const next = Math.min(i + 1, campaigns.length - 1); if (next !== i) playMenuCursor(); return next; });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIdx(i => { const next = Math.max(i - 1, 0); if (next !== i) playMenuCursor(); return next; });
+      } else if (e.key === 'Enter' && activeIdx >= 0 && campaigns[activeIdx]) {
+        playPinSelect();
+        onSelect(campaigns[activeIdx].slug, campaigns[activeIdx].name);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, campaigns, activeIdx, renamingSlug, showNew]);
 
+  // ── Volume / mute ────────────────────────────────────────────────────────────
+  const handleVolumeChange = (v: number) => {
+    setVolume(v);
+    setFairyVolume(v);
+    if (muted && v > 0) { setSoundMuted(false); setMuted(false); playFairyFountain(); }
+  };
+
+  const handleMuteToggle = () => {
+    const next = !muted;
+    setSoundMuted(next);
+    setMuted(next);
+    if (next) { stopFairyFountain(); }
+    else      { playFairyFountain(); }
+  };
+
+  // ── Campaign actions ─────────────────────────────────────────────────────────
   const handleCreate = async () => {
     const name = newName.trim();
     if (!name) return;
     setCreating(true);
     try {
       const c = await api.campaigns.create(name);
-      setNewName('');
-      setShowNew(false);
+      setNewName(''); setShowNew(false);
       await load();
       onSelect(c.slug, c.name);
     } finally { setCreating(false); }
@@ -111,16 +162,12 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
   const handleDelete = async (c: CampaignMeta) => {
     if (!confirm(`Delete campaign "${c.name}"? This cannot be undone.`)) return;
     setDeleting(c.slug);
-    try {
-      await api.campaigns.remove(c.slug);
-      await load();
-    } finally { setDeleting(null); }
+    try { await api.campaigns.remove(c.slug); await load(); }
+    finally { setDeleting(null); }
   };
 
   const startRename = (c: CampaignMeta, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRenamingSlug(c.slug);
-    setRenameInput(c.name);
+    e.stopPropagation(); setRenamingSlug(c.slug); setRenameInput(c.name);
   };
 
   const commitRename = async () => {
@@ -138,7 +185,6 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
   const cancelRename = () => { setRenamingSlug(null); setRenameInput(''); };
 
   // ── Render ───────────────────────────────────────────────────────────────────
-
   return (
     <div
       className={`cs-overlay ${phase === 'splash-out' ? 'cs-overlay--fading' : ''}`}
@@ -147,22 +193,26 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
       {/* ── Starfield ── */}
       <div className="cs-stars" aria-hidden="true">
         {stars.map(s => (
-          <span
-            key={s.id}
-            className="cs-star"
-            style={{
-              left: `${s.x}%`,
-              top: `${s.y}%`,
-              width: `${s.size}px`,
-              height: `${s.size}px`,
-              animationDelay: `${s.delay}s`,
-              animationDuration: `${s.dur}s`,
-            }}
-          />
+          <span key={s.id} className="cs-star" style={{
+            left: `${s.x}%`, top: `${s.y}%`,
+            width: `${s.size}px`, height: `${s.size}px`,
+            animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s`,
+          }} />
         ))}
       </div>
 
-      {/* ── Radial glow beneath content ── */}
+      {/* ── Floating gold sparkles ── */}
+      <div className="cs-sparkles" aria-hidden="true">
+        {sparkles.map(s => (
+          <span key={s.id} className="cs-sparkle" style={{
+            left: `${s.x}%`, top: `${s.y}%`,
+            width: `${s.size}px`, height: `${s.size}px`,
+            animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s`,
+          }} />
+        ))}
+      </div>
+
+      {/* ── Radial glow ── */}
       <div className="cs-glow" aria-hidden="true" />
 
       {/* ── Splash screen ── */}
@@ -181,6 +231,7 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
       {/* ── Campaign select screen ── */}
       {phase === 'select' && (
         <div className="cs-screen">
+
           {/* Header */}
           <div className="cs-header">
             <RuneDivider small />
@@ -208,23 +259,24 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
             {campaigns.map((c, idx) => (
               <div
                 key={c.slug}
-                className={`cs-file-slot ${c.slug === currentSlug ? 'cs-file-slot--active' : ''}`}
+                className={`cs-file-slot ${c.slug === currentSlug ? 'cs-file-slot--active' : ''} ${activeIdx === idx ? 'cs-file-slot--keyed' : ''}`}
                 style={{ animationDelay: `${idx * 0.07}s` }}
+                onMouseEnter={() => { if (activeIdx !== idx) { setActiveIdx(idx); playMenuCursor(); } }}
+                onMouseLeave={() => setActiveIdx(-1)}
                 onClick={() => renamingSlug !== c.slug && onSelect(c.slug, c.name)}
               >
+                {/* FF7-style hand cursor */}
+                <div className="cs-hand-col" aria-hidden="true">
+                  {activeIdx === idx && <span className="cs-hand">☞</span>}
+                </div>
+
                 {renamingSlug === c.slug ? (
-                  <div
-                    style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}
-                    onClick={e => e.stopPropagation()}
-                  >
+                  <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                     <input
                       ref={renameRef}
                       value={renameInput}
                       onChange={e => setRenameInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') commitRename();
-                        if (e.key === 'Escape') cancelRename();
-                      }}
+                      onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); }}
                       className="cs-rename-input"
                     />
                     <button className="btn btn-primary btn-sm" onClick={commitRename} disabled={renaming || !renameInput.trim()}>
@@ -234,35 +286,25 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
                   </div>
                 ) : (
                   <>
-                    {/* Slot icon */}
                     <div className="cs-file-icon" aria-hidden="true">
                       {c.slug === currentSlug ? '⚔' : '📜'}
                     </div>
-                    {/* Slot info */}
                     <div className="cs-file-info">
                       <div className="cs-file-name">{c.name}</div>
                       <div className="cs-file-slug">{c.slug}</div>
                     </div>
-                    {/* Actions */}
                     <div className="cs-file-actions" onClick={e => e.stopPropagation()}>
-                      <button
-                        className="btn btn-sm btn-ghost btn-icon"
-                        onClick={e => startRename(c, e)}
-                        title="Rename campaign"
-                      >✏</button>
+                      <button className="btn btn-sm btn-ghost btn-icon" onClick={e => startRename(c, e)} title="Rename">✏</button>
                       {c.slug !== 'default' && (
                         <button
                           className="btn btn-sm btn-ghost btn-icon"
                           style={{ color: 'var(--danger-text)' }}
                           onClick={() => handleDelete(c)}
                           disabled={deleting === c.slug}
-                          title="Delete campaign"
-                        >
-                          {deleting === c.slug ? '…' : '✕'}
-                        </button>
+                          title="Delete"
+                        >{deleting === c.slug ? '…' : '✕'}</button>
                       )}
                     </div>
-                    {/* Hover arrow */}
                     <div className="cs-file-arrow" aria-hidden="true">›</div>
                   </>
                 )}
@@ -270,13 +312,10 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
             ))}
           </div>
 
-          {/* New campaign section */}
+          {/* New campaign */}
           <div className="cs-new-area">
             {!showNew ? (
-              <button
-                className="cs-new-btn"
-                onClick={() => setShowNew(true)}
-              >
+              <button className="cs-new-btn" onClick={() => setShowNew(true)}>
                 <span className="cs-new-icon">✦</span>
                 Begin a New Adventure
               </button>
@@ -293,26 +332,43 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
                   }}
                   placeholder="Campaign name…"
                 />
-                <button
-                  className="btn btn-primary"
-                  onClick={handleCreate}
-                  disabled={creating || !newName.trim()}
-                >
+                <button className="btn btn-primary" onClick={handleCreate} disabled={creating || !newName.trim()}>
                   {creating ? 'Creating…' : '+ Create'}
                 </button>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => { setShowNew(false); setNewName(''); }}
-                >
-                  Cancel
-                </button>
+                <button className="btn btn-sm btn-ghost" onClick={() => { setShowNew(false); setNewName(''); }}>Cancel</button>
               </div>
             )}
           </div>
 
-          <div className="cs-footer-ornament" aria-hidden="true">
-            <RuneDivider />
+          {/* Divider */}
+          <div className="cs-footer-ornament" aria-hidden="true"><RuneDivider /></div>
+
+          {/* Audio controls */}
+          <div className="cs-audio-controls">
+            <button
+              className={`cs-mute-btn ${muted ? 'cs-mute-btn--muted' : ''}`}
+              onClick={handleMuteToggle}
+              title={muted ? 'Unmute music' : 'Mute music'}
+            >
+              {muted ? '🔇' : '🔊'}
+            </button>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={muted ? 0 : volume}
+              onChange={e => handleVolumeChange(parseFloat(e.target.value))}
+              className="cs-volume-slider"
+              title="Music volume"
+            />
           </div>
+
+          {/* Footer credit */}
+          <div className="cs-credit">
+            Made by <span className="cs-credit-name">Genopath</span>
+            &nbsp;·&nbsp;
+            Powered by <span className="cs-credit-claude">Claude Code</span>
+            &nbsp;·&nbsp; 2026
+          </div>
+
         </div>
       )}
     </div>
