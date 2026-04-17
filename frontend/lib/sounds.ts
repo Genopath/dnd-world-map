@@ -173,12 +173,20 @@ function pluck(
 
 // ── Sound library ─────────────────────────────────────────────────────────────
 
-/** Small bell chime when selecting a map pin */
+/** Barely-there soft pluck when hovering/selecting a map pin */
 export function playPinSelect() {
   const c = ac(); if (!c) return;
-  const mg = masterGain(c, 0.7);
+  const mg = masterGain(c, 0.32);
   const now = c.currentTime;
-  bell(c, mg, 1320, 0.22, now, 0.55);
+  // Single fundamental only — no harmonics, very quiet, very short
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.linearRampToValueAtTime(0.12, now + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+  g.connect(mg);
+  const o = c.createOscillator();
+  o.type = 'triangle'; o.frequency.setValueAtTime(660, now);
+  o.connect(g); o.start(now); o.stop(now + 0.14);
 }
 
 /** Wax-seal stamp thud when placing a new pin */
@@ -347,37 +355,43 @@ export function playCampaignSwitch() {
   noise(c, mg, 0.05, now, 0.15, 'lowpass', 700, 1);
 }
 
-// ── Fairy Fountain theme ──────────────────────────────────────────────────────
-// Module-level gain reference so we can fade it out on splash advance
-let _fairyMasterGain: GainNode | null = null;
+// ── Fairy Fountain theme (looping) ───────────────────────────────────────────
+// One iteration is ~4.3 s; the loop restarts automatically.
+// Uses a module-level "active" flag + master gain so stopFairyFountain()
+// fades everything out cleanly on the next tick.
 
-/** Fade out and stop the fairy fountain theme early */
+let _fairyActive  = false;
+let _fairyLoop: ReturnType<typeof setTimeout> | null = null;
+let _fairyGain:  GainNode | null = null;
+
+/** Stop and fade out the looping fairy fountain theme */
 export function stopFairyFountain() {
-  if (_fairyMasterGain && _ctx) {
-    const g = _fairyMasterGain;
+  _fairyActive = false;
+  if (_fairyLoop) { clearTimeout(_fairyLoop); _fairyLoop = null; }
+  if (_fairyGain && _ctx) {
+    const g = _fairyGain;
     const t = _ctx.currentTime;
     g.gain.cancelScheduledValues(t);
-    g.gain.setValueAtTime(g.gain.value, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-    _fairyMasterGain = null;
+    g.gain.setValueAtTime(g.gain.value ?? 0.72, t);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.5);
+    _fairyGain = null;
   }
 }
 
-/**
- * Great Fairy Fountain inspired harp theme.
- * Plays on the splash screen — ~4 s, fades cleanly.
- * Call stopFairyFountain() to fade it out if the player skips early.
- *
- * Approximates the Koji Kondo theme:
- *   opening D-major harp arpeggios → descending fairy melody
- */
-export function playFairyFountain() {
-  const c = ac(); if (!c) return;
-  const mg = masterGain(c, 0.72);
-  _fairyMasterGain = mg;
-  const now = c.currentTime;
+function _fairyIteration() {
+  const c = ac();
+  if (!c || !_fairyActive) return;
 
-  // ── Soft ambient bass drone (D2) ──────────────────────────────────────────
+  // Shared master gain for this iteration — fade in on first pass
+  const mg = c.createGain();
+  mg.gain.setValueAtTime(0.72, c.currentTime);
+  mg.connect(c.destination);
+  _fairyGain = mg;
+
+  const now = c.currentTime;
+  const LOOP_MS = 4500; // restart interval (ms); slightly longer than content
+
+  // ── Soft ambient bass drone (D2) ────────────────────────────────────────
   {
     const g = c.createGain();
     g.gain.setValueAtTime(0, now);
@@ -390,32 +404,26 @@ export function playFairyFountain() {
   }
 
   // ── Opening harp arpeggio: D4 F#4 A4 D5 F#5 A5 ──────────────────────────
-  const arp1 = [293.66, 369.99, 440, 587.33, 739.99, 880]; // D4-A5
-  arp1.forEach((freq, i) => {
+  [293.66, 369.99, 440, 587.33, 739.99, 880].forEach((freq, i) => {
     pluck(c, mg, freq, 0.18, now + i * 0.052, 1.1 - i * 0.08);
   });
 
-  // ── Melody — dreamy triangle/sine blend ───────────────────────────────────
-  // Approximating the descending fairy theme
+  // ── Melody — triangle (warm flute) + octave shimmer ──────────────────────
   const melodyNotes: [number, number, number][] = [
-    // [freq Hz, start offset s, duration s]
-    [587.33, 0.44, 0.40],   // D5  — first long note
+    [587.33, 0.44, 0.40],   // D5
     [554.37, 0.84, 0.16],   // C#5
     [493.88, 1.00, 0.18],   // B4
     [440,    1.18, 0.30],   // A4
-    [493.88, 1.48, 0.14],   // B4  — turn
+    [493.88, 1.48, 0.14],   // B4 turn
     [392,    1.62, 0.28],   // G4
-    [369.99, 1.90, 0.55],   // F#4 — phrase resolve
-    // Second phrase — echo a fifth up
-    [880,    2.52, 0.26],   // A5 — sparkle
+    [369.99, 1.90, 0.55],   // F#4 resolve
+    [880,    2.52, 0.26],   // A5 sparkle
     [783.99, 2.78, 0.18],   // G5
     [739.99, 2.96, 0.20],   // F#5
     [659.25, 3.16, 0.22],   // E5
-    [587.33, 3.38, 0.65],   // D5 — final resolve
+    [587.33, 3.38, 0.65],   // D5 final
   ];
-
   for (const [freq, t, dur] of melodyNotes) {
-    // Triangle for warm, flute-like melody
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, now + t);
     g.gain.linearRampToValueAtTime(0.15, now + t + 0.035);
@@ -425,7 +433,6 @@ export function playFairyFountain() {
     o.type = 'triangle'; o.frequency.setValueAtTime(freq, now + t);
     o.connect(g); o.start(now + t); o.stop(now + t + dur + 0.02);
 
-    // Subtle octave above for shimmer
     const g2 = c.createGain();
     g2.gain.setValueAtTime(0.0001, now + t);
     g2.gain.linearRampToValueAtTime(0.04, now + t + 0.04);
@@ -436,11 +443,24 @@ export function playFairyFountain() {
     o2.connect(g2); o2.start(now + t); o2.stop(now + t + dur + 0.02);
   }
 
-  // ── Second harp sweep (D5-F#5-A5-D6) at ~2.5 s ──────────────────────────
-  const arp2 = [587.33, 739.99, 880, 1174.66]; // D5-D6
-  arp2.forEach((freq, i) => {
+  // ── Second harp sweep (D5-F#5-A5-D6) ────────────────────────────────────
+  [587.33, 739.99, 880, 1174.66].forEach((freq, i) => {
     pluck(c, mg, freq, 0.10, now + 2.45 + i * 0.055, 0.70 - i * 0.06);
   });
+
+  // Schedule next loop iteration
+  _fairyLoop = setTimeout(() => { if (_fairyActive) _fairyIteration(); }, LOOP_MS);
+}
+
+/**
+ * Start the looping Great Fairy Fountain inspired theme.
+ * Must be called from a user-gesture context (click / keydown).
+ * Call stopFairyFountain() to fade it out.
+ */
+export function playFairyFountain() {
+  if (_fairyActive) return; // already playing
+  _fairyActive = true;
+  _fairyIteration();
 }
 
 /** Gentle bell strike for generic positive actions (save, export, etc.) */

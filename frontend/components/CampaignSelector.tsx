@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import { playCampaignSwitch, playFairyFountain, stopFairyFountain } from '../lib/sounds';
+import { playFairyFountain, stopFairyFountain } from '../lib/sounds';
 import type { CampaignMeta } from '../types';
 
 interface Props {
@@ -62,10 +62,11 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
 
   useEffect(() => { load(); }, []);
 
-  // Play fairy fountain theme on splash
+  // Stop fairy fountain when component unmounts (campaign selected)
   useEffect(() => {
-    if (showSplash) playFairyFountain();
-    return () => { if (showSplash) stopFairyFountain(); };
+    // If there's no splash (switching campaigns), we already have a user gesture — start immediately
+    if (!showSplash) playFairyFountain();
+    return () => stopFairyFountain();
   }, []);
 
   useEffect(() => {
@@ -78,8 +79,8 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
 
   // ── Splash phase: advance on any key or click, auto after 3.5 s
   const advanceSplash = () => {
-    stopFairyFountain();
-    playCampaignSwitch();
+    // First user gesture — start the music (keeps playing through campaign select)
+    playFairyFountain();
     setPhase('splash-out');
     setTimeout(() => setPhase('select'), 550);
   };
