@@ -44,21 +44,22 @@ function RuneDivider({ small = false }: { small?: boolean }) {
 }
 
 export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer, onBack }: Props) {
-  const [phase,     setPhase]     = useState<Phase>('loading');
-  const [input,     setInput]     = useState('');
-  const [error,     setError]     = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [activeBtn, setActiveBtn] = useState<'dm' | 'player' | null>(null);
+  const [phase,      setPhase]      = useState<Phase>('loading');
+  const [hasPasscode, setHasPasscode] = useState(false);
+  const [input,      setInput]      = useState('');
+  const [error,      setError]      = useState('');
+  const [submitting, setSubmitting]  = useState(false);
+  const [activeBtn,  setActiveBtn]  = useState<'dm' | 'player' | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const stars    = useMemo(() => makeStars(90), []);
   const sparkles = useMemo(() => makeSparkles(28), []);
 
-  // Fetch server-side passcode status on mount
+  // Fetch server-side passcode status on mount — always show role screen first
   useEffect(() => {
     api.dm.status()
-      .then(({ has_passcode }) => setPhase(has_passcode ? 'dm-auth' : 'role'))
-      .catch(() => setPhase('role')); // fallback: show role select if fetch fails
+      .then(({ has_passcode }) => { setHasPasscode(has_passcode); setPhase('role'); })
+      .catch(() => setPhase('role'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignSlug]);
 
@@ -69,7 +70,8 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
   }, [phase]);
 
   const handleDMChoice = () => {
-    setPhase('dm-auth');
+    // Route based on whether a server passcode exists
+    setPhase(hasPasscode ? 'dm-auth' : 'dm-set');
     setInput(''); setError('');
   };
 
@@ -157,7 +159,7 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
                 </span>
                 <span className="login-role-icon">⚔</span>
                 <span className="login-role-label">Dungeon Master</span>
-                <span className="login-role-hint">Set a passcode</span>
+                <span className="login-role-hint">{hasPasscode ? 'Passcode required' : 'Set a passcode'}</span>
               </button>
               <button
                 className="login-role-btn login-role-player"
