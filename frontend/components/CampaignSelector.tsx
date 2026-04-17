@@ -232,6 +232,12 @@ export default function CampaignSelector({ currentSlug, showSplash = false, onSe
       {phase === 'select' && (
         <div className="cs-screen">
 
+          {/* App title */}
+          <div className="cs-app-title">
+            <h2 className="cs-app-name">Interactive D&amp;D World Map Editor</h2>
+            <p className="cs-app-desc">Track locations, quests, NPCs, and your party across every campaign</p>
+          </div>
+
           {/* Header */}
           <div className="cs-header">
             <RuneDivider small />

@@ -395,6 +395,7 @@ export default function MapView({
   const isDragging  = useRef(false);
   const hasDragged  = useRef(false);
   const dragStart   = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+  const lastPinchDist = useRef<number | null>(null);
   // Keep a ref to transform for use in non-React event handlers
   const transformRef = useRef(transform);
   transformRef.current = transform;
@@ -742,6 +743,58 @@ export default function MapView({
     .sort((a, b) => a.position - b.position)
     .forEach((e, i) => { pathPositions[e.location_id] = i + 1; });
 
+  // ── Touch: pan (1 finger) + pinch-zoom (2 fingers) ─────────────────────────
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (fogPaintMode) return;
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      isDragging.current  = true;
+      hasDragged.current  = false;
+      lastPinchDist.current = null;
+      dragStart.current = { x: t.clientX, y: t.clientY, tx: transformRef.current.x, ty: transformRef.current.y };
+    } else if (e.touches.length === 2) {
+      isDragging.current = false;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
+    }
+  }, [fogPaintMode]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (fogPaintMode) return;
+    if (e.touches.length === 1 && isDragging.current) {
+      const t   = e.touches[0];
+      const dx  = t.clientX - dragStart.current.x;
+      const dy  = t.clientY - dragStart.current.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged.current = true;
+      setTransform(prev => ({ ...prev, x: dragStart.current.tx + dx, y: dragStart.current.ty + dy }));
+    } else if (e.touches.length === 2 && lastPinchDist.current !== null) {
+      const dx   = e.touches[0].clientX - e.touches[1].clientX;
+      const dy   = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const factor = dist / lastPinchDist.current;
+      lastPinchDist.current = dist;
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const el   = containerRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setTransform(prev => {
+          const newScale = Math.max(0.25, Math.min(10, prev.scale * factor));
+          const mx = midX - rect.left;
+          const my = midY - rect.top;
+          const ratio = newScale / prev.scale;
+          return { x: mx - (mx - prev.x) * ratio, y: my - (my - prev.y) * ratio, scale: newScale };
+        });
+      }
+    }
+  }, [fogPaintMode]);
+
+  const handleTouchEnd = useCallback(() => {
+    isDragging.current    = false;
+    lastPinchDist.current = null;
+  }, []);
+
   const imgSrc = mapImageUrl
     ? `${API_BASE}${mapImageUrl}`
     : null;
@@ -757,9 +810,13 @@ export default function MapView({
         waypointMode ? 'waypoint-drawing' : '',
         rulerActive  ? 'ruler-active'  : '',
       ].filter(Boolean).join(' ')}
+      style={{ touchAction: 'none' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       onMouseLeave={e => {
         if (isDrawingWp.current) {
           isDrawingWp.current = false; // stop drawing; don't auto-save on accidental leave

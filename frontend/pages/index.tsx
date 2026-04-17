@@ -134,6 +134,7 @@ export default function Home() {
   const _idbBackupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [campaignName,         setCampaignName]         = useState<string>('');
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
+  const [mobileSidebarOpen,    setMobileSidebarOpen]    = useState(false);
 
   // ── Core state ──────────────────────────────────────────────────────────────
   const [locations,   setLocations]   = useState<Location[]>([]);
@@ -941,24 +942,45 @@ export default function Home() {
       <div className="app">
         {/* ── Header ───────────────────────────────────────────────────── */}
         <header className="header">
-          <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>⚔</span>
-            <span>{campaignName || 'World Map'}</span>
+          {/* ── Row 1: always visible ── */}
+          <div className="header-row-main">
+            <div className="header-title">
+              <span>⚔</span>
+              <span>{campaignName || 'World Map'}</span>
+              <button
+                className="btn btn-sm btn-ghost"
+                style={{ fontSize: 11, padding: '2px 8px' }}
+                onClick={() => setShowCampaignSelector(true)}
+                title="Switch campaign"
+              >⇄</button>
+            </div>
+
+            <div className="mode-toggle">
+              <button className={`mode-btn ${isDMMode ? 'active' : ''}`} onClick={handleDMModeClick}>DM Mode</button>
+              <button className={`mode-btn ${!isDMMode ? 'active' : ''}`} onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); playDMLock(); }}>Player View</button>
+            </div>
+
+            {/* Always-visible tools */}
+            <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
+            <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); playSearchOpen(); }}>🔍</button>
             <button
-              className="btn btn-sm btn-ghost"
-              style={{ fontSize: 11, padding: '2px 8px' }}
-              onClick={() => setShowCampaignSelector(true)}
-              title="Switch campaign"
-            >⇄</button>
+              className="btn btn-icon"
+              title={soundMuted ? 'Sounds off — click to enable' : 'Sounds on — click to mute'}
+              onClick={() => { const next = !soundMuted; setSoundMuted(next); setSoundMutedState(next); }}
+            >{soundMuted ? '🔇' : '🔊'}</button>
+
+            {/* Mobile sidebar toggle */}
+            <button
+              className="btn btn-sm btn-icon header-sidebar-toggle"
+              onClick={() => setMobileSidebarOpen(v => !v)}
+              title="Open panel"
+            >{mobileSidebarOpen ? '✕' : '☰'}</button>
           </div>
 
-          <div className="mode-toggle">
-            <button className={`mode-btn ${isDMMode ? 'active' : ''}`} onClick={handleDMModeClick}>DM Mode</button>
-            <button className={`mode-btn ${!isDMMode ? 'active' : ''}`} onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); playDMLock(); }}>Player View</button>
-          </div>
-
+          {/* ── Row 2: DM tools (scrollable on mobile) ── */}
           {isDMMode && (
-            <>
+            <div className="header-dm-tools">
+              <>
               <button className="btn btn-sm btn-icon" title="Set / change DM passcode" onClick={() => { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('set'); }}>🔒</button>
 
               {/* Fog toolbar — world map and submaps */}
@@ -1057,19 +1079,16 @@ export default function Home() {
                 <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) await handleImport(f); }} />
               </label>
             </>
+            </div>
           )}
-
-          {/* Fit-to-pins / search / sound */}
-          <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
-          <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); playSearchOpen(); }}>🔍</button>
-          <button
-            className="btn btn-icon"
-            title={soundMuted ? 'Sounds off — click to enable' : 'Sounds on — click to mute'}
-            onClick={() => { const next = !soundMuted; setSoundMuted(next); setSoundMutedState(next); }}
-          >{soundMuted ? '🔇' : '🔊'}</button>
         </header>
 
         {/* ── Main ─────────────────────────────────────────────────────── */}
+        {/* Mobile sidebar backdrop */}
+        {mobileSidebarOpen && (
+          <div className="sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
+        )}
+
         <div className="main">
           <MapView
             locations={levelLocations} allLocations={locations}
@@ -1090,7 +1109,7 @@ export default function Home() {
             showDistLabels={showDistLabels}
             showTimeLabels={showTimeLabels}
             fitTrigger={fitTrigger}
-            onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); playPinSelect(); }}
+            onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); playPinSelect(); if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileSidebarOpen(true); }}
             onDeselect={() => setSelectedId(null)}
             onAddPin={handleAddPin}
             onFogChange={handleFogChange}
@@ -1110,6 +1129,7 @@ export default function Home() {
             gridCellSize={gridCellSize}
             rulerActive={rulerMode}
           />
+          <div className={`sidebar-drawer ${mobileSidebarOpen ? 'sidebar-drawer--open' : ''}`}>
           <Sidebar
             location={selectedLocation} isDMMode={isDMMode}
             playerPath={levelPlayerPath} locations={locations}
@@ -1161,6 +1181,7 @@ export default function Home() {
             onClearWaypoints={handleClearWaypoints}
             onScheduleBackup={scheduleIdbBackup}
           />
+          </div>
         </div>
       </div>
 
