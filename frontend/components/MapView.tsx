@@ -7,6 +7,7 @@ import {
 } from 'react';
 import type { CharacterPathEntry, Location, PartyMember, PathEntry, Quest } from '../types';
 import { API_BASE } from '../lib/api';
+import { playRulerTick } from '../lib/sounds';
 import FogCanvas from './FogCanvas';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -781,6 +782,7 @@ export default function MapView({
         const y = ((e.clientY - rect.top) / rect.height) * 100;
         if (x < 0 || x > 100 || y < 0 || y > 100) return;
         setRulerPoints(prev => [...prev, [x, y] as [number, number]]);
+        playRulerTick();
         e.stopPropagation(); // prevent pin selection / deselect while ruler is active
       }}
     >

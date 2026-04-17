@@ -5,6 +5,13 @@ import MapView from '../components/MapView';
 import Sidebar from '../components/Sidebar';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { api, API_BASE, setCurrentCampaign } from '../lib/api';
+import {
+  isSoundMuted, setSoundMuted,
+  playPinSelect, playPinPlace, playPinDelete,
+  playTabSwitch, playQuestComplete, playDMUnlock, playDMLock,
+  playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
+  playCampaignSwitch, playChime,
+} from '../lib/sounds';
 import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, MapConfig, NPC, PartyMember, PathEntry, Quest, SearchResults, SessionEntry, SidebarTab } from '../types';
 
 // ── Browser backup helpers ────────────────────────────────────────────────────
@@ -143,6 +150,7 @@ export default function Home() {
   const [showTimeLabels,  setShowTimeLabels]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_time_labels') !== '0' : true);
   const [showScaleBar,    setShowScaleBar]    = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_scale_bar') !== '0' : true);
   const [rulerMode,       setRulerMode]       = useState(false);
+  const [soundMuted,      setSoundMutedState] = useState(() => isSoundMuted());
   const [showGrid,        setShowGrid]        = useState(() => typeof window !== 'undefined' ? localStorage.getItem('show_grid') === '1' : false);
   const [gridCellSize,    setGridCellSize]    = useState<number | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -279,6 +287,7 @@ export default function Home() {
   }, []);
 
   const handleSelectCampaign = useCallback((slug: string, name: string) => {
+    playCampaignSwitch();
     setCurrentCampaign(slug);
     if (typeof window !== 'undefined') localStorage.setItem('campaign_slug', slug);
     setCampaignSlug(slug);
@@ -451,6 +460,7 @@ export default function Home() {
       setSelectedId(newLoc.id);
       setSidebarTab('location');
       scheduleIdbBackup();
+      playPinPlace();
     } catch (e) { console.error(e); }
   }, [currentMapId, scheduleIdbBackup]);
 
@@ -466,6 +476,7 @@ export default function Home() {
     setPlayerPath(prev => prev.filter(e => e.location_id !== id));
     if (selectedId === id) setSelectedId(null);
     scheduleIdbBackup();
+    playPinDelete();
   }, [selectedId, scheduleIdbBackup]);
 
   const handleDuplicateLocation = useCallback(async (loc: Location) => {
@@ -482,7 +493,7 @@ export default function Home() {
   }, [scheduleIdbBackup]);
 
   // ── Path handlers ────────────────────────────────────────────────────────────
-  const handleAddToPath           = useCallback(async (locationId: number) => { const e = await api.path.add(locationId); setPlayerPath(prev => [...prev, e]); }, []);
+  const handleAddToPath           = useCallback(async (locationId: number) => { const e = await api.path.add(locationId); setPlayerPath(prev => [...prev, e]); playPathAdd(); }, []);
   const handleRemoveFromPath      = useCallback(async (entryId: number) => { await api.path.remove(entryId); setPlayerPath(prev => prev.filter(e => e.id !== entryId)); }, []);
   const handleReorderPath         = useCallback(async (order: number[]) => { setPlayerPath(await api.path.reorder(order)); }, []);
   const handleUpdatePathTravelType = useCallback(async (entryId: number, travelType: string) => {
@@ -583,7 +594,10 @@ export default function Home() {
     const quest = await api.quests.create(data); setQuests(prev => [...prev, quest]); scheduleIdbBackup();
   }, [scheduleIdbBackup]);
   const handleUpdateQuest = useCallback(async (id: number, data: Partial<Quest>) => {
-    const updated = await api.quests.update(id, data); setQuests(prev => prev.map(q => (q.id === id ? updated : q))); scheduleIdbBackup();
+    const updated = await api.quests.update(id, data);
+    setQuests(prev => prev.map(q => (q.id === id ? updated : q)));
+    scheduleIdbBackup();
+    if (data.status === 'completed') playQuestComplete();
   }, [scheduleIdbBackup]);
   const handleDeleteQuest = useCallback(async (id: number) => {
     await api.quests.remove(id); setQuests(prev => prev.filter(q => q.id !== id)); scheduleIdbBackup();
@@ -819,6 +833,7 @@ export default function Home() {
 
   // ── Export / Import ───────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
+    playChime();
     const data = await api.data.export();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
@@ -866,12 +881,12 @@ export default function Home() {
     if (isDMMode) return;
     const stored = typeof window !== 'undefined' ? localStorage.getItem('dm_passcode') : null;
     if (stored) { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('enter'); }
-    else { setIsDMMode(true); }
+    else { setIsDMMode(true); playDMUnlock(); }
   }, [isDMMode]);
 
   const handlePasscodeSubmit = useCallback(() => {
     if (passcodeModal === 'enter') {
-      if (passcodeInput === (localStorage.getItem('dm_passcode') ?? '')) { setIsDMMode(true); setPasscodeModal(null); }
+      if (passcodeInput === (localStorage.getItem('dm_passcode') ?? '')) { setIsDMMode(true); setPasscodeModal(null); playDMUnlock(); }
       else { setPasscodeError('Incorrect passcode'); }
     } else if (passcodeModal === 'set') {
       if (passcodeInput.trim()) localStorage.setItem('dm_passcode', passcodeInput);
@@ -936,7 +951,7 @@ export default function Home() {
 
           <div className="mode-toggle">
             <button className={`mode-btn ${isDMMode ? 'active' : ''}`} onClick={handleDMModeClick}>DM Mode</button>
-            <button className={`mode-btn ${!isDMMode ? 'active' : ''}`} onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); }}>Player View</button>
+            <button className={`mode-btn ${!isDMMode ? 'active' : ''}`} onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); playDMLock(); }}>Player View</button>
           </div>
 
           {isDMMode && (
@@ -1041,9 +1056,14 @@ export default function Home() {
             </>
           )}
 
-          {/* Fit-to-pins / search */}
+          {/* Fit-to-pins / search / sound */}
           <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
-          <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); }}>🔍</button>
+          <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); playSearchOpen(); }}>🔍</button>
+          <button
+            className="btn btn-icon"
+            title={soundMuted ? 'Sounds off — click to enable' : 'Sounds on — click to mute'}
+            onClick={() => { const next = !soundMuted; setSoundMuted(next); setSoundMutedState(next); }}
+          >{soundMuted ? '🔇' : '🔊'}</button>
         </header>
 
         {/* ── Main ─────────────────────────────────────────────────────── */}
@@ -1067,7 +1087,7 @@ export default function Home() {
             showDistLabels={showDistLabels}
             showTimeLabels={showTimeLabels}
             fitTrigger={fitTrigger}
-            onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
+            onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); playPinSelect(); }}
             onDeselect={() => setSelectedId(null)}
             onAddPin={handleAddPin}
             onFogChange={handleFogChange}
@@ -1095,7 +1115,7 @@ export default function Home() {
             calendarConfig={calendarConfig}
             characterPaths={levelCharPaths}
             activeTab={sidebarTab} selectedLocationId={selectedId}
-            onTabChange={setSidebarTab}
+            onTabChange={tab => { setSidebarTab(tab); playTabSwitch(); }}
             onUpdate={handleUpdateLocation} onDelete={handleDeleteLocation} onDuplicateLocation={handleDuplicateLocation}
             onAddToPath={handleAddToPath} onRemoveFromPath={handleRemoveFromPath} onReorderPath={handleReorderPath}
             onSelectLocation={id => { setSelectedId(id); setSidebarTab('location'); }}
