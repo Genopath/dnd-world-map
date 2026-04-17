@@ -395,25 +395,39 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   50%       { filter: drop-shadow(0 0 8px rgba(220,140,255,1.0)) drop-shadow(0 0 20px rgba(180,80,255,0.9)); }
 }
 
-/* Override the pin stem/needle for arcane — no needle needed */
-.pin:has(.pin-arcane) .pin-body::after { display: none; }
+/* Arcane badge — reuse ring + eye animations inside badge wrapper */
+.pin-style-badge--arcane {
+  animation: arcane-float 3.2s ease-in-out infinite;
+}
+.pin-style-badge--arcane svg {
+  width: 14px; height: 14px;
+  color: #c084fc;
+  filter: drop-shadow(0 0 3px rgba(192,100,255,0.9)) drop-shadow(0 0 7px rgba(160,60,255,0.6));
+  animation: arcane-glow 2.4s ease-in-out infinite;
+}
+.pin-style-badge--arcane .pin-arcane-ring {
+  width: 100%; height: 100%;
+  inset: 0;
+}
 
-/* ── Animated pin styles — shared base ──────────────────────────────────────── */
-.pin-anim {
-  position: relative;
-  width: 30px; height: 30px;
+/* ── Pin style badge — floats above/offset the existing pin icon ─────────────── */
+.pin-style-badge {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px; height: 18px;
   display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  z-index: 6;
+}
+.pin-style-badge svg {
+  width: 16px; height: 16px;
   flex-shrink: 0;
 }
-.pin-anim svg {
-  width: 22px; height: 22px;
-  flex-shrink: 0;
-}
-/* No pin needle for any animated style */
-.pin:has(.pin-anim) .pin-body::after { display: none; }
 
 /* ── Flame ───────────────────────────────────────────────────────────────────── */
-.pin-anim--flame svg {
+.pin-style-badge--flame svg {
   color: #f97316;
   filter: drop-shadow(0 0 4px rgba(249,115,22,0.9)) drop-shadow(0 0 10px rgba(239,68,68,0.7));
   animation: flame-flicker 0.9s ease-in-out infinite, flame-float 2.8s ease-in-out infinite;
@@ -431,7 +445,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Frost ───────────────────────────────────────────────────────────────────── */
-.pin-anim--frost svg {
+.pin-style-badge--frost svg {
   color: #67e8f9;
   filter: drop-shadow(0 0 4px rgba(103,232,249,0.85)) drop-shadow(0 0 10px rgba(165,243,252,0.6));
   animation: frost-spin 6s linear infinite, frost-shimmer 2.5s ease-in-out infinite;
@@ -446,7 +460,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Cursed ──────────────────────────────────────────────────────────────────── */
-.pin-anim--cursed svg {
+.pin-style-badge--cursed svg {
   color: #4ade80;
   filter: drop-shadow(0 0 4px rgba(74,222,128,0.85)) drop-shadow(0 0 10px rgba(34,197,94,0.6));
   animation: cursed-float 3s ease-in-out infinite, cursed-pulse 2s ease-in-out infinite;
@@ -461,10 +475,10 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Divine ──────────────────────────────────────────────────────────────────── */
-.pin-anim--divine {
+.pin-style-badge--divine {
   animation: divine-halo 2.5s ease-in-out infinite;
 }
-.pin-anim--divine svg {
+.pin-style-badge--divine svg {
   color: #fcd34d;
   filter: drop-shadow(0 0 5px rgba(252,211,77,0.9)) drop-shadow(0 0 12px rgba(251,191,36,0.7));
   animation: divine-rotate 8s linear infinite;
@@ -479,7 +493,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Storm ───────────────────────────────────────────────────────────────────── */
-.pin-anim--storm svg {
+.pin-style-badge--storm svg {
   color: #e2e8f0;
   filter: drop-shadow(0 0 4px rgba(96,165,250,0.85)) drop-shadow(0 0 10px rgba(147,197,253,0.6));
   animation: storm-crackle 1.6s ease-in-out infinite;
@@ -496,7 +510,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Shadow ──────────────────────────────────────────────────────────────────── */
-.pin-anim--shadow svg {
+.pin-style-badge--shadow svg {
   color: #a5b4fc;
   animation: shadow-drift 3.5s ease-in-out infinite;
 }
@@ -506,7 +520,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Lair ────────────────────────────────────────────────────────────────────── */
-.pin-anim--lair svg {
+.pin-style-badge--lair svg {
   color: #f87171;
   filter: drop-shadow(0 0 4px rgba(248,113,113,0.85)) drop-shadow(0 0 10px rgba(220,38,38,0.6));
   animation: lair-throb 1.4s ease-in-out infinite;
