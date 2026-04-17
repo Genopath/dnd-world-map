@@ -1430,14 +1430,15 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
     flex-direction: column; align-items: stretch;
   }
   .header-row-main {
+    display: flex; align-items: center;
     gap: 6px; width: 100%;
     overflow-x: auto; flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
   }
   .header-title { font-size: 14px; gap: 5px; white-space: nowrap; }
-  .mode-toggle { flex-shrink: 0; }
   .header-sidebar-toggle { display: flex; flex-shrink: 0; margin-left: auto; }
   .header-dm-tools {
+    display: flex; align-items: center;
     flex-wrap: nowrap;
     overflow-x: auto; overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
