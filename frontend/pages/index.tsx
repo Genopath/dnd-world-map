@@ -126,7 +126,17 @@ function _idbBackupAsync(slug: string, force = false): void {
   if (!force && sessionStorage.getItem(key)) return;
   sessionStorage.setItem(key, '1');
   api.data.export()
-    .then(data => _idbSave(`export_${slug}`, { ...(data as object), _saved_at: new Date().toISOString() }))
+    .then(async data => {
+      const d = data as Record<string, unknown>;
+      // Never overwrite a good backup with an empty export — this can happen if
+      // the backend restarted (ephemeral filesystem) right after a save operation.
+      const locs = (d.locations as unknown[]) ?? [];
+      if (locs.length === 0) {
+        sessionStorage.removeItem(key); // allow retry once server has real data
+        return;
+      }
+      await _idbSave(`export_${slug}`, { ...d, _saved_at: new Date().toISOString() });
+    })
     .catch(() => { /* best-effort */ });
 }
 
