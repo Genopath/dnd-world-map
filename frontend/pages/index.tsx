@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CampaignSelector from '../components/CampaignSelector';
+import LoginScreen, { passcodeKey } from '../components/LoginScreen';
 import MapView from '../components/MapView';
 import Sidebar from '../components/Sidebar';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -134,6 +135,7 @@ export default function Home() {
   const _idbBackupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [campaignName,         setCampaignName]         = useState<string>('');
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
+  const [showLoginScreen,      setShowLoginScreen]      = useState(false);
   const [mobileSidebarOpen,    setMobileSidebarOpen]    = useState(false);
 
   // ── Core state ──────────────────────────────────────────────────────────────
@@ -304,6 +306,8 @@ export default function Home() {
     setQuestJumpId(null);
     setIsAddingPin(false);
     setFogPaint(false);
+    setIsDMMode(false); // always start as player until login confirms DM
+    setShowLoginScreen(true);
   }, []);
 
   // ── Initial load (runs once campaign is selected) ────────────────────────────
@@ -882,21 +886,23 @@ export default function Home() {
   // ── DM Passcode ──────────────────────────────────────────────────────────────
   const handleDMModeClick = useCallback(() => {
     if (isDMMode) return;
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('dm_passcode') : null;
+    const key    = campaignSlug ? passcodeKey(campaignSlug) : 'dm_passcode';
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
     if (stored) { setPasscodeInput(''); setPasscodeError(''); setPasscodeModal('enter'); }
     else { setIsDMMode(true); playDMUnlock(); }
-  }, [isDMMode]);
+  }, [isDMMode, campaignSlug]);
 
   const handlePasscodeSubmit = useCallback(() => {
+    const key = campaignSlug ? passcodeKey(campaignSlug) : 'dm_passcode';
     if (passcodeModal === 'enter') {
-      if (passcodeInput === (localStorage.getItem('dm_passcode') ?? '')) { setIsDMMode(true); setPasscodeModal(null); playDMUnlock(); }
+      if (passcodeInput === (localStorage.getItem(key) ?? '')) { setIsDMMode(true); setPasscodeModal(null); playDMUnlock(); }
       else { setPasscodeError('Incorrect passcode'); }
     } else if (passcodeModal === 'set') {
-      if (passcodeInput.trim()) localStorage.setItem('dm_passcode', passcodeInput);
-      else localStorage.removeItem('dm_passcode');
+      if (passcodeInput.trim()) localStorage.setItem(key, passcodeInput);
+      else localStorage.removeItem(key);
       setPasscodeModal(null);
     }
-  }, [passcodeModal, passcodeInput]);
+  }, [passcodeModal, passcodeInput, campaignSlug]);
 
   // ── Loading / error ───────────────────────────────────────────────────────────
   if (loading) {
@@ -927,6 +933,20 @@ export default function Home() {
           showSplash={!campaignSlug}
           onSelect={handleSelectCampaign}
           onRename={(slug, name) => { if (slug === campaignSlug) setCampaignName(name); }}
+        />
+      </>
+    );
+  }
+
+  if (showLoginScreen && campaignSlug) {
+    return (
+      <>
+        <Head><title>D&amp;D World Map</title></Head>
+        <LoginScreen
+          campaignName={campaignName}
+          campaignSlug={campaignSlug}
+          onDM={() => { setIsDMMode(true); setShowLoginScreen(false); playDMUnlock(); }}
+          onPlayer={() => { setIsDMMode(false); setShowLoginScreen(false); }}
         />
       </>
     );
