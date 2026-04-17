@@ -68,6 +68,7 @@ _MIGRATIONS = [
     "ALTER TABLE map_config ADD COLUMN scale_unit VARCHAR(50)",
     "ALTER TABLE locations ADD COLUMN scale_value REAL",
     "ALTER TABLE locations ADD COLUMN scale_unit VARCHAR(50)",
+    "ALTER TABLE campaign_settings ADD COLUMN dm_passcode VARCHAR(255)",
 ]
 
 

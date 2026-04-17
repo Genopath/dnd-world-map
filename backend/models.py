@@ -126,6 +126,7 @@ class CampaignSettings(Base):
     cal_day   = Column(Integer, default=1)
     cal_month = Column(Integer, default=1)
     cal_year  = Column(Integer, default=1)
+    dm_passcode = Column(String(255), nullable=True, default=None)
 
 
 class PartyMember(Base):

@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '../lib/api';
 
 interface Props {
   campaignName: string;
   campaignSlug: string;
-  onDM:     () => void;
-  onPlayer: () => void;
-  onBack:   () => void;
+  onDM:        () => void;
+  onPlayer:    () => void;
+  onBack:      () => void;
 }
 
-type Phase = 'role' | 'dm-auth' | 'dm-set';
-
-function passcodeKey(slug: string) { return `dm_passcode_${slug}`; }
+type Phase = 'loading' | 'role' | 'dm-auth' | 'dm-set';
 
 interface Particle { id: number; x: number; y: number; size: number; delay: number; dur: number; }
 
@@ -45,20 +44,23 @@ function RuneDivider({ small = false }: { small?: boolean }) {
 }
 
 export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer, onBack }: Props) {
-  const [phase,     setPhase]     = useState<Phase>('role');
+  const [phase,     setPhase]     = useState<Phase>('loading');
   const [input,     setInput]     = useState('');
   const [error,     setError]     = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [activeBtn, setActiveBtn] = useState<'dm' | 'player' | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const stars    = useMemo(() => makeStars(90), []);
   const sparkles = useMemo(() => makeSparkles(28), []);
 
-  const hasPasscode = typeof window !== 'undefined'
-    ? !!localStorage.getItem(passcodeKey(campaignSlug))
-    : false;
-
-  // Music is managed by index.tsx — no lifecycle here.
+  // Fetch server-side passcode status on mount
+  useEffect(() => {
+    api.dm.status()
+      .then(({ has_passcode }) => setPhase(has_passcode ? 'dm-auth' : 'role'))
+      .catch(() => setPhase('role')); // fallback: show role select if fetch fails
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignSlug]);
 
   useEffect(() => {
     if ((phase === 'dm-auth' || phase === 'dm-set') && inputRef.current) {
@@ -67,31 +69,38 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
   }, [phase]);
 
   const handleDMChoice = () => {
-    if (hasPasscode) { setPhase('dm-auth'); setInput(''); setError(''); }
-    else             { setPhase('dm-set');  setInput(''); setError(''); }
+    setPhase('dm-auth');
+    setInput(''); setError('');
   };
 
-  const handleSubmit = () => {
-    if (phase === 'dm-auth') {
-      const stored = localStorage.getItem(passcodeKey(campaignSlug)) ?? '';
-      if (input === stored) { onDM(); }
-      else { setError('Incorrect passcode.'); }
-    } else if (phase === 'dm-set') {
-      if (input.trim()) localStorage.setItem(passcodeKey(campaignSlug), input.trim());
-      onDM();
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      if (phase === 'dm-auth') {
+        await api.dm.verify(input);
+        onDM();
+      } else if (phase === 'dm-set') {
+        await api.dm.set(input);
+        onDM();
+      }
+    } catch {
+      setError('Incorrect passcode.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleResetPasscode = () => {
-    localStorage.removeItem(passcodeKey(campaignSlug));
+  const handleResetPasscode = async () => {
+    await api.dm.set('').catch(() => {});
     setPhase('dm-set');
-    setInput('');
-    setError('');
+    setInput(''); setError('');
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="cs-overlay">
-      {/* ── Starfield ── */}
+      {/* Starfield */}
       <div className="cs-stars" aria-hidden="true">
         {stars.map(s => (
           <span key={s.id} className="cs-star" style={{
@@ -102,7 +111,7 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
         ))}
       </div>
 
-      {/* ── Floating gold sparkles ── */}
+      {/* Gold sparkles */}
       <div className="cs-sparkles" aria-hidden="true">
         {sparkles.map(s => (
           <span key={s.id} className="cs-sparkle" style={{
@@ -113,16 +122,24 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
         ))}
       </div>
 
-      {/* ── Radial glow ── */}
+      {/* Glow */}
       <div className="cs-glow" aria-hidden="true" />
 
-      {/* ── Card ── */}
+      {/* Card */}
       <div className="login-card">
         <div className="login-campaign-name">{campaignName}</div>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
           <RuneDivider small />
         </div>
 
+        {/* ── Loading ── */}
+        {phase === 'loading' && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            <span className="cs-loading-dot" /><span className="cs-loading-dot" /><span className="cs-loading-dot" />
+          </div>
+        )}
+
+        {/* ── Role select ── */}
         {phase === 'role' && (
           <>
             <h2 className="login-title">Who are you?</h2>
@@ -140,7 +157,7 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
                 </span>
                 <span className="login-role-icon">⚔</span>
                 <span className="login-role-label">Dungeon Master</span>
-                <span className="login-role-hint">{hasPasscode ? 'Passcode required' : 'Set a passcode'}</span>
+                <span className="login-role-hint">Set a passcode</span>
               </button>
               <button
                 className="login-role-btn login-role-player"
@@ -163,6 +180,7 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
           </>
         )}
 
+        {/* ── DM auth / set passcode ── */}
         {(phase === 'dm-auth' || phase === 'dm-set') && (
           <>
             <h2 className="login-title">
@@ -184,20 +202,25 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
                 onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); if (e.key === 'Escape') setPhase('role'); }}
                 placeholder={phase === 'dm-auth' ? 'Passcode' : 'New passcode (optional)'}
                 autoComplete="off"
+                disabled={submitting}
               />
               {error && <div className="login-error">{error}</div>}
               <div className="login-passcode-actions">
-                <button className="btn btn-sm btn-ghost" onClick={() => setPhase('role')}>← Back</button>
-                <button className="btn btn-primary" onClick={handleSubmit}>
-                  {phase === 'dm-auth' ? 'Unlock' : 'Continue'}
+                <button className="btn btn-sm btn-ghost" onClick={() => setPhase('role')} disabled={submitting}>← Back</button>
+                <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                  {submitting ? '…' : phase === 'dm-auth' ? 'Unlock' : 'Continue'}
                 </button>
               </div>
               {phase === 'dm-auth' && (
-                <button className="login-reset-link" onClick={handleResetPasscode}>
+                <button className="login-reset-link" onClick={handleResetPasscode} disabled={submitting}>
                   Forgot passcode? Reset it
                 </button>
               )}
             </div>
+
+            <button className="login-back-link" onClick={onBack} style={{ marginTop: 8 }}>
+              ← Back to campaign select
+            </button>
           </>
         )}
 
@@ -208,6 +231,3 @@ export default function LoginScreen({ campaignName, campaignSlug, onDM, onPlayer
     </div>
   );
 }
-
-/** Helper — read per-campaign passcode key (used by index.tsx for the change-passcode flow) */
-export { passcodeKey };

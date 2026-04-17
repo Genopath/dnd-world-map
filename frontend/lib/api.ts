@@ -187,6 +187,16 @@ export const api = {
     rename: (slug: string, name: string) => req<CampaignMeta>(`/campaigns/${slug}/name`, { method: 'PUT', body: JSON.stringify({ name }) }),
     remove: (slug: string) => req<{ deleted: string }>(`/campaigns/${slug}`, { method: 'DELETE' }),
   },
+  dm: {
+    /** Returns whether a server-side DM passcode is set for the campaign */
+    status: () => req<{ has_passcode: boolean }>('/dm-passcode-status'),
+    /** Verifies a passcode — throws on 401 if wrong */
+    verify: (passcode: string) =>
+      req<{ ok: boolean }>('/verify-dm-passcode', { method: 'POST', body: JSON.stringify({ passcode }) }),
+    /** Sets (or clears, if blank) the server-side DM passcode */
+    set: (passcode: string) =>
+      req<{ ok: boolean }>('/set-dm-passcode', { method: 'POST', body: JSON.stringify({ passcode }) }),
+  },
 };
 
 export { API_BASE };

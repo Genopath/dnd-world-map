@@ -975,6 +975,24 @@ export default function Home() {
               >⇄</button>
             </div>
 
+            {/* DM player-view toggle — lets DM preview what players see */}
+            {isDMMode && (
+              <button
+                className="btn btn-sm btn-ghost"
+                style={{ fontSize: 11, padding: '2px 8px', whiteSpace: 'nowrap' }}
+                onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); }}
+                title="Preview as player"
+              >👁 Player View</button>
+            )}
+            {!isDMMode && (
+              <button
+                className="btn btn-sm btn-ghost"
+                style={{ fontSize: 11, padding: '2px 8px', whiteSpace: 'nowrap' }}
+                onClick={() => setIsDMMode(true)}
+                title="Return to DM mode"
+              >⚔ DM Mode</button>
+            )}
+
             {/* Always-visible tools */}
             <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
             <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); playSearchOpen(); }}>🔍</button>

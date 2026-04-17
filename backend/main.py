@@ -947,6 +947,31 @@ def update_campaign(data: schemas.CampaignUpdate, db: Session = Depends(get_db))
     return c
 
 
+# ── DM Passcode (server-side, shared across all devices) ─────────────────────
+
+@app.get("/dm-passcode-status")
+def dm_passcode_status(db: Session = Depends(get_db)):
+    c = _get_or_create_campaign(db)
+    return {"has_passcode": bool(c.dm_passcode)}
+
+@app.post("/verify-dm-passcode")
+def verify_dm_passcode(data: dict, db: Session = Depends(get_db)):
+    c = _get_or_create_campaign(db)
+    if not c.dm_passcode:
+        return {"ok": True}
+    if data.get("passcode", "") == c.dm_passcode:
+        return {"ok": True}
+    raise HTTPException(status_code=401, detail="Incorrect passcode")
+
+@app.post("/set-dm-passcode")
+def set_dm_passcode(data: dict, db: Session = Depends(get_db)):
+    c = _get_or_create_campaign(db)
+    passcode = (data.get("passcode") or "").strip()
+    c.dm_passcode = passcode if passcode else None
+    db.commit()
+    return {"ok": True}
+
+
 # ── Party Members ─────────────────────────────────────────────────────────────
 
 @app.get("/party", response_model=List[schemas.PartyMemberOut])
