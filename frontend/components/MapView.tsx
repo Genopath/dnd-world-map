@@ -403,16 +403,18 @@ export default function MapView({
   waypointModeRef.current = waypointMode;
 
   // ── Ruler tool ───────────────────────────────────────────────────────────
-  const [rulerAnchor, setRulerAnchor] = useState<[number, number] | null>(null);
+  const [rulerPoints, setRulerPoints] = useState<[number, number][]>([]);
   const [rulerCursor, setRulerCursor] = useState<[number, number] | null>(null);
   const rulerActiveRef = useRef(rulerActive);
   rulerActiveRef.current = rulerActive;
-  // Clear ruler state when tool is deactivated
-  useEffect(() => { if (!rulerActive) { setRulerAnchor(null); setRulerCursor(null); } }, [rulerActive]);
-  // Escape clears current anchor
+  // Clear all ruler state when tool is deactivated
+  useEffect(() => { if (!rulerActive) { setRulerPoints([]); setRulerCursor(null); } }, [rulerActive]);
+  // Escape removes last placed point (undo), double-Escape clears all
   useEffect(() => {
     if (!rulerActive) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRulerAnchor(null); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setRulerPoints(prev => prev.slice(0, -1));
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [rulerActive]);
@@ -778,7 +780,7 @@ export default function MapView({
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
         if (x < 0 || x > 100 || y < 0 || y > 100) return;
-        setRulerAnchor([x, y]);
+        setRulerPoints(prev => [...prev, [x, y] as [number, number]]);
         e.stopPropagation(); // prevent pin selection / deselect while ruler is active
       }}
     >
@@ -1026,45 +1028,98 @@ export default function MapView({
           })()}
 
           {/* ── Ruler overlay ──────────────────────────────────────────── */}
-          {rulerActive && rulerAnchor && rulerCursor && (() => {
-            const [ax, ay] = rulerAnchor;
-            const [cx, cy] = rulerCursor;
-            const mx = (ax + cx) / 2;
-            const my = (ay + cy) / 2;
-            // Compute real-world distance using map scale + image aspect ratio
-            let distLabel = '';
-            if (mapScale && mapScale.value > 0) {
-              const mapEl = imgRef.current;
-              const natW = mapEl?.naturalWidth  || mapEl?.offsetWidth  || 1;
-              const natH = mapEl?.naturalHeight || mapEl?.offsetHeight || 1;
-              const dx = (cx - ax) / 100 * mapScale.value;
-              const dy = (cy - ay) / 100 * mapScale.value * (natH / natW);
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist >= 10000) distLabel = `${(dist / 1000).toFixed(1)}k ${mapScale.unit}`;
-              else if (dist >= 10) distLabel = `${Math.round(dist).toLocaleString()} ${mapScale.unit}`;
-              else if (dist >= 1)  distLabel = `${dist.toFixed(1)} ${mapScale.unit}`;
-              else                 distLabel = `${dist.toFixed(2)} ${mapScale.unit}`;
+          {rulerActive && rulerPoints.length > 0 && (() => {
+            const mapEl = imgRef.current;
+            const natW = mapEl?.naturalWidth  || mapEl?.offsetWidth  || 1;
+            const natH = mapEl?.naturalHeight || mapEl?.offsetHeight || 1;
+
+            function segDist(x1: number, y1: number, x2: number, y2: number): number {
+              if (!mapScale || mapScale.value <= 0) return 0;
+              const dx = (x2 - x1) / 100 * mapScale.value;
+              const dy = (y2 - y1) / 100 * mapScale.value * (natH / natW);
+              return Math.sqrt(dx * dx + dy * dy);
             }
+            function fmtDist(d: number): string {
+              if (!mapScale) return '';
+              if (d >= 10000) return `${(d / 1000).toFixed(1)}k ${mapScale.unit}`;
+              if (d >= 10)    return `${Math.round(d).toLocaleString()} ${mapScale.unit}`;
+              if (d >= 1)     return `${d.toFixed(1)} ${mapScale.unit}`;
+              return `${d.toFixed(2)} ${mapScale.unit}`;
+            }
+
+            // Accumulate distance across all placed segments
+            let totalDist = 0;
+            for (let i = 1; i < rulerPoints.length; i++) {
+              const [x1, y1] = rulerPoints[i - 1];
+              const [x2, y2] = rulerPoints[i];
+              totalDist += segDist(x1, y1, x2, y2);
+            }
+            // Preview segment from last placed point to cursor
+            const last = rulerPoints[rulerPoints.length - 1];
+            const previewDist = rulerCursor ? segDist(last[0], last[1], rulerCursor[0], rulerCursor[1]) : 0;
+            const grandTotal = totalDist + previewDist;
+
+            const textStyle: React.CSSProperties = {
+              fill: '#f0e060', stroke: '#000', strokeWidth: '3',
+              paintOrder: 'stroke', userSelect: 'none', pointerEvents: 'none',
+            };
+
             return (
               <g>
-                {/* Shadow line */}
-                <line x1={`${ax}%`} y1={`${ay}%`} x2={`${cx}%`} y2={`${cy}%`}
-                  stroke="#000" strokeWidth="3.5" strokeDasharray="10,5" opacity="0.5" />
-                {/* Ruler line */}
-                <line x1={`${ax}%`} y1={`${ay}%`} x2={`${cx}%`} y2={`${cy}%`}
-                  stroke="#f0e060" strokeWidth="1.8" strokeDasharray="10,5" />
-                {/* Anchor dot */}
-                <circle cx={`${ax}%`} cy={`${ay}%`} r="5" fill="#f0e060" stroke="#000" strokeWidth="1.5" />
-                {/* Cursor crosshair */}
-                <circle cx={`${cx}%`} cy={`${cy}%`} r="4" fill="none" stroke="#f0e060" strokeWidth="1.8" />
-                <circle cx={`${cx}%`} cy={`${cy}%`} r="1.5" fill="#f0e060" />
-                {/* Distance label */}
-                {distLabel && (
-                  <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="auto"
-                    fontSize="13" fontWeight="700"
-                    style={{ fill: '#f0e060', stroke: '#000', strokeWidth: '3', paintOrder: 'stroke', userSelect: 'none', pointerEvents: 'none' }}>
-                    {distLabel}
-                  </text>
+                {/* Placed segments */}
+                {rulerPoints.map((pt, i) => {
+                  if (i === 0) return null;
+                  const prev = rulerPoints[i - 1];
+                  const mx = (prev[0] + pt[0]) / 2;
+                  const my = (prev[1] + pt[1]) / 2;
+                  const d = segDist(prev[0], prev[1], pt[0], pt[1]);
+                  return (
+                    <g key={`rs${i}`}>
+                      <line x1={`${prev[0]}%`} y1={`${prev[1]}%`} x2={`${pt[0]}%`} y2={`${pt[1]}%`}
+                        stroke="#000" strokeWidth="3.5" opacity="0.5" />
+                      <line x1={`${prev[0]}%`} y1={`${prev[1]}%`} x2={`${pt[0]}%`} y2={`${pt[1]}%`}
+                        stroke="#f0e060" strokeWidth="1.8" />
+                      {mapScale && d > 0 && (
+                        <text x={`${mx}%`} y={`${my}%`} textAnchor="middle" dominantBaseline="auto"
+                          fontSize="11" fontWeight="700" style={textStyle}>
+                          {fmtDist(d)}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* Waypoint dots */}
+                {rulerPoints.map((pt, i) => (
+                  <g key={`rd${i}`}>
+                    <circle cx={`${pt[0]}%`} cy={`${pt[1]}%`} r="5" fill="#f0e060" stroke="#000" strokeWidth="1.5" />
+                    {i === 0 && (
+                      <text x={`${pt[0]}%`} y={`${pt[1] - 1.5}%`} textAnchor="middle" dominantBaseline="auto"
+                        fontSize="9" style={textStyle}>START</text>
+                    )}
+                  </g>
+                ))}
+
+                {/* Live preview segment */}
+                {rulerCursor && (
+                  <>
+                    <line x1={`${last[0]}%`} y1={`${last[1]}%`} x2={`${rulerCursor[0]}%`} y2={`${rulerCursor[1]}%`}
+                      stroke="#000" strokeWidth="3.5" strokeDasharray="10,5" opacity="0.5" />
+                    <line x1={`${last[0]}%`} y1={`${last[1]}%`} x2={`${rulerCursor[0]}%`} y2={`${rulerCursor[1]}%`}
+                      stroke="#f0e060" strokeWidth="1.8" strokeDasharray="10,5" opacity="0.75" />
+                    {/* Cursor dot */}
+                    <circle cx={`${rulerCursor[0]}%`} cy={`${rulerCursor[1]}%`} r="4"
+                      fill="none" stroke="#f0e060" strokeWidth="1.8" />
+                    <circle cx={`${rulerCursor[0]}%`} cy={`${rulerCursor[1]}%`} r="1.5" fill="#f0e060" />
+                    {/* Total distance near cursor */}
+                    {mapScale && grandTotal > 0 && (
+                      <text x={`${rulerCursor[0]}%`} y={`${rulerCursor[1] - 2}%`}
+                        textAnchor="middle" dominantBaseline="auto"
+                        fontSize="13" fontWeight="700" style={textStyle}>
+                        {rulerPoints.length > 1 ? `Total: ${fmtDist(grandTotal)}` : fmtDist(grandTotal)}
+                      </text>
+                    )}
+                  </>
                 )}
               </g>
             );
