@@ -524,6 +524,14 @@ export default function Home() {
     }, 3000);
   }, [campaignSlug]);
 
+  // ── Periodic background backup — every 2 min, independent of user actions ────
+  // This means a crash on any request can only lose at most ~2 min of work.
+  useEffect(() => {
+    if (!campaignSlug) return;
+    const id = setInterval(() => _idbBackupAsync(campaignSlug, true), 2 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [campaignSlug]);
+
   // ── Location handlers ───────────────────────────────────────────────────────
   const handleAddPin = useCallback(async (x: number, y: number) => {
     setIsAddingPin(false);
