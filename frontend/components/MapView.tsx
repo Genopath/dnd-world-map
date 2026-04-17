@@ -1284,6 +1284,40 @@ export default function MapView({
                         <circle cx="14.5" cy="11" r="1.5" fill="#07070d"/>
                         <path d="M10 14.5C10.5 15.5 11.2 16 12 16C12.8 16 13.5 15.5 14 14.5" stroke="#07070d" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
                       </svg>
+                    ) : loc.pin_style === 'swords' ? (
+                      <svg viewBox="0 0 24 24" fill="none">
+                        {/* Blade 1: NW→SE */}
+                        <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        {/* Guard 1 */}
+                        <line x1="13" y1="15" x2="17" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        {/* Blade 2: NE→SW */}
+                        <line x1="20" y1="4" x2="4" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        {/* Guard 2 */}
+                        <line x1="7" y1="11" x2="11" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        {/* Crosspoint gem */}
+                        <circle cx="12" cy="12" r="1.8" fill="currentColor"/>
+                      </svg>
+                    ) : loc.pin_style === 'arrows' ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        {/* N */}
+                        <path d="M12 2L9 7h6z"/>
+                        {/* S */}
+                        <path d="M12 22L9 17h6z"/>
+                        {/* W */}
+                        <path d="M2 12L7 9v6z"/>
+                        {/* E */}
+                        <path d="M22 12L17 9v6z"/>
+                        {/* Center */}
+                        <circle cx="12" cy="12" r="2"/>
+                      </svg>
+                    ) : loc.pin_style === 'quake' ? (
+                      <svg viewBox="0 0 24 24" fill="none">
+                        {/* Main fissure zigzag */}
+                        <path d="M12 2L8 9L13 12L7 22" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        {/* Side cracks */}
+                        <path d="M8 9L4 8M13 12L17 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.75"/>
+                        <path d="M7 22L4 21M7 22L9 23" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/>
+                      </svg>
                     ) : null}
                   </div>
                 )}

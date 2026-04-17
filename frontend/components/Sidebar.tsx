@@ -545,7 +545,7 @@ interface EditFormProps {
   onSave: () => void; onCancel: () => void; saving: boolean;
   onUpdateLocation: (id: number, data: Partial<Location>) => Promise<void>;
   currentPinSize?: 'sm' | 'md' | 'lg';
-  currentPinStyle?: 'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane';
+  currentPinStyle?: 'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane' | 'swords' | 'arrows' | 'quake';
   currentPinBorder?: 'none' | 'siege' | 'blessed' | 'warded' | 'cursed' | 'haunted' | 'plague' | 'frozen' | 'burning';
   currentIsVisible?: boolean;
   currentIconUrl?: string | null;
@@ -622,6 +622,9 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
             { value: 'shadow',  label: 'Shadow',   emoji: '👻' },
             { value: 'lair',    label: 'Lair',     emoji: '💀' },
             { value: 'arcane',  label: 'Arcane',   emoji: '👁' },
+            { value: 'swords',  label: 'Swords',   emoji: '⚔️' },
+            { value: 'arrows',  label: 'Arrows',   emoji: '🏹' },
+            { value: 'quake',   label: 'Quake',    emoji: '🌋' },
           ] as const).map(({ value, label, emoji }) => (
             <button key={value} type="button"
               className={`btn btn-sm${currentPinStyle === value ? ' btn-active' : ''}`}

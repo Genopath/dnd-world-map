@@ -17,7 +17,7 @@ export interface Location {
   parent_id?: number | null;
   submap_image_url?: string | null;
   pin_size?:    'sm' | 'md' | 'lg';
-  pin_style?:   'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane';
+  pin_style?:   'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane' | 'swords' | 'arrows' | 'quake';
   pin_border?:  'none' | 'siege' | 'blessed' | 'warded' | 'cursed' | 'haunted' | 'plague' | 'frozen' | 'burning';
   is_visible?:  boolean;
   scale_value?: number | null;
