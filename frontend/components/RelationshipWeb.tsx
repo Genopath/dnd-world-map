@@ -29,7 +29,7 @@ function nodeKey(type: NodeKind, id: number) { return `${type}-${id}`; }
 
 function defaultPos(type: NodeKind, index: number, total: number): { x: number; y: number } {
   const angle = (index / Math.max(total, 1)) * 2 * Math.PI - Math.PI / 2;
-  const r = type === 'faction' ? 140 : 270;
+  const r = type === 'faction' ? 130 : 260;
   return { x: W / 2 + r * Math.cos(angle), y: H / 2 + r * Math.sin(angle) };
 }
 
@@ -46,33 +46,23 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [loading,   setLoading]   = useState(true);
 
-  // Pan / zoom
+  // ── Transform state — keep a ref in sync for use inside event listeners ───
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
-  const [scale, setScale] = useState(0.65);
-  const transformRef = useRef({ tx: 0, ty: 0, scale: 0.65 });
-  transformRef.current = { tx, ty, scale };
-  const isPanning = useRef(false);
-  const panStart  = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+  const [scale, setScale] = useState(1);
+  const xfRef = useRef({ tx: 0, ty: 0, scale: 1 });
+  xfRef.current = { tx, ty, scale };
+
+  // ── Interaction refs — no re-render on change ─────────────────────────────
+  // mode: 'idle' | 'pan' | 'drag'
+  const mode      = useRef<'idle' | 'pan' | 'drag'>('idle');
+  const panOrigin = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+  const dragState = useRef<{ key: string; origX: number; origY: number; startCx: number; startCy: number } | null>(null);
 
   // Node selection / edge creation
   const [selecting, setSelecting] = useState<NodeKey | null>(null);
   const [pendingEdge, setPendingEdge] = useState<{ from: NodeKey; to: NodeKey; screenX: number; screenY: number } | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
-
-  // Node drag
-  const dragging = useRef<{ key: string; startMx: number; startMy: number; origX: number; origY: number } | null>(null);
-
-  // ── Center view on mount ─────────────────────────────────────────────────
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const s = 0.65;
-    setScale(s);
-    setTx(rect.width  / 2 - (W / 2) * s);
-    setTy(rect.height / 2 - (H / 2) * s);
-  }, []);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -90,74 +80,102 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
     return positions[nodeKey(type, id)] ?? defaultPos(type, index, total);
   }, [positions]);
 
+  // ── Center view on mount ─────────────────────────────────────────────────
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    // rAF so layout is committed and getBoundingClientRect is accurate
+    requestAnimationFrame(() => {
+      const rect = svg.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const s = Math.min(rect.width / W, rect.height / H) * 0.9;
+      const cx = rect.width  / 2 - (W / 2) * s;
+      const cy = rect.height / 2 - (H / 2) * s;
+      setScale(s);
+      setTx(cx);
+      setTy(cy);
+    });
+  }, []);
+
   // ── Wheel zoom ────────────────────────────────────────────────────────────
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const factor = e.deltaY > 0 ? 0.9 : 1.11;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
       const rect = svg.getBoundingClientRect();
-      const { tx, ty, scale } = transformRef.current;
+      const { tx, ty, scale } = xfRef.current;
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-      const newScale = Math.max(0.25, Math.min(4, scale * factor));
-      const ratio = newScale / scale;
+      const newScale = Math.max(0.15, Math.min(5, scale * factor));
+      const r = newScale / scale;
       setScale(newScale);
-      setTx(mx - (mx - tx) * ratio);
-      setTy(my - (my - ty) * ratio);
+      setTx(mx - (mx - tx) * r);
+      setTy(my - (my - ty) * r);
     };
     svg.addEventListener('wheel', onWheel, { passive: false });
     return () => svg.removeEventListener('wheel', onWheel);
   }, []);
 
-  // ── SVG coords helper ─────────────────────────────────────────────────────
-  const toSvg = (clientX: number, clientY: number) => {
-    const rect = svgRef.current!.getBoundingClientRect();
-    const { tx, ty, scale } = transformRef.current;
-    return { x: (clientX - rect.left - tx) / scale, y: (clientY - rect.top - ty) / scale };
-  };
-
-  // ── Pan handlers ──────────────────────────────────────────────────────────
-  const onBgDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    isPanning.current = true;
-    panStart.current = { mx: e.clientX, my: e.clientY, tx, ty };
-  };
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (isPanning.current) {
-      setTx(panStart.current.tx + (e.clientX - panStart.current.mx));
-      setTy(panStart.current.ty + (e.clientY - panStart.current.my));
-    }
-    if (dragging.current) {
-      const { key, startMx, startMy, origX, origY } = dragging.current;
-      const { scale } = transformRef.current;
-      const rect = svgRef.current!.getBoundingClientRect();
-      const dx = (e.clientX - rect.left - startMx) / scale;
-      const dy = (e.clientY - rect.top  - startMy) / scale;
-      setPositions(prev => ({ ...prev, [key]: { x: origX + dx, y: origY + dy } }));
-    }
-  };
-  const onMouseUp = useCallback(() => {
-    isPanning.current = false;
-    if (dragging.current) {
-      const { key } = dragging.current;
-      const [type, idStr] = key.split('-');
-      setPositions(prev => {
-        const p = prev[key];
-        if (p) {
-          api.relationships.upsertPosition({ entity_type: type as NodeKind, entity_id: Number(idStr), x: p.x, y: p.y });
-        }
-        return prev;
-      });
-      dragging.current = null;
-    }
+  // ── Global mousemove / mouseup (captured on window) ───────────────────────
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (mode.current === 'pan') {
+        const { mx, my, tx: otx, ty: oty } = panOrigin.current;
+        setTx(otx + e.clientX - mx);
+        setTy(oty + e.clientY - my);
+      } else if (mode.current === 'drag' && dragState.current) {
+        const { key, origX, origY, startCx, startCy } = dragState.current;
+        const { scale } = xfRef.current;
+        const dx = (e.clientX - startCx) / scale;
+        const dy = (e.clientY - startCy) / scale;
+        setPositions(prev => ({ ...prev, [key]: { x: origX + dx, y: origY + dy } }));
+      }
+    };
+    const onUp = () => {
+      if (mode.current === 'drag' && dragState.current) {
+        const { key } = dragState.current;
+        const [type, idStr] = key.split('-');
+        setPositions(prev => {
+          const p = prev[key];
+          if (p) api.relationships.upsertPosition({ entity_type: type as NodeKind, entity_id: Number(idStr), x: p.x, y: p.y });
+          return prev;
+        });
+        dragState.current = null;
+      }
+      mode.current = 'idle';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, []);
 
-  // ── Node click ────────────────────────────────────────────────────────────
+  // ── Pan: click on SVG background ─────────────────────────────────────────
+  const onSvgMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    mode.current = 'pan';
+    panOrigin.current = { mx: e.clientX, my: e.clientY, tx, ty };
+  };
+
+  // ── Node drag start ───────────────────────────────────────────────────────
+  const onNodeMouseDown = (e: React.MouseEvent, type: NodeKind, id: number) => {
+    if (e.button !== 0 || !isDMMode) return;
+    e.stopPropagation(); // prevent pan
+    const key = nodeKey(type, id);
+    const index = type === 'npc' ? npcs.findIndex(n => n.id === id) : factions.findIndex(f => f.id === id);
+    const total = type === 'npc' ? npcs.length : factions.length;
+    const pos = getPos(type, id, index, total);
+    mode.current = 'drag';
+    dragState.current = { key, origX: pos.x, origY: pos.y, startCx: e.clientX, startCy: e.clientY };
+  };
+
+  // ── Node click (select / link) ────────────────────────────────────────────
   const onNodeClick = (e: React.MouseEvent, type: NodeKind, id: number) => {
     e.stopPropagation();
     if (!isDMMode) return;
+    // Ignore if this was a drag (moved > 4px)
+    if (dragState.current === null && mode.current === 'idle') return;
     if (!selecting) {
       setSelecting({ type, id });
     } else {
@@ -167,23 +185,6 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
       setLabelDraft('');
       setSelecting(null);
     }
-  };
-
-  const onNodeDragStart = (e: React.MouseEvent, type: NodeKind, id: number) => {
-    if (!isDMMode) return;
-    e.stopPropagation();
-    const key = nodeKey(type, id);
-    const index = type === 'npc' ? npcs.findIndex(n => n.id === id) : factions.findIndex(f => f.id === id);
-    const total = type === 'npc' ? npcs.length : factions.length;
-    const pos = getPos(type, id, index, total);
-    const rect = svgRef.current!.getBoundingClientRect();
-    const { tx, ty, scale } = transformRef.current;
-    dragging.current = {
-      key,
-      startMx: (e.clientX - rect.left - tx) / scale,
-      startMy: (e.clientY - rect.top  - ty) / scale,
-      origX: pos.x, origY: pos.y,
-    };
   };
 
   // ── Edge creation ─────────────────────────────────────────────────────────
@@ -207,7 +208,7 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
   // ── Node position lookup ──────────────────────────────────────────────────
   const npcPos     = (id: number) => { const i = npcs.findIndex(n => n.id === id);     return getPos('npc',     id, i, npcs.length);     };
   const factionPos = (id: number) => { const i = factions.findIndex(f => f.id === id); return getPos('faction', id, i, factions.length); };
-  const edgePos    = (e: RelationshipEdge) => ({
+  const edgeEndpoints = (e: RelationshipEdge) => ({
     x1: e.from_type === 'npc' ? npcPos(e.from_id).x : factionPos(e.from_id).x,
     y1: e.from_type === 'npc' ? npcPos(e.from_id).y : factionPos(e.from_id).y,
     x2: e.to_type   === 'npc' ? npcPos(e.to_id).x   : factionPos(e.to_id).x,
@@ -225,18 +226,17 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
     <div className="rel-web-wrap">
       {isDMMode && (
         <div className="rel-web-hint">
-          {selecting ? '🔗 Click a second node to link · Esc to cancel' : 'Click a node to link · Drag to move · Right-click edge to delete'}
+          {selecting
+            ? '🔗 Click a second node to link · click same node or background to cancel'
+            : 'Click a node to start linking · drag to reposition · right-click edge to delete · scroll to zoom'}
         </div>
       )}
 
       <svg
         ref={svgRef}
         className="rel-web-svg"
-        onMouseDown={onBgDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-        onClick={() => setSelecting(null)}
+        onMouseDown={onSvgMouseDown}
+        onClick={() => { if (mode.current === 'idle') setSelecting(null); }}
         onKeyDown={e => { if (e.key === 'Escape') setSelecting(null); }}
         tabIndex={0}
       >
@@ -254,16 +254,15 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
         <g transform={`translate(${tx},${ty}) scale(${scale})`}>
           {/* ── Edges ─────────────────────────────────────────────────── */}
           {edges.map(edge => {
-            const { x1, y1, x2, y2 } = edgePos(edge);
+            const { x1, y1, x2, y2 } = edgeEndpoints(edge);
             const mx = (x1 + x2) / 2;
             const my = (y1 + y2) / 2;
             const color = edgeColor(edge.label);
             const labelKey = edge.label.toLowerCase();
             const markerId = EDGE_COLORS[labelKey] ? `arrow-${labelKey}` : 'arrow-default';
-            // Shorten line to not overlap node
-            const dx = x2 - x1; const dy = y2 - y1;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            const ux = dx / len; const uy = dy / len;
+            const dxx = x2 - x1; const dyy = y2 - y1;
+            const len = Math.sqrt(dxx * dxx + dyy * dyy) || 1;
+            const ux = dxx / len; const uy = dyy / len;
             const pad2 = edge.to_type === 'npc' ? NPC_R + 4 : FACT_H / 2 + 4;
             const ex2 = x2 - ux * pad2; const ey2 = y2 - uy * pad2;
             return (
@@ -274,10 +273,7 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
                   stroke={color} strokeWidth={2} strokeOpacity={0.75}
                   markerEnd={`url(#${markerId})`}
                 />
-                {/* Wider invisible hit target */}
-                <line x1={x1} y1={y1} x2={ex2} y2={ey2}
-                  stroke="transparent" strokeWidth={14}
-                />
+                <line x1={x1} y1={y1} x2={ex2} y2={ey2} stroke="transparent" strokeWidth={14} />
                 {edge.label && (
                   <text x={mx} y={my - 6} textAnchor="middle" className="rel-edge-label" fill={color}>
                     {edge.label}
@@ -295,15 +291,15 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
             return (
               <g key={key} className="rel-node"
                 transform={`translate(${pos.x},${pos.y})`}
+                onMouseDown={e => onNodeMouseDown(e, 'faction', f.id)}
                 onClick={e => onNodeClick(e, 'faction', f.id)}
-                onMouseDown={e => { if (e.button === 0) onNodeDragStart(e, 'faction', f.id); }}
               >
                 <rect x={-FACT_W / 2} y={-FACT_H / 2} width={FACT_W} height={FACT_H} rx={6}
                   fill={f.color || '#555577'} fillOpacity={0.85}
-                  stroke={isSelected ? '#fff' : (f.color || '#888')} strokeWidth={isSelected ? 3 : 1.5}
+                  stroke={isSelected ? '#e8c870' : (f.color || '#888')} strokeWidth={isSelected ? 3 : 1.5}
                 />
-                {isSelected && <rect x={-FACT_W / 2 - 3} y={-FACT_H / 2 - 3} width={FACT_W + 6} height={FACT_H + 6} rx={8}
-                  fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="4 3" />}
+                {isSelected && <rect x={-FACT_W / 2 - 4} y={-FACT_H / 2 - 4} width={FACT_W + 8} height={FACT_H + 8} rx={8}
+                  fill="none" stroke="#e8c870" strokeWidth={1.5} strokeDasharray="4 3" />}
                 <text x={0} y={5} textAnchor="middle" className="rel-node-label rel-node-label--faction">
                   {f.name.length > 12 ? f.name.slice(0, 11) + '…' : f.name}
                 </text>
@@ -321,10 +317,10 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
             return (
               <g key={key} className="rel-node"
                 transform={`translate(${pos.x},${pos.y})`}
+                onMouseDown={e => onNodeMouseDown(e, 'npc', n.id)}
                 onClick={e => onNodeClick(e, 'npc', n.id)}
-                onMouseDown={e => { if (e.button === 0) onNodeDragStart(e, 'npc', n.id); }}
               >
-                {isSelected && <circle r={NPC_R + 7} fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="4 3" />}
+                {isSelected && <circle r={NPC_R + 8} fill="none" stroke="#e8c870" strokeWidth={1.5} strokeDasharray="4 3" />}
                 <circle r={NPC_R} fill="#1c1b32" stroke={ringColor} strokeWidth={isSelected ? 3 : 2} />
                 {n.portrait_url
                   ? (
