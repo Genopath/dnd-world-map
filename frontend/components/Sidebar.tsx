@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
-import type { CalendarConfig, CharacterPathEntry, CampaignSettings, Faction, Location, LocationType, LootItem, NPC, PartyMember, PathEntry, Quest, Rumour, SessionEntry, SidebarTab } from '../types';
+import type { CalendarConfig, CharacterPathEntry, CampaignSettings, Faction, Location, LocationType, LootItem, NPC, PartyMember, PathEntry, Quest, SessionEntry, SidebarTab } from '../types';
 import CalendarPanel from './CalendarPanel';
 import FactionPanel from './FactionPanel';
 import LibraryPicker from './LibraryPicker';
@@ -9,7 +9,6 @@ import MarkdownText from './MarkdownText';
 import NPCPanel from './NPCPanel';
 import PartyPanel from './PartyPanel';
 import QuestPanel from './QuestPanel';
-import RumourPanel from './RumourPanel';
 import SessionPanel from './SessionPanel';
 
 // ── Travel type metadata ──────────────────────────────────────────────────────
@@ -139,11 +138,6 @@ interface Props {
   onCreateLoot:   (data: Omit<LootItem, 'id' | 'created_at'>) => Promise<void>;
   onUpdateLoot:   (id: number, data: Partial<LootItem>) => Promise<void>;
   onDeleteLoot:   (id: number) => Promise<void>;
-  // Rumours
-  rumours:        Rumour[];
-  onCreateRumour: (data: Omit<Rumour, 'id' | 'created_at'>) => Promise<void>;
-  onUpdateRumour: (id: number, data: Partial<Rumour>) => Promise<void>;
-  onDeleteRumour: (id: number) => Promise<void>;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -159,7 +153,6 @@ const TABS_ROW2: { key: SidebarTab; label: string; icon: string }[] = [
   { key: 'calendar', label: 'Calendar', icon: '🗓️' },
   { key: 'path',     label: 'Path',     icon: '🧭' },
   { key: 'loot',     label: 'Loot',     icon: '💰' },
-  { key: 'rumours',  label: 'Rumours',  icon: '📌' },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -187,7 +180,6 @@ export default function Sidebar({
   onDuplicateLocation,
   onScheduleBackup,
   loot, onCreateLoot, onUpdateLoot, onDeleteLoot,
-  rumours, onCreateRumour, onUpdateRumour, onDeleteRumour,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [editState,  setEditState]  = useState<EditState | null>(null);
@@ -398,13 +390,6 @@ export default function Sidebar({
           />
         )}
 
-        {/* ── Rumours tab ───────────────────────────────────────────────── */}
-        {activeTab === 'rumours' && (
-          <RumourPanel
-            rumours={rumours} locations={locations} npcs={npcs} isDMMode={isDMMode}
-            onCreate={onCreateRumour} onUpdate={onUpdateRumour} onDelete={onDeleteRumour}
-          />
-        )}
       </div>
     </aside>
   );

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import CampaignSelector from '../components/CampaignSelector';
 import LoginScreen from '../components/LoginScreen';
 import MapView from '../components/MapView';
+import RumourPanel from '../components/RumourPanel';
 import Sidebar from '../components/Sidebar';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { api, API_BASE, setCurrentCampaign } from '../lib/api';
@@ -227,7 +228,8 @@ export default function Home() {
   const [party,    setParty]    = useState<PartyMember[]>([]);
   const [factions, setFactions] = useState<Faction[]>([]);
   const [loot,     setLoot]     = useState<LootItem[]>([]);
-  const [rumours,  setRumours]  = useState<Rumour[]>([]);
+  const [rumours,       setRumours]       = useState<Rumour[]>([]);
+  const [showRumourBoard, setShowRumourBoard] = useState(false);
   const [campaign, setCampaign] = useState<CampaignSettings | null>(null);
   const [fogData,  setFogData]  = useState<string>('1'.repeat(10000));
   const [fogPaint, setFogPaint] = useState(false);
@@ -1146,6 +1148,12 @@ export default function Home() {
             )}
 
             {/* Always-visible tools */}
+            <button
+              className={`btn btn-sm${showRumourBoard ? ' btn-active' : ''}`}
+              style={{ fontSize: 11, padding: '2px 8px', whiteSpace: 'nowrap' }}
+              title="Open rumour board"
+              onClick={() => setShowRumourBoard(v => !v)}
+            >📌 Board</button>
             <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
             <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); playSearchOpen(); }}>🔍</button>
             <button
@@ -1375,10 +1383,6 @@ export default function Home() {
             onCreateLoot={handleCreateLoot}
             onUpdateLoot={handleUpdateLoot}
             onDeleteLoot={handleDeleteLoot}
-            rumours={rumours}
-            onCreateRumour={handleCreateRumour}
-            onUpdateRumour={handleUpdateRumour}
-            onDeleteRumour={handleDeleteRumour}
           />
           </div>
         </div>
@@ -1389,6 +1393,31 @@ export default function Home() {
         <div className="lightbox-overlay" onClick={() => setLightboxUrl(null)}>
           <img src={lightboxUrl} alt="Handout" className="lightbox-img" onClick={e => e.stopPropagation()} />
           <button className="lightbox-close" onClick={() => setLightboxUrl(null)}>✕</button>
+        </div>
+      )}
+
+      {/* ── Rumour Board overlay ──────────────────────────────────────── */}
+      {showRumourBoard && (
+        <div className="rumour-overlay-backdrop" onClick={() => setShowRumourBoard(false)}>
+          <div className="rumour-overlay-panel" onClick={e => e.stopPropagation()}>
+            <div className="rumour-overlay-header">
+              <span className="rumour-overlay-title">📌 Rumour Board</span>
+              <button className="rumour-overlay-close" onClick={() => setShowRumourBoard(false)}>✕</button>
+            </div>
+            <div className="rumour-overlay-body">
+              <RumourPanel
+                rumours={rumours}
+                quests={quests}
+                locations={locations}
+                npcs={npcs}
+                isDMMode={isDMMode}
+                onCreate={handleCreateRumour}
+                onUpdate={handleUpdateRumour}
+                onDelete={handleDeleteRumour}
+                onOpenQuestLog={() => { setShowRumourBoard(false); setSidebarTab('quests'); if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileSidebarOpen(true); }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

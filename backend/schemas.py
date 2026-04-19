@@ -468,6 +468,8 @@ class RumourCreate(BaseModel):
     source:      str = ""
     location_id: Optional[int] = None
     npc_id:      Optional[int] = None
+    type:        str = "rumour"
+    archived:    bool = False
     is_visible:  bool = True
 
 class RumourUpdate(BaseModel):
@@ -477,6 +479,8 @@ class RumourUpdate(BaseModel):
     source:      Optional[str] = None
     location_id: Optional[int] = None
     npc_id:      Optional[int] = None
+    type:        Optional[str] = None
+    archived:    Optional[bool] = None
     is_visible:  Optional[bool] = None
 
 class RumourOut(BaseModel):
@@ -487,6 +491,8 @@ class RumourOut(BaseModel):
     source:      str
     location_id: Optional[int] = None
     npc_id:      Optional[int] = None
+    type:        str = "rumour"
+    archived:    bool = False
     is_visible:  bool = True
     created_at:  Optional[datetime] = None
     model_config = {"from_attributes": True}

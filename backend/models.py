@@ -237,6 +237,8 @@ class Rumour(Base):
     source      = Column(String(255), default="")            # who told them this
     location_id = Column(Integer, nullable=True)
     npc_id      = Column(Integer, nullable=True)
+    type        = Column(String(20), default="rumour")           # rumour/main_quest/side_quest
+    archived    = Column(Boolean, default=False)
     is_visible  = Column(Boolean, default=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
 

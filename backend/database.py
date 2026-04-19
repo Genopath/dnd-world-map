@@ -78,6 +78,8 @@ _MIGRATIONS = [
     "ALTER TABLE party_members ADD COLUMN marker_x REAL",
     "ALTER TABLE party_members ADD COLUMN marker_y REAL",
     "ALTER TABLE party_members ADD COLUMN marker_visible BOOLEAN DEFAULT 1",
+    "ALTER TABLE rumours ADD COLUMN type VARCHAR(20) DEFAULT 'rumour'",
+    "ALTER TABLE rumours ADD COLUMN archived BOOLEAN DEFAULT 0",
 ]
 
 

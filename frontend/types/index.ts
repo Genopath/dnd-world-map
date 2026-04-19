@@ -207,6 +207,7 @@ export interface Rumour {
   source: string;
   location_id?: number | null;
   npc_id?: number | null;
+  archived?: boolean;
   is_visible?: boolean;
   created_at?: string;
 }
@@ -214,4 +215,4 @@ export interface Rumour {
 export type SidebarTab =
   | 'location' | 'npcs' | 'quests' | 'sessions'
   | 'party' | 'factions' | 'calendar' | 'path'
-  | 'loot' | 'rumours';
+  | 'loot';
