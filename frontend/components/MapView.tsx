@@ -1599,11 +1599,9 @@ export default function MapView({
               onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, mx, my, e.clientX, e.clientY); } : undefined}
               onMouseEnter={e => showTokenHover('party', undefined, mx, my, e)}
               onMouseLeave={hideTokenHoverSoon}
-              onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
-              onDoubleClick={e => { e.stopPropagation(); if (hasCampMap && onOpenCampMap) onOpenCampMap(); }}
-              onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'party' }); } : undefined}
+              onClick={e => { e.stopPropagation(); if (hasCampMap && onOpenCampMap) { onOpenCampMap(); } else { onNavigateToParty?.(); } }}
               data-no-draw
-              title={hasCampMap ? 'Double-click to open camp map' : 'Party marker'}
+              title={hasCampMap ? 'Click to open camp map' : 'Party marker'}
             >⚔</div>
           );
         })()}
@@ -1800,15 +1798,7 @@ export default function MapView({
           style={{ left: mapCtxMenu.screenX, top: mapCtxMenu.screenY }}
           onClick={e => e.stopPropagation()}
         >
-          {mapCtxMenu.tokenKind === 'party' ? (
-            <>
-              <div className="pin-context-name">Party Marker</div>
-              <button className="pin-context-delete" onClick={() => {
-                onUpdatePartyMarker?.(null, null);
-                setMapCtxMenu(null);
-              }}>🗑 Remove Marker</button>
-            </>
-          ) : mapCtxMenu.tokenKind === 'char' ? (
+          {mapCtxMenu.tokenKind === 'char' ? (
             <>
               <div className="pin-context-name">
                 {party.find(m => m.id === mapCtxMenu.memberId)?.name ?? 'Character'} Marker
