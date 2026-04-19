@@ -189,6 +189,7 @@ export default function Home() {
   const [campaignName,         setCampaignName]         = useState<string>('');
   const [showCampaignSelector, setShowCampaignSelector] = useState(false);
   const [showLoginScreen,      setShowLoginScreen]      = useState(false);
+  const [hasDMAuth,            setHasDMAuth]            = useState(false);
   const [mobileSidebarOpen,    setMobileSidebarOpen]    = useState(false);
   const [backupMetas,          setBackupMetas]          = useState<IdbBackupMeta[] | null>(null); // null = modal closed
   // Last-used slug read once at startup — used only for highlighting in the
@@ -266,6 +267,36 @@ export default function Home() {
   const [searchQuery,   setSearchQuery]   = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Mobile: swipe from right edge to open sidebar ───────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      tracking = t.clientX > window.innerWidth - 32;
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = Math.abs(t.clientY - startY);
+      if (dx < -60 && dy < 100) setMobileSidebarOpen(true);
+    };
+
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchend',   onEnd,   { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchend',   onEnd);
+    };
+  }, []);
 
   // ── Campaign bootstrap ──────────────────────────────────────────────────────
   useEffect(() => { preloadFairyFountain(); }, []);
@@ -1109,7 +1140,7 @@ export default function Home() {
         <LoginScreen
           campaignName={campaignName}
           campaignSlug={campaignSlug}
-          onDM={() => { setIsDMMode(true); setShowLoginScreen(false); playDMUnlock(); }}
+          onDM={() => { setIsDMMode(true); setHasDMAuth(true); setShowLoginScreen(false); playDMUnlock(); }}
           onPlayer={() => { setIsDMMode(false); setShowLoginScreen(false); }}
           onBack={() => { setShowLoginScreen(false); setShowCampaignSelector(true); }}
         />
@@ -1149,7 +1180,7 @@ export default function Home() {
                 title="Preview as player"
               >👁 Player View</button>
             )}
-            {!isDMMode && (
+            {!isDMMode && hasDMAuth && (
               <button
                 className="btn btn-sm btn-ghost"
                 style={{ fontSize: 11, padding: '2px 8px', whiteSpace: 'nowrap' }}
