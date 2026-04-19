@@ -49,8 +49,8 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
   // Pan / zoom
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
-  const [scale, setScale] = useState(1);
-  const transformRef = useRef({ tx: 0, ty: 0, scale: 1 });
+  const [scale, setScale] = useState(0.65);
+  const transformRef = useRef({ tx: 0, ty: 0, scale: 0.65 });
   transformRef.current = { tx, ty, scale };
   const isPanning = useRef(false);
   const panStart  = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
@@ -62,6 +62,17 @@ export default function RelationshipWeb({ npcs, factions, isDMMode }: Props) {
 
   // Node drag
   const dragging = useRef<{ key: string; startMx: number; startMy: number; origX: number; origY: number } | null>(null);
+
+  // ── Center view on mount ─────────────────────────────────────────────────
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const s = 0.65;
+    setScale(s);
+    setTx(rect.width  / 2 - (W / 2) * s);
+    setTy(rect.height / 2 - (H / 2) * s);
+  }, []);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
