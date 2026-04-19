@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE } from '../lib/api';
 import type { Location, NPC, Quest, Rumour } from '../types';
 
 // ── Rumour status ─────────────────────────────────────────────────────────────
@@ -54,9 +55,6 @@ interface EditState {
   title: string; content: string; status: Status;
   source: string; location_id: string; npc_id: string; is_visible: boolean;
 }
-function blank(): EditState {
-  return { title: '', content: '', status: 'unconfirmed', source: '', location_id: '', npc_id: '', is_visible: true };
-}
 function toEdit(r: Rumour): EditState {
   return {
     title: r.title, content: r.content, status: r.status as Status,
@@ -89,13 +87,15 @@ interface Props {
   onUpdate: (id: number, data: Partial<Rumour>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onOpenQuestLog?: () => void;
+  onWaxStamp?: () => void;
+  onNoteFlip?: () => void;
 }
 
 type FilterKind = 'all' | 'main' | 'side' | 'rumour' | 'archived';
 
 export default function RumourPanel({
   rumours, quests, locations, npcs, isDMMode,
-  onCreate, onUpdate, onDelete, onOpenQuestLog,
+  onUpdate, onDelete, onOpenQuestLog, onWaxStamp, onNoteFlip,
 }: Props) {
   const [editingId,   setEditingId]   = useState<number | 'new' | null>(null);
   const [editState,   setEditState]   = useState<EditState | null>(null);
@@ -103,16 +103,18 @@ export default function RumourPanel({
   const [filter,      setFilter]      = useState<FilterKind>('all');
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  const startNew  = () => { setEditState(blank()); setEditingId('new'); setExpandedKey(null); };
   const startEdit = (r: Rumour) => { setEditState(toEdit(r)); setEditingId(r.id); setExpandedKey(null); };
   const cancel    = () => { setEditingId(null); setEditState(null); };
 
+  const toggleExpand = (key: string) => {
+    setExpandedKey(prev => { const next = prev === key ? null : key; if (next) onNoteFlip?.(); return next; });
+  };
+
   const save = async () => {
-    if (!editState) return;
+    if (!editState || typeof editingId !== 'number') return;
     setSaving(true);
     try {
-      if (editingId === 'new') await onCreate(fromEdit(editState));
-      else if (typeof editingId === 'number') await onUpdate(editingId, fromEdit(editState));
+      await onUpdate(editingId, fromEdit(editState));
       cancel();
     } finally { setSaving(false); }
   };
@@ -120,6 +122,7 @@ export default function RumourPanel({
   const cycleStatus = async (e: React.MouseEvent, r: Rumour) => {
     e.stopPropagation();
     if (!isDMMode) return;
+    onWaxStamp?.();
     const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(r.status as Status) + 1) % STATUS_CYCLE.length];
     await onUpdate(r.id, { status: next });
   };
@@ -189,7 +192,7 @@ export default function RumourPanel({
         <div className="rumour-form-sheet">
           <div className="rumour-form-pin" />
           <div className="rumour-form-title">
-            {editingId === 'new' ? '— New Rumour —' : '— Edit Rumour —'}
+            {'— Edit Rumour —'}
           </div>
           <div className="form-group">
             <label className="form-label rb-label">Headline</label>
@@ -234,7 +237,7 @@ export default function RumourPanel({
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-            <button className="btn btn-sm rb-save-btn" onClick={save} disabled={saving}>{saving ? 'Pinning…' : editingId === 'new' ? 'Pin to Board' : 'Save Changes'}</button>
+            <button className="btn btn-sm rb-save-btn" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
             <button className="btn btn-sm btn-ghost" onClick={cancel}>Cancel</button>
           </div>
         </div>
@@ -243,14 +246,6 @@ export default function RumourPanel({
       {/* ── The board ─────────────────────────────────────────────────── */}
       <div className="rumour-board">
 
-        {/* New rumour card */}
-        {isDMMode && editingId === null && !showArchivedOn && (filter === 'all' || filter === 'rumour') && (
-          <div className="rumour-note rumour-note--new" onClick={startNew} title="Pin a new rumour">
-            <div className="rumour-note-pin rumour-note-pin--new" />
-            <div className="rumour-note-add-icon">+</div>
-            <div className="rumour-note-add-label">New rumour</div>
-          </div>
-        )}
 
         {/* ── Quest notes (read-only, from quest log) ─────────────────── */}
         {[...displayedMain, ...displayedSide].map(q => {
@@ -272,7 +267,7 @@ export default function RumourPanel({
                 '--pin-hi': pin.hi,
                 '--seal-color': QUEST_SEAL[q.status] ?? '#c9a84c',
               } as React.CSSProperties}
-              onClick={() => setExpandedKey(isExpanded ? null : key)}
+              onClick={() => toggleExpand(key)}
             >
               <div className="rumour-note-pin" />
 
@@ -289,6 +284,9 @@ export default function RumourPanel({
 
               {isExpanded && (
                 <div className="rumour-note-body">
+                  {q.image_url && (
+                    <img src={`${API_BASE}${q.image_url}`} alt={q.title} className="rumour-note-quest-img" />
+                  )}
                   {q.description && <p className="rumour-note-content">{q.description}</p>}
                   <div className="rumour-note-meta">
                     {giver && <div>👤 {giver.name}</div>}
@@ -333,7 +331,7 @@ export default function RumourPanel({
                 '--pin-hi': pin.hi,
                 '--seal-color': SEAL_COLOR[status],
               } as React.CSSProperties}
-              onClick={() => setExpandedKey(isExpanded ? null : key)}
+              onClick={() => toggleExpand(key)}
             >
               <div className="rumour-note-pin" />
 

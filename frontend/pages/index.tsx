@@ -14,6 +14,7 @@ import {
   playTabSwitch, playQuestComplete, playDMUnlock,
   playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
   playCampaignSwitch, playChime, playTokenPlace, playTokenRemove, playPing,
+  playBoardOpen, playBoardClose, playWaxStamp, playNoteFlip,
 } from '../lib/sounds';
 import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, MapConfig, NPC, PartyMember, PathEntry, Quest, Rumour, SearchResults, SessionEntry, SidebarTab } from '../types';
 
@@ -736,6 +737,13 @@ export default function Home() {
     const updated = await api.campaign.update(data); setCampaign(updated); scheduleIdbBackup();
   }, [scheduleIdbBackup]);
 
+  const handleUpdateMemberGold = useCallback(async (id: number, gold: number) => {
+    await handleUpdateParty(id, { gold });
+  }, [handleUpdateParty]);
+  const handleUpdatePoolGold = useCallback(async (gold: number) => {
+    await handleUpdateCampaign({ pool_gold: gold });
+  }, [handleUpdateCampaign]);
+
   // ── Party marker handlers ─────────────────────────────────────────────────────
   const handleUpdatePartyMarker = useCallback(async (x: number | null, y: number | null) => {
     const updated = await api.campaign.update({ party_marker_x: x, party_marker_y: y });
@@ -1148,12 +1156,6 @@ export default function Home() {
             )}
 
             {/* Always-visible tools */}
-            <button
-              className={`btn btn-sm${showRumourBoard ? ' btn-active' : ''}`}
-              style={{ fontSize: 11, padding: '2px 8px', whiteSpace: 'nowrap' }}
-              title="Open rumour board"
-              onClick={() => setShowRumourBoard(v => !v)}
-            >📌 Board</button>
             <button className="btn btn-sm btn-icon" title="Fit map to all pins" onClick={() => setFitTrigger(t => t + 1)}>⊞</button>
             <button className="btn btn-icon" title="Search" onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchResults(null); playSearchOpen(); }}>🔍</button>
             <button
@@ -1281,7 +1283,20 @@ export default function Home() {
           <div className="sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
         )}
 
-        <div className="main">
+        <div className="main" style={{ position: 'relative' }}>
+          {/* ── Rumour Board floating button ── */}
+          <button
+            className={`rumour-board-fab${showRumourBoard ? ' rumour-board-fab--open' : ''}`}
+            title="Rumour Board"
+            onClick={() => {
+              const next = !showRumourBoard;
+              setShowRumourBoard(next);
+              if (next) playBoardOpen(); else playBoardClose();
+            }}
+          >
+            <span className="rumour-board-fab-icon">📌</span>
+            <span className="rumour-board-fab-label">Board</span>
+          </button>
           <MapView
             locations={levelLocations} allLocations={locations}
             selectedId={selectedId}
@@ -1383,6 +1398,8 @@ export default function Home() {
             onCreateLoot={handleCreateLoot}
             onUpdateLoot={handleUpdateLoot}
             onDeleteLoot={handleDeleteLoot}
+            onUpdateMemberGold={handleUpdateMemberGold}
+            onUpdatePoolGold={handleUpdatePoolGold}
           />
           </div>
         </div>
@@ -1414,7 +1431,9 @@ export default function Home() {
                 onCreate={handleCreateRumour}
                 onUpdate={handleUpdateRumour}
                 onDelete={handleDeleteRumour}
-                onOpenQuestLog={() => { setShowRumourBoard(false); setSidebarTab('quests'); if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileSidebarOpen(true); }}
+                onOpenQuestLog={() => { setShowRumourBoard(false); playBoardClose(); setSidebarTab('quests'); if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileSidebarOpen(true); }}
+                onWaxStamp={playWaxStamp}
+                onNoteFlip={playNoteFlip}
               />
             </div>
           </div>

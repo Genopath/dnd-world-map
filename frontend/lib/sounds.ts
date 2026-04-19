@@ -486,6 +486,52 @@ export function playTokenPlace() {
   bell(c, mg, 1320, 0.04, now + 0.025, 0.20);
 }
 
+/** Heavy corkboard reveal — low thud + parchment sweep */
+export function playBoardOpen() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.52);
+  const now = c.currentTime;
+  // Cork thud
+  noise(c, mg, 0.22, now, 0.12, 'bandpass', 150, 5);
+  noise(c, mg, 0.10, now, 0.10, 'lowpass', 320, 1);
+  // Parchment sweep rising
+  noise(c, mg, 0.12, now + 0.06, 0.20, 'bandpass', 2200, 2);
+  noise(c, mg, 0.06, now + 0.12, 0.15, 'bandpass', 4000, 2);
+  // Low wooden resonance
+  tone(c, mg, 'sine', 95, 72, 0.10, now, 0.22, 0.01);
+}
+
+/** Soft fold — parchment swish closing */
+export function playBoardClose() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.38);
+  const now = c.currentTime;
+  noise(c, mg, 0.14, now, 0.14, 'bandpass', 3000, 2);
+  noise(c, mg, 0.08, now + 0.04, 0.10, 'bandpass', 1400, 2);
+  tone(c, mg, 'sine', 80, 60, 0.06, now, 0.15, 0.01);
+}
+
+/** Muffled wax-stamp thud — status seal cycle (no bell) */
+export function playWaxStamp() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.48);
+  const now = c.currentTime;
+  // Impact thud
+  noise(c, mg, 0.20, now, 0.08, 'bandpass', 600, 4);
+  noise(c, mg, 0.12, now, 0.06, 'lowpass', 280, 1);
+  // Low descending resonance
+  tone(c, mg, 'sine', 110, 65, 0.14, now, 0.18, 0.004);
+}
+
+/** Quick paper flutter — note expanding on the board */
+export function playNoteFlip() {
+  const c = ac(); if (!c) return;
+  const mg = masterGain(c, 0.30);
+  const now = c.currentTime;
+  noise(c, mg, 0.14, now, 0.07, 'bandpass', 3800, 3);
+  noise(c, mg, 0.08, now + 0.03, 0.06, 'bandpass', 2200, 2);
+}
+
 /** Gentle swish-lift when removing a party/char token */
 export function playTokenRemove() {
   const c = ac(); if (!c) return;

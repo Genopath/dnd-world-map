@@ -3233,3 +3233,166 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   opacity: 0.6;
   pointer-events: none;
 }
+
+/* ── Rumour Board FAB ──────────────────────────────────────────────────────── */
+.rumour-board-fab {
+  position: absolute;
+  bottom: 28px;
+  left: 28px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #c9a84c, #7a5a10);
+  border: 2px solid rgba(255, 220, 100, 0.45);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.55), 0 0 0 1px rgba(201,168,76,0.2), inset 0 1px 0 rgba(255,240,160,0.3);
+  cursor: pointer;
+  color: #1a1200;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  padding: 0;
+  justify-content: center;
+}
+.rumour-board-fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.65), 0 0 16px rgba(201,168,76,0.35), inset 0 1px 0 rgba(255,240,160,0.4);
+  background: radial-gradient(circle at 38% 32%, #e8c870, #9a7a20);
+}
+.rumour-board-fab--open {
+  background: radial-gradient(circle at 38% 32%, #e8c870, #8b6310);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.55), 0 0 20px rgba(201,168,76,0.4), inset 0 1px 0 rgba(255,240,160,0.4);
+  transform: scale(1.05);
+}
+.rumour-board-fab-icon { font-size: 22px; line-height: 1; }
+.rumour-board-fab-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(30,15,0,0.75);
+}
+
+/* ── Quest image on board note ─────────────────────────────────────────────── */
+.rumour-note-quest-img {
+  width: 100%;
+  max-height: 100px;
+  object-fit: cover;
+  border-radius: 3px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(100,70,20,0.3);
+}
+
+/* ── Gold tracker ──────────────────────────────────────────────────────────── */
+.gold-tracker {
+  background: linear-gradient(135deg, #1a1400 0%, #241c04 60%, #1e1800 100%);
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(201,168,76,0.1);
+}
+.gold-tracker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 6px;
+  background: linear-gradient(90deg, rgba(201,168,76,0.12), rgba(201,168,76,0.06));
+  border-bottom: 1px solid rgba(201,168,76,0.2);
+}
+.gold-tracker-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e8c870;
+  letter-spacing: 0.05em;
+}
+.gold-tracker-total {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.gold-tracker-rows {
+  padding: 6px 0;
+}
+.gold-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  gap: 8px;
+  border-bottom: 1px solid rgba(201,168,76,0.08);
+}
+.gold-row:last-child { border-bottom: none; }
+.gold-row--pool {
+  background: rgba(201,168,76,0.06);
+}
+.gold-row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gold-row--pool .gold-row-label { color: var(--text); font-weight: 600; }
+.gold-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gold-row-amount {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9a84c;
+  cursor: default;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.gold-row--pool .gold-row-amount { font-size: 13px; color: #e8c870; }
+.gold-row-amount:hover .gold-edit-hint { opacity: 1; }
+.gold-edit-hint {
+  font-size: 9px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: var(--text-dim);
+}
+.gold-row-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.gold-input {
+  width: 72px;
+  font-size: 12px;
+  padding: 2px 6px;
+  background: var(--surface3);
+  border: 1px solid rgba(201,168,76,0.4);
+  border-radius: 3px;
+  color: #e8c870;
+  text-align: right;
+}
+.gold-input:focus { outline: none; border-color: rgba(201,168,76,0.7); }
+.gold-confirm-btn {
+  background: rgba(201,168,76,0.2);
+  border: 1px solid rgba(201,168,76,0.4);
+  border-radius: 3px;
+  color: #c9a84c;
+  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.gold-confirm-btn:hover { background: rgba(201,168,76,0.35); color: #e8c870; }

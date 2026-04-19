@@ -140,6 +140,7 @@ export interface PartyMember {
   notes: string;
   portrait_url?: string | null;
   path_color: string;
+  gold?: number;
   marker_x?: number | null;
   marker_y?: number | null;
   marker_visible?: boolean;
@@ -169,6 +170,7 @@ export interface CampaignSettings {
   cal_day: number;
   cal_month: number;
   cal_year: number;
+  pool_gold?: number;
   party_marker_x?: number | null;
   party_marker_y?: number | null;
   party_marker_visible?: boolean;

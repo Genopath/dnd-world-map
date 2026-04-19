@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { LootItem, PartyMember, SessionEntry } from '../types';
+import type { CampaignSettings, LootItem, PartyMember, SessionEntry } from '../types';
 
 const RARITIES = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact'] as const;
 type Rarity = typeof RARITIES[number];
@@ -50,18 +50,23 @@ interface Props {
   loot: LootItem[];
   party: PartyMember[];
   sessions: SessionEntry[];
+  campaign: CampaignSettings | null;
   isDMMode: boolean;
   onCreate: (data: Omit<LootItem, 'id' | 'created_at'>) => Promise<void>;
   onUpdate: (id: number, data: Partial<LootItem>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onUpdateMemberGold: (id: number, gold: number) => Promise<void>;
+  onUpdatePoolGold: (gold: number) => Promise<void>;
 }
 
-export default function LootPanel({ loot, party, sessions, isDMMode, onCreate, onUpdate, onDelete }: Props) {
+export default function LootPanel({ loot, party, sessions, campaign, isDMMode, onCreate, onUpdate, onDelete, onUpdateMemberGold, onUpdatePoolGold }: Props) {
   const [editingId, setEditingId] = useState<number | 'new' | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [editingGoldId, setEditingGoldId] = useState<number | 'pool' | null>(null);
+  const [goldInput, setGoldInput] = useState('');
 
   const startNew = () => { setEditState(blank()); setEditingId('new'); };
   const startEdit = (item: LootItem) => { setEditState(toEdit(item)); setEditingId(item.id); };
@@ -100,8 +105,68 @@ export default function LootPanel({ loot, party, sessions, isDMMode, onCreate, o
   // Filter buttons: recipients present in visible loot
   const recipientIds = new Set(visible.map(i => i.recipient_id));
 
+  const commitGold = async () => {
+    const val = Math.max(0, parseInt(goldInput) || 0);
+    if (editingGoldId === 'pool') await onUpdatePoolGold(val);
+    else if (typeof editingGoldId === 'number') await onUpdateMemberGold(editingGoldId, val);
+    setEditingGoldId(null);
+    setGoldInput('');
+  };
+
+  const totalGold = (campaign?.pool_gold ?? 0) + party.reduce((s, m) => s + (m.gold ?? 0), 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* ── Gold Tracker ──────────────────────────────────────────────── */}
+      <div className="gold-tracker">
+        <div className="gold-tracker-header">
+          <span className="gold-tracker-title">🪙 Gold</span>
+          <span className="gold-tracker-total">{totalGold.toLocaleString()} gp total</span>
+        </div>
+        <div className="gold-tracker-rows">
+          {/* Party pool */}
+          <div className="gold-row gold-row--pool">
+            <span className="gold-row-label">⚔️ Party Pool</span>
+            {editingGoldId === 'pool' ? (
+              <span className="gold-row-edit">
+                <input className="gold-input" type="number" min={0} value={goldInput}
+                  onChange={e => setGoldInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitGold(); if (e.key === 'Escape') setEditingGoldId(null); }}
+                  autoFocus />
+                <button className="gold-confirm-btn" onClick={commitGold}>✓</button>
+              </span>
+            ) : (
+              <span className="gold-row-amount" onClick={() => { if (isDMMode) { setEditingGoldId('pool'); setGoldInput(String(campaign?.pool_gold ?? 0)); } }}>
+                {(campaign?.pool_gold ?? 0).toLocaleString()} gp{isDMMode && <span className="gold-edit-hint">✏</span>}
+              </span>
+            )}
+          </div>
+          {/* Per-member */}
+          {party.map(m => (
+            <div key={m.id} className="gold-row">
+              <span className="gold-row-label">
+                <span className="gold-dot" style={{ background: m.path_color }} />
+                {m.name}
+              </span>
+              {editingGoldId === m.id ? (
+                <span className="gold-row-edit">
+                  <input className="gold-input" type="number" min={0} value={goldInput}
+                    onChange={e => setGoldInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') commitGold(); if (e.key === 'Escape') setEditingGoldId(null); }}
+                    autoFocus />
+                  <button className="gold-confirm-btn" onClick={commitGold}>✓</button>
+                </span>
+              ) : (
+                <span className="gold-row-amount" onClick={() => { if (isDMMode) { setEditingGoldId(m.id); setGoldInput(String(m.gold ?? 0)); } }}>
+                  {(m.gold ?? 0).toLocaleString()} gp{isDMMode && <span className="gold-edit-hint">✏</span>}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {isDMMode && editingId === null && (
         <button className="btn btn-primary btn-sm" onClick={startNew} style={{ alignSelf: 'flex-start' }}>+ Add Loot</button>
       )}

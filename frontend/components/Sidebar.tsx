@@ -134,10 +134,12 @@ interface Props {
   onDuplicateLocation:        (loc: Location) => Promise<void>;
   onScheduleBackup?:          () => void;
   // Loot
-  loot:           LootItem[];
-  onCreateLoot:   (data: Omit<LootItem, 'id' | 'created_at'>) => Promise<void>;
-  onUpdateLoot:   (id: number, data: Partial<LootItem>) => Promise<void>;
-  onDeleteLoot:   (id: number) => Promise<void>;
+  loot:                LootItem[];
+  onCreateLoot:        (data: Omit<LootItem, 'id' | 'created_at'>) => Promise<void>;
+  onUpdateLoot:        (id: number, data: Partial<LootItem>) => Promise<void>;
+  onDeleteLoot:        (id: number) => Promise<void>;
+  onUpdateMemberGold:  (id: number, gold: number) => Promise<void>;
+  onUpdatePoolGold:    (gold: number) => Promise<void>;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -179,7 +181,7 @@ export default function Sidebar({
   onStartWaypointDraw, onClearWaypoints,
   onDuplicateLocation,
   onScheduleBackup,
-  loot, onCreateLoot, onUpdateLoot, onDeleteLoot,
+  loot, onCreateLoot, onUpdateLoot, onDeleteLoot, onUpdateMemberGold, onUpdatePoolGold,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [editState,  setEditState]  = useState<EditState | null>(null);
@@ -385,8 +387,9 @@ export default function Sidebar({
         {/* ── Loot tab ─────────────────────────────────────────────────── */}
         {activeTab === 'loot' && (
           <LootPanel
-            loot={loot} party={party} sessions={sessions} isDMMode={isDMMode}
+            loot={loot} party={party} sessions={sessions} campaign={campaign} isDMMode={isDMMode}
             onCreate={onCreateLoot} onUpdate={onUpdateLoot} onDelete={onDeleteLoot}
+            onUpdateMemberGold={onUpdateMemberGold} onUpdatePoolGold={onUpdatePoolGold}
           />
         )}
 
