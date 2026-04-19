@@ -761,6 +761,7 @@ export default function Home() {
   const handleNavigateToParty = useCallback((memberId?: number) => {
     setSidebarTab('party');
     if (memberId != null) setPartyJumpId(memberId);
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileSidebarOpen(true);
   }, []);
 
   const pingSeq = useRef(0);

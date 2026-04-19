@@ -2062,8 +2062,33 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   .passcode-modal { width: 90vw; max-width: 90vw; }
 
   /* ── FABs: sidebar is overlay on mobile so reset to edge ── */
-  .rumour-board-fab,
-  .camp-map-fab { right: 20px; }
+  .rumour-board-fab {
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 52px;
+    height: 52px;
+  }
+  .camp-map-fab {
+    right: 16px;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    width: 52px;
+    height: 52px;
+  }
+  .rumour-board-fab-icon, .camp-map-fab-icon { font-size: 18px; }
+  .rumour-board-fab-label, .camp-map-fab-label { font-size: 8px; }
+
+  /* ── Camp panel: full-screen on mobile, hide fullscreen toggle ── */
+  .camp-btn-icon { display: none; }
+  .camp-panel {
+    width: 100vw !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+  .camp-overlay { align-items: flex-start; }
+  .camp-header { padding: 8px 12px; }
+  .camp-header-actions { gap: 4px; }
+  .camp-btn-sm { font-size: 10px; padding: 3px 7px; }
 }
 
 /* ── Campaign selector — Zelda-style splash + file select ───────────────────── */
@@ -3520,7 +3545,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .camp-btn-danger:hover { background: rgba(200,80,80,0.22); }
 .camp-panel--fullscreen {
   width: 100vw !important;
-  height: 100vh !important;
+  height: 100dvh !important;
   border-radius: 0 !important;
   border: none !important;
 }
