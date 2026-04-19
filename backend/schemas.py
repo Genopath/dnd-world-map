@@ -421,3 +421,72 @@ class CalendarConfigOut(BaseModel):
     weekdays:  str
     year_name: str
     model_config = {"from_attributes": True}
+
+
+# ── Loot Items ────────────────────────────────────────────────────────────────
+
+class LootItemCreate(BaseModel):
+    name:         str
+    quantity:     int = 1
+    rarity:       str = "common"
+    description:  str = ""
+    notes:        str = ""
+    recipient_id: Optional[int] = None
+    session_id:   Optional[int] = None
+    is_visible:   bool = True
+
+class LootItemUpdate(BaseModel):
+    name:         Optional[str] = None
+    quantity:     Optional[int] = None
+    rarity:       Optional[str] = None
+    description:  Optional[str] = None
+    notes:        Optional[str] = None
+    recipient_id: Optional[int] = None
+    session_id:   Optional[int] = None
+    is_visible:   Optional[bool] = None
+
+class LootItemOut(BaseModel):
+    id:           int
+    name:         str
+    quantity:     int
+    rarity:       str
+    description:  str
+    notes:        str
+    recipient_id: Optional[int] = None
+    session_id:   Optional[int] = None
+    is_visible:   bool = True
+    created_at:   Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
+# ── Rumours ───────────────────────────────────────────────────────────────────
+
+class RumourCreate(BaseModel):
+    title:       str
+    content:     str = ""
+    status:      str = "unconfirmed"
+    source:      str = ""
+    location_id: Optional[int] = None
+    npc_id:      Optional[int] = None
+    is_visible:  bool = True
+
+class RumourUpdate(BaseModel):
+    title:       Optional[str] = None
+    content:     Optional[str] = None
+    status:      Optional[str] = None
+    source:      Optional[str] = None
+    location_id: Optional[int] = None
+    npc_id:      Optional[int] = None
+    is_visible:  Optional[bool] = None
+
+class RumourOut(BaseModel):
+    id:          int
+    title:       str
+    content:     str
+    status:      str
+    source:      str
+    location_id: Optional[int] = None
+    npc_id:      Optional[int] = None
+    is_visible:  bool = True
+    created_at:  Optional[datetime] = None
+    model_config = {"from_attributes": True}

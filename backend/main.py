@@ -1610,3 +1610,79 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
 
     db.commit()
     return {"imported": True}
+
+
+# ── Loot Items ────────────────────────────────────────────────────────────────
+
+@app.get("/loot", response_model=List[schemas.LootItemOut])
+def list_loot(db: Session = Depends(get_db)):
+    return db.query(models.LootItem).order_by(models.LootItem.created_at).all()
+
+
+@app.post("/loot", response_model=schemas.LootItemOut, status_code=201)
+def create_loot(data: schemas.LootItemCreate, db: Session = Depends(get_db)):
+    item = models.LootItem(**data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.put("/loot/{item_id}", response_model=schemas.LootItemOut)
+def update_loot(item_id: int, data: schemas.LootItemUpdate, db: Session = Depends(get_db)):
+    item = db.query(models.LootItem).filter(models.LootItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Loot item not found")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(item, k, v)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/loot/{item_id}")
+def delete_loot(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(models.LootItem).filter(models.LootItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Loot item not found")
+    db.delete(item)
+    db.commit()
+    return {"deleted": item_id}
+
+
+# ── Rumours ───────────────────────────────────────────────────────────────────
+
+@app.get("/rumours", response_model=List[schemas.RumourOut])
+def list_rumours(db: Session = Depends(get_db)):
+    return db.query(models.Rumour).order_by(models.Rumour.created_at).all()
+
+
+@app.post("/rumours", response_model=schemas.RumourOut, status_code=201)
+def create_rumour(data: schemas.RumourCreate, db: Session = Depends(get_db)):
+    rumour = models.Rumour(**data.model_dump())
+    db.add(rumour)
+    db.commit()
+    db.refresh(rumour)
+    return rumour
+
+
+@app.put("/rumours/{rumour_id}", response_model=schemas.RumourOut)
+def update_rumour(rumour_id: int, data: schemas.RumourUpdate, db: Session = Depends(get_db)):
+    rumour = db.query(models.Rumour).filter(models.Rumour.id == rumour_id).first()
+    if not rumour:
+        raise HTTPException(status_code=404, detail="Rumour not found")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(rumour, k, v)
+    db.commit()
+    db.refresh(rumour)
+    return rumour
+
+
+@app.delete("/rumours/{rumour_id}")
+def delete_rumour(rumour_id: int, db: Session = Depends(get_db)):
+    rumour = db.query(models.Rumour).filter(models.Rumour.id == rumour_id).first()
+    if not rumour:
+        raise HTTPException(status_code=404, detail="Rumour not found")
+    db.delete(rumour)
+    db.commit()
+    return {"deleted": rumour_id}

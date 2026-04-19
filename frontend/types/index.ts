@@ -186,6 +186,32 @@ export interface CampaignMeta {
   name: string;
 }
 
+export interface LootItem {
+  id: number;
+  name: string;
+  quantity: number;
+  rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact';
+  description: string;
+  notes: string;
+  recipient_id?: number | null;
+  session_id?: number | null;
+  is_visible?: boolean;
+  created_at?: string;
+}
+
+export interface Rumour {
+  id: number;
+  title: string;
+  content: string;
+  status: 'unconfirmed' | 'confirmed' | 'false';
+  source: string;
+  location_id?: number | null;
+  npc_id?: number | null;
+  is_visible?: boolean;
+  created_at?: string;
+}
+
 export type SidebarTab =
   | 'location' | 'npcs' | 'quests' | 'sessions'
-  | 'party' | 'factions' | 'calendar' | 'path';
+  | 'party' | 'factions' | 'calendar' | 'path'
+  | 'loot' | 'rumours';

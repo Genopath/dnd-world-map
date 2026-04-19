@@ -1,6 +1,6 @@
 import type {
-  CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, MapConfig,
-  NPC, PartyMember, PathEntry, Quest, SearchResults, SessionEntry,
+  CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, MapConfig,
+  NPC, PartyMember, PathEntry, Quest, Rumour, SearchResults, SessionEntry,
 } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -176,6 +176,24 @@ export const api = {
   },
   library: {
     list: () => req<{ name: string; url: string }[]>('/library-list'),
+  },
+  loot: {
+    list: () => req<LootItem[]>('/loot'),
+    create: (data: Omit<LootItem, 'id' | 'created_at'>) =>
+      req<LootItem>('/loot', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Omit<LootItem, 'id' | 'created_at'>>) =>
+      req<LootItem>(`/loot/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) =>
+      req<{ deleted: number }>(`/loot/${id}`, { method: 'DELETE' }),
+  },
+  rumours: {
+    list: () => req<Rumour[]>('/rumours'),
+    create: (data: Omit<Rumour, 'id' | 'created_at'>) =>
+      req<Rumour>('/rumours', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Omit<Rumour, 'id' | 'created_at'>>) =>
+      req<Rumour>(`/rumours/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) =>
+      req<{ deleted: number }>(`/rumours/${id}`, { method: 'DELETE' }),
   },
   data: {
     export: () => req<object>('/export'),

@@ -14,7 +14,7 @@ import {
   playRulerTick, playPathAdd, playSearchOpen, playFogReveal,
   playCampaignSwitch, playChime, playTokenPlace, playTokenRemove, playPing,
 } from '../lib/sounds';
-import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, MapConfig, NPC, PartyMember, PathEntry, Quest, SearchResults, SessionEntry, SidebarTab } from '../types';
+import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, MapConfig, NPC, PartyMember, PathEntry, Quest, Rumour, SearchResults, SessionEntry, SidebarTab } from '../types';
 
 // ── Browser backup helpers ────────────────────────────────────────────────────
 // Builds an import-compatible payload from frontend state (no binary file data).
@@ -226,6 +226,8 @@ export default function Home() {
   // ── Phase-2 state ───────────────────────────────────────────────────────────
   const [party,    setParty]    = useState<PartyMember[]>([]);
   const [factions, setFactions] = useState<Faction[]>([]);
+  const [loot,     setLoot]     = useState<LootItem[]>([]);
+  const [rumours,  setRumours]  = useState<Rumour[]>([]);
   const [campaign, setCampaign] = useState<CampaignSettings | null>(null);
   const [fogData,  setFogData]  = useState<string>('1'.repeat(10000));
   const [fogPaint, setFogPaint] = useState(false);
@@ -400,8 +402,10 @@ export default function Home() {
       api.fog.get(),
       api.calendar.get(),
       api.characterPaths.listAll(),
+      api.loot.list(),
+      api.rumours.list(),
     ])
-      .then(async ([locs, path, cfg, npcList, questList, sessionList, partyList, factionList, campaignData, fogResult, calConfig, charPaths]) => {
+      .then(async ([locs, path, cfg, npcList, questList, sessionList, partyList, factionList, campaignData, fogResult, calConfig, charPaths, lootList, rumourList]) => {
         const fog = fogResult.data || '1'.repeat(10000);
         const isEmpty = locs.length === 0 && npcList.length === 0 && questList.length === 0;
 
@@ -447,6 +451,8 @@ export default function Home() {
         setFogData(fog);
         setCalendarConfig(calConfig);
         setCharacterPaths(charPaths);
+        setLoot(lootList);
+        setRumours(rumourList);
 
         // ── Save browser backup whenever we have real data ────────────────────
         if (!isEmpty) {
@@ -749,6 +755,34 @@ export default function Home() {
   const handlePingMarker = useCallback((kind: 'party' | 'char', memberId?: number) => {
     setPingTarget({ kind, memberId, seq: ++pingSeq.current });
     playPing();
+  }, []);
+
+  // ── Loot handlers ────────────────────────────────────────────────────────────
+  const handleCreateLoot = useCallback(async (data: Omit<LootItem, 'id' | 'created_at'>) => {
+    const item = await api.loot.create(data);
+    setLoot(prev => [...prev, item]);
+  }, []);
+  const handleUpdateLoot = useCallback(async (id: number, data: Partial<LootItem>) => {
+    const item = await api.loot.update(id, data);
+    setLoot(prev => prev.map(i => i.id === id ? item : i));
+  }, []);
+  const handleDeleteLoot = useCallback(async (id: number) => {
+    await api.loot.remove(id);
+    setLoot(prev => prev.filter(i => i.id !== id));
+  }, []);
+
+  // ── Rumour handlers ──────────────────────────────────────────────────────────
+  const handleCreateRumour = useCallback(async (data: Omit<Rumour, 'id' | 'created_at'>) => {
+    const r = await api.rumours.create(data);
+    setRumours(prev => [...prev, r]);
+  }, []);
+  const handleUpdateRumour = useCallback(async (id: number, data: Partial<Rumour>) => {
+    const r = await api.rumours.update(id, data);
+    setRumours(prev => prev.map(x => x.id === id ? r : x));
+  }, []);
+  const handleDeleteRumour = useCallback(async (id: number) => {
+    await api.rumours.remove(id);
+    setRumours(prev => prev.filter(x => x.id !== id));
   }, []);
 
   // ── Phase-3 handlers ─────────────────────────────────────────────────────────
@@ -1337,6 +1371,14 @@ export default function Home() {
             onStartWaypointDraw={handleStartWaypointDraw}
             onClearWaypoints={handleClearWaypoints}
             onScheduleBackup={scheduleIdbBackup}
+            loot={loot}
+            onCreateLoot={handleCreateLoot}
+            onUpdateLoot={handleUpdateLoot}
+            onDeleteLoot={handleDeleteLoot}
+            rumours={rumours}
+            onCreateRumour={handleCreateRumour}
+            onUpdateRumour={handleUpdateRumour}
+            onDeleteRumour={handleDeleteRumour}
           />
           </div>
         </div>

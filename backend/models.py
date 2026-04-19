@@ -212,6 +212,35 @@ class QuestNPCLink(Base):
     npc_id   = Column(Integer, primary_key=True)
 
 
+class LootItem(Base):
+    __tablename__ = "loot_items"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    name         = Column(String(255), nullable=False)
+    quantity     = Column(Integer, default=1)
+    rarity       = Column(String(20), default="common")   # common/uncommon/rare/very_rare/legendary/artifact
+    description  = Column(Text, default="")
+    notes        = Column(Text, default="")
+    recipient_id = Column(Integer, nullable=True)          # party_member id, null = party pool
+    session_id   = Column(Integer, nullable=True)          # session id for context
+    is_visible   = Column(Boolean, default=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Rumour(Base):
+    __tablename__ = "rumours"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    title       = Column(String(255), nullable=False)
+    content     = Column(Text, default="")
+    status      = Column(String(20), default="unconfirmed")  # unconfirmed/confirmed/false
+    source      = Column(String(255), default="")            # who told them this
+    location_id = Column(Integer, nullable=True)
+    npc_id      = Column(Integer, nullable=True)
+    is_visible  = Column(Boolean, default=True)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class StoredImage(Base):
     __tablename__ = "stored_images"
 
