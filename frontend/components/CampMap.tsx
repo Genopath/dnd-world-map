@@ -103,7 +103,8 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
       const dy = cy - draggingRef.current.startY;
       const newX = Math.max(0, Math.min(100, draggingRef.current.origX + (dx / (imgRef.current.offsetWidth  * scale)) * 100));
       const newY = Math.max(0, Math.min(100, draggingRef.current.origY + (dy / (imgRef.current.offsetHeight * scale)) * 100));
-      setPositions(prev => ({ ...prev, [draggingRef.current!.memberId]: { x: newX, y: newY } }));
+      const id = draggingRef.current.memberId;
+      setPositions(prev => ({ ...prev, [id]: { x: newX, y: newY } }));
     };
 
     const onMouseMove = (ev: MouseEvent) => move(ev.clientX, ev.clientY);
