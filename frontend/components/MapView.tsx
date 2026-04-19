@@ -531,11 +531,11 @@ export default function MapView({
   ) => {
     tokenDragRef.current = { kind, memberId, startX: startClientX, startY: startClientY, origX, origY, moved: false };
 
-    const onMove = (e: MouseEvent) => {
+    const move = (clientX: number, clientY: number) => {
       const td = tokenDragRef.current;
       if (!td) return;
-      const dx = e.clientX - td.startX;
-      const dy = e.clientY - td.startY;
+      const dx = clientX - td.startX;
+      const dy = clientY - td.startY;
       if (Math.abs(dx) + Math.abs(dy) > 3) {
         td.moved = true;
         const mapEl = imgRef.current ?? placeholderRef.current;
@@ -550,12 +550,14 @@ export default function MapView({
       }
     };
 
+    const onMove      = (e: MouseEvent) => move(e.clientX, e.clientY);
+    const onTouchMove = (e: TouchEvent) => { e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY); };
+
     const SNAP_PX_THRESHOLD = 3.5; // % units — snap if dropped within this distance of a pin
     const onUp = () => {
       const td = tokenDragRef.current;
       if (td?.moved && td.curX != null && td.curY != null) {
         const { onUpdatePartyMarker, onUpdateCharMarker } = updateMarkersRef.current;
-        // Snap to nearest visible pin if close enough
         let finalX = td.curX;
         let finalY = td.curY;
         for (const loc of locationsRef.current) {
@@ -570,12 +572,16 @@ export default function MapView({
       }
       tokenDragRef.current = null;
       setTokenDragPos(null);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
+      document.removeEventListener('mousemove',  onMove);
+      document.removeEventListener('mouseup',    onUp);
+      document.removeEventListener('touchmove',  onTouchMove);
+      document.removeEventListener('touchend',   onUp);
     };
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup',   onUp);
+    document.addEventListener('touchmove', onTouchMove, { passive: false } as AddEventListenerOptions);
+    document.addEventListener('touchend',  onUp);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -931,6 +937,7 @@ export default function MapView({
   // ── Touch: pan (1 finger) + pinch-zoom (2 fingers) ─────────────────────────
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (fogPaintMode) return;
+    if ((e.target as HTMLElement).closest('.party-token, .party-bauble')) return;
     if (e.touches.length === 1) {
       const t = e.touches[0];
       isDragging.current  = true;
@@ -1551,6 +1558,7 @@ export default function MapView({
                   baubles.push(
                     <div key="party" className={`party-bauble party-bauble--party${pingedToken === 'party' ? ' token-pinged' : ''}${hasCampMap ? ' party-token--has-camp' : ''}`}
                       onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, loc.x, loc.y, e.clientX, e.clientY); } : undefined}
+                      onTouchStart={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, loc.x, loc.y, e.touches[0].clientX, e.touches[0].clientY); } : undefined}
                       onMouseEnter={e => showTokenHover('party', undefined, loc.x, loc.y, e)}
                       onMouseLeave={hideTokenHoverSoon}
                       onClick={e => { e.stopPropagation(); if (hasCampMap && onOpenCampMap) { onOpenCampMap(); } else { onNavigateToParty?.(); } }}
@@ -1568,6 +1576,7 @@ export default function MapView({
                       <div key={`char-${m.id}`} className={`party-bauble party-bauble--char${pingedToken === bpingKey ? ' token-pinged' : ''}`}
                         style={{ '--bauble-color': m.path_color } as React.CSSProperties}
                         onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', m.id, loc.x, loc.y, e.clientX, e.clientY); } : undefined}
+                        onTouchStart={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', m.id, loc.x, loc.y, e.touches[0].clientX, e.touches[0].clientY); } : undefined}
                         onMouseEnter={e => showTokenHover('char', m.id, undefined, undefined, e)}
                         onMouseLeave={hideTokenHoverSoon}
                         onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: loc.x, mapY: loc.y, tokenKind: 'char', memberId: m.id }); } : undefined}
@@ -1597,6 +1606,7 @@ export default function MapView({
               className={`party-token${pingedToken === 'party' ? ' token-pinged' : ''}${hasCampMap ? ' party-token--has-camp' : ''}`}
               style={{ left: `${mx}%`, top: `${my}%` }}
               onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, mx, my, e.clientX, e.clientY); } : undefined}
+              onTouchStart={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, mx, my, e.touches[0].clientX, e.touches[0].clientY); } : undefined}
               onMouseEnter={e => showTokenHover('party', undefined, mx, my, e)}
               onMouseLeave={hideTokenHoverSoon}
               onClick={e => { e.stopPropagation(); if (hasCampMap && onOpenCampMap) { onOpenCampMap(); } else { onNavigateToParty?.(); } }}
@@ -1620,6 +1630,7 @@ export default function MapView({
               className={`party-token party-token--char${pingedToken === pingKey ? ' token-pinged' : ''}`}
               style={{ left: `${mx}%`, top: `${my}%`, '--token-color': member.path_color } as React.CSSProperties}
               onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', member.id, mx, my, e.clientX, e.clientY); } : undefined}
+              onTouchStart={isDMMode ? e => { e.stopPropagation(); startTokenDrag('char', member.id, mx, my, e.touches[0].clientX, e.touches[0].clientY); } : undefined}
               onMouseEnter={e => showTokenHover('char', member.id, undefined, undefined, e)}
               onMouseLeave={hideTokenHoverSoon}
               onClick={e => { e.stopPropagation(); onNavigateToParty?.(member.id); }}

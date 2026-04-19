@@ -15,8 +15,8 @@ interface Props {
 
 export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCampaign, onUpdateMember }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const imgRef       = useRef<HTMLImageElement>(null);
+  const fileRef      = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -24,12 +24,9 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
   const transformRef = useRef(transform);
   transformRef.current = transform;
 
-  // Pan state
-  const isPanning = useRef(false);
-  const panStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
-  const hasPanned = useRef(false);
+  const isPanning  = useRef(false);
+  const panStart   = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
 
-  // Token drag state
   const draggingRef = useRef<{ memberId: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const [positions, setPositions] = useState<Record<number, { x: number; y: number }>>({});
 
@@ -59,24 +56,22 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
-  // ── Pan ───────────────────────────────────────────────────────────────────────
-  const handlePanDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('.camp-token')) return;
+  // ── Pan helpers ───────────────────────────────────────────────────────────────
+  const startPan = (clientX: number, clientY: number) => {
     isPanning.current = true;
-    hasPanned.current = false;
-    panStart.current = { x: e.clientX, y: e.clientY, tx: transformRef.current.x, ty: transformRef.current.y };
-  }, []);
-
-  const handlePanMove = useCallback((e: React.MouseEvent) => {
+    panStart.current = { x: clientX, y: clientY, tx: transformRef.current.x, ty: transformRef.current.y };
+  };
+  const movePan = (clientX: number, clientY: number) => {
     if (!isPanning.current) return;
-    const dx = e.clientX - panStart.current.x;
-    const dy = e.clientY - panStart.current.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) hasPanned.current = true;
-    setTransform(prev => ({ ...prev, x: panStart.current.tx + dx, y: panStart.current.ty + dy }));
-  }, []);
+    setTransform(prev => ({ ...prev, x: panStart.current.tx + (clientX - panStart.current.x), y: panStart.current.ty + (clientY - panStart.current.y) }));
+  };
+  const endPan = () => { isPanning.current = false; };
 
-  const handlePanUp = useCallback(() => { isPanning.current = false; }, []);
+  const handlePanDown  = useCallback((e: React.MouseEvent)  => { if (e.button !== 0 || (e.target as HTMLElement).closest('.camp-token')) return; startPan(e.clientX, e.clientY); }, []);
+  const handlePanMove  = useCallback((e: React.MouseEvent)  => movePan(e.clientX, e.clientY), []);
+  const handlePanUp    = useCallback(() => endPan(), []);
+  const handleTouchPanStart = useCallback((e: React.TouchEvent) => { if ((e.target as HTMLElement).closest('.camp-token')) return; if (e.touches.length === 1) startPan(e.touches[0].clientX, e.touches[0].clientY); }, []);
+  const handleTouchPanMove  = useCallback((e: React.TouchEvent) => { if (e.touches.length === 1) movePan(e.touches[0].clientX, e.touches[0].clientY); }, []);
 
   // ── Upload / delete ──────────────────────────────────────────────────────────
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,10 +82,7 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
       const res = await api.campaign.uploadCampMap(file);
       await onUpdateCampaign({ camp_map_url: res.camp_map_url });
       setTransform({ x: 0, y: 0, scale: 1 });
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
+    } finally { setUploading(false); e.target.value = ''; }
   };
 
   const handleDeleteMap = async () => {
@@ -99,23 +91,29 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
     await onUpdateCampaign({ camp_map_url: null });
   };
 
-  // ── Token drag ────────────────────────────────────────────────────────────────
-  const onTokenMouseDown = useCallback((e: React.MouseEvent, member: PartyMember) => {
-    if (!isDMMode) return;
-    e.preventDefault();
-    e.stopPropagation();
+  // ── Token drag — mouse + touch, available to all users ───────────────────────
+  const startTokenDrag = useCallback((clientX: number, clientY: number, member: PartyMember) => {
     const pos = getPos(member);
-    draggingRef.current = { memberId: member.id, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+    draggingRef.current = { memberId: member.id, startX: clientX, startY: clientY, origX: pos.x, origY: pos.y };
 
-    const onMove = (ev: MouseEvent) => {
+    const move = (cx: number, cy: number) => {
       if (!draggingRef.current || !imgRef.current) return;
-      const imgEl = imgRef.current;
       const scale = transformRef.current.scale;
-      const dx = ev.clientX - draggingRef.current.startX;
-      const dy = ev.clientY - draggingRef.current.startY;
-      const newX = Math.max(0, Math.min(100, draggingRef.current.origX + (dx / (imgEl.offsetWidth * scale)) * 100));
-      const newY = Math.max(0, Math.min(100, draggingRef.current.origY + (dy / (imgEl.offsetHeight * scale)) * 100));
+      const dx = cx - draggingRef.current.startX;
+      const dy = cy - draggingRef.current.startY;
+      const newX = Math.max(0, Math.min(100, draggingRef.current.origX + (dx / (imgRef.current.offsetWidth  * scale)) * 100));
+      const newY = Math.max(0, Math.min(100, draggingRef.current.origY + (dy / (imgRef.current.offsetHeight * scale)) * 100));
       setPositions(prev => ({ ...prev, [draggingRef.current!.memberId]: { x: newX, y: newY } }));
+    };
+
+    const onMouseMove = (ev: MouseEvent) => move(ev.clientX, ev.clientY);
+    const onTouchMove = (ev: TouchEvent) => { ev.preventDefault(); move(ev.touches[0].clientX, ev.touches[0].clientY); };
+
+    const cleanup = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup',   onUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend',  onUp);
     };
 
     const onUp = () => {
@@ -124,8 +122,7 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
       const origX = draggingRef.current.origX;
       const origY = draggingRef.current.origY;
       draggingRef.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      cleanup();
       setPositions(prev => {
         const finalPos = prev[id] ?? { x: origX, y: origY };
         onUpdateMember(id, { camp_x: finalPos.x, camp_y: finalPos.y });
@@ -133,9 +130,11 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
       });
     };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [isDMMode, onUpdateMember]);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup',   onUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend',  onUp);
+  }, [onUpdateMember]);
 
   const toggleVisible = async (m: PartyMember) => {
     await onUpdateMember(m.id, { camp_visible: !(m.camp_visible ?? true) });
@@ -143,8 +142,8 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
 
   const visibleParty = isDMMode ? party : party.filter(m => m.camp_visible !== false);
 
-  const zoomIn  = () => setTransform(prev => ({ ...prev, scale: Math.min(8, prev.scale * 1.25) }));
-  const zoomOut = () => setTransform(prev => ({ ...prev, scale: Math.max(0.2, prev.scale * 0.8) }));
+  const zoomIn   = () => setTransform(prev => ({ ...prev, scale: Math.min(8, prev.scale * 1.25) }));
+  const zoomOut  = () => setTransform(prev => ({ ...prev, scale: Math.max(0.2, prev.scale * 0.8) }));
   const resetView = () => setTransform({ x: 0, y: 0, scale: 1 });
 
   return (
@@ -166,9 +165,7 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
                 <button className="camp-btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                   {uploading ? 'Uploading…' : campUrl ? '🗺 Replace' : '🗺 Upload Map'}
                 </button>
-                {campUrl && (
-                  <button className="camp-btn-sm camp-btn-danger" onClick={handleDeleteMap}>✕ Remove</button>
-                )}
+                {campUrl && <button className="camp-btn-sm camp-btn-danger" onClick={handleDeleteMap}>✕ Remove</button>}
                 <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUpload} />
               </>
             )}
@@ -188,7 +185,9 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
               onMouseMove={handlePanMove}
               onMouseUp={handlePanUp}
               onMouseLeave={handlePanUp}
-              style={{ cursor: isPanning.current && hasPanned.current ? 'grabbing' : 'grab' }}
+              onTouchStart={handleTouchPanStart}
+              onTouchMove={handleTouchPanMove}
+              onTouchEnd={handlePanUp}
             >
               <div
                 className="camp-map-transform"
@@ -202,27 +201,22 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
                   return (
                     <div
                       key={m.id}
-                      className={`camp-token${isDMMode ? ' camp-token--dm' : ''}${hidden ? ' camp-token--hidden' : ''}`}
+                      className={`camp-token camp-token--draggable${hidden ? ' camp-token--hidden' : ''}`}
                       style={{ left: `${pos.x}%`, top: `${pos.y}%`, borderColor: m.path_color }}
-                      onMouseDown={e => onTokenMouseDown(e, m)}
+                      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startTokenDrag(e.clientX, e.clientY, m); }}
+                      onTouchStart={e => { e.preventDefault(); e.stopPropagation(); startTokenDrag(e.touches[0].clientX, e.touches[0].clientY, m); }}
                       title={m.name}
                     >
-                      {m.portrait_url ? (
-                        <img src={API_BASE + m.portrait_url} alt={m.name} className="camp-token-portrait" />
-                      ) : (
-                        <span className="camp-token-initial" style={{ background: m.path_color }}>
-                          {m.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      {m.portrait_url
+                        ? <img src={API_BASE + m.portrait_url} alt={m.name} className="camp-token-portrait" />
+                        : <span className="camp-token-initial" style={{ background: m.path_color }}>{m.name.charAt(0).toUpperCase()}</span>
+                      }
                       <span className="camp-token-label">{m.name}</span>
                       {isDMMode && (
-                        <button
-                          className="camp-token-eye"
+                        <button className="camp-token-eye"
                           title={hidden ? 'Show to players' : 'Hide from players'}
                           onClick={e => { e.stopPropagation(); toggleVisible(m); }}
-                        >
-                          {hidden ? '🙈' : '👁'}
-                        </button>
+                        >{hidden ? '🙈' : '👁'}</button>
                       )}
                     </div>
                   );
@@ -242,9 +236,11 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
           )}
         </div>
 
-        {isDMMode && campUrl && (
+        {campUrl && (
           <div className="camp-footer">
-            <span className="camp-hint">Scroll to zoom · Drag to pan · Drag tokens to reposition · 👁 toggles player visibility</span>
+            <span className="camp-hint">
+              {isDMMode ? 'Scroll to zoom · Drag to pan · Drag tokens · 👁 toggles visibility' : 'Drag tokens to move your character'}
+            </span>
           </div>
         )}
       </div>
