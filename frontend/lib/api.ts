@@ -142,6 +142,8 @@ export const api = {
     get: () => req<CampaignSettings>('/campaign'),
     update: (data: Partial<Omit<CampaignSettings, 'id'>>) =>
       req<CampaignSettings>('/campaign', { method: 'PUT', body: JSON.stringify(data) }),
+    uploadCampMap: (file: File) => upload<{ camp_map_url: string }>('/campaign/camp-map', file),
+    deleteCampMap: () => req<{ ok: boolean }>('/campaign/camp-map', { method: 'DELETE' }),
   },
   calendar: {
     get: () => req<CalendarConfig>('/calendar-config'),

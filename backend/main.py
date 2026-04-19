@@ -949,6 +949,22 @@ def update_campaign(data: schemas.CampaignUpdate, db: Session = Depends(get_db))
     db.refresh(c)
     return c
 
+@app.post("/campaign/camp-map")
+async def upload_camp_map(file: UploadFile = File(...), slug: str = Depends(database.get_campaign_slug), db: Session = Depends(get_db)):
+    c = _get_or_create_campaign(db)
+    _delete_stored_image(c.camp_map_url, db)
+    c.camp_map_url = await _store_image(file, slug, db)
+    db.commit()
+    return {"camp_map_url": c.camp_map_url}
+
+@app.delete("/campaign/camp-map")
+def delete_camp_map(db: Session = Depends(get_db)):
+    c = _get_or_create_campaign(db)
+    _delete_stored_image(c.camp_map_url, db)
+    c.camp_map_url = None
+    db.commit()
+    return {"ok": True}
+
 
 # ── DM Passcode (server-side, shared across all devices) ─────────────────────
 

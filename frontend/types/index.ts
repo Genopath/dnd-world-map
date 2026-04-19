@@ -147,6 +147,9 @@ export interface PartyMember {
   marker_x?: number | null;
   marker_y?: number | null;
   marker_visible?: boolean;
+  camp_x?: number | null;
+  camp_y?: number | null;
+  camp_visible?: boolean;
   created_at?: string;
 }
 
@@ -180,6 +183,7 @@ export interface CampaignSettings {
   party_marker_x?: number | null;
   party_marker_y?: number | null;
   party_marker_visible?: boolean;
+  camp_map_url?: string | null;
 }
 
 export interface CalendarConfig {

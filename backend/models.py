@@ -137,6 +137,7 @@ class CampaignSettings(Base):
     party_marker_x       = Column(Float, nullable=True)
     party_marker_y       = Column(Float, nullable=True)
     party_marker_visible = Column(Boolean, default=True)
+    camp_map_url         = Column(String(500), nullable=True)
 
 
 class PartyMember(Base):
@@ -162,6 +163,9 @@ class PartyMember(Base):
     marker_x       = Column(Float, nullable=True)
     marker_y       = Column(Float, nullable=True)
     marker_visible = Column(Boolean, default=True)
+    camp_x         = Column(Float, nullable=True)
+    camp_y         = Column(Float, nullable=True)
+    camp_visible   = Column(Boolean, default=True)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
 

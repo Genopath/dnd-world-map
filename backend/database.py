@@ -88,6 +88,10 @@ _MIGRATIONS = [
     "ALTER TABLE campaign_settings ADD COLUMN pool_silver INTEGER DEFAULT 0",
     "ALTER TABLE campaign_settings ADD COLUMN pool_copper INTEGER DEFAULT 0",
     "ALTER TABLE campaign_settings ADD COLUMN pool_electrum INTEGER DEFAULT 0",
+    "ALTER TABLE campaign_settings ADD COLUMN camp_map_url VARCHAR(500)",
+    "ALTER TABLE party_members ADD COLUMN camp_x REAL",
+    "ALTER TABLE party_members ADD COLUMN camp_y REAL",
+    "ALTER TABLE party_members ADD COLUMN camp_visible BOOLEAN DEFAULT 1",
 ]
 
 

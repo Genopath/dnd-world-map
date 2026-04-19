@@ -258,6 +258,7 @@ class CampaignUpdate(BaseModel):
     party_marker_x:       Optional[float] = None
     party_marker_y:       Optional[float] = None
     party_marker_visible: Optional[bool]  = None
+    camp_map_url:         Optional[str]   = None
 
 class CampaignOut(BaseModel):
     id: int
@@ -277,6 +278,7 @@ class CampaignOut(BaseModel):
     party_marker_x:       Optional[float] = None
     party_marker_y:       Optional[float] = None
     party_marker_visible: bool = True
+    camp_map_url:         Optional[str]   = None
     model_config = {"from_attributes": True}
 
 
@@ -315,6 +317,9 @@ class PartyMemberUpdate(BaseModel):
     marker_x:       Optional[float] = None
     marker_y:       Optional[float] = None
     marker_visible: Optional[bool]  = None
+    camp_x:         Optional[float] = None
+    camp_y:         Optional[float] = None
+    camp_visible:   Optional[bool]  = None
 
 class PartyMemberOut(BaseModel):
     id: int
@@ -337,6 +342,9 @@ class PartyMemberOut(BaseModel):
     marker_x:       Optional[float] = None
     marker_y:       Optional[float] = None
     marker_visible: bool = True
+    camp_x:         Optional[float] = None
+    camp_y:         Optional[float] = None
+    camp_visible:   bool = True
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 

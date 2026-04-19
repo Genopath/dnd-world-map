@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import CampaignSelector from '../components/CampaignSelector';
 import LoginScreen from '../components/LoginScreen';
 import MapView from '../components/MapView';
+import CampMap from '../components/CampMap';
 import RumourPanel from '../components/RumourPanel';
 import Sidebar from '../components/Sidebar';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -231,6 +232,7 @@ export default function Home() {
   const [loot,     setLoot]     = useState<LootItem[]>([]);
   const [rumours,       setRumours]       = useState<Rumour[]>([]);
   const [showRumourBoard, setShowRumourBoard] = useState(false);
+  const [showCampMap, setShowCampMap] = useState(false);
   const [campaign, setCampaign] = useState<CampaignSettings | null>(null);
   const [fogData,  setFogData]  = useState<string>('1'.repeat(10000));
   const [fogPaint, setFogPaint] = useState(false);
@@ -1297,6 +1299,15 @@ export default function Home() {
             <span className="rumour-board-fab-icon">📌</span>
             <span className="rumour-board-fab-label">Quests</span>
           </button>
+          {/* ── Camp Battlemap floating button ── */}
+          <button
+            className={`camp-map-fab${showCampMap ? ' camp-map-fab--open' : ''}`}
+            title="Camp Battlemap"
+            onClick={() => setShowCampMap(v => !v)}
+          >
+            <span className="camp-map-fab-icon">⛺</span>
+            <span className="camp-map-fab-label">Camp</span>
+          </button>
           <MapView
             locations={levelLocations} allLocations={locations}
             selectedId={selectedId}
@@ -1438,6 +1449,18 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Camp Battlemap overlay ───────────────────────────────────── */}
+      {showCampMap && (
+        <CampMap
+          campaign={campaign}
+          party={party}
+          isDMMode={isDMMode}
+          onClose={() => setShowCampMap(false)}
+          onUpdateCampaign={handleUpdateCampaign}
+          onUpdateMember={handleUpdateParty}
+        />
       )}
 
       {/* ── Search modal ─────────────────────────────────────────────── */}
