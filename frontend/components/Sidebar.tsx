@@ -399,7 +399,10 @@ export default function Sidebar({
         )}
 
         {activeTab === 'web' && (
-          <RelationshipWeb npcs={npcs} factions={factions} isDMMode={isDMMode} />
+          <RelationshipWeb
+            npcs={npcs} factions={factions} isDMMode={isDMMode}
+            onCreateNPC={onCreateNPC} onCreateFaction={onCreateFaction}
+          />
         )}
 
       </div>
