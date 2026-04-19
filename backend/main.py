@@ -1708,3 +1708,47 @@ def delete_rumour(rumour_id: int, db: Session = Depends(get_db)):
     db.delete(rumour)
     db.commit()
     return {"deleted": rumour_id}
+
+
+# ── Relationship Web ──────────────────────────────────────────────────────────
+
+@app.get("/relationships/edges", response_model=list[schemas.RelationshipEdgeOut])
+def list_relationship_edges(db: Session = Depends(get_db)):
+    return db.query(models.RelationshipEdge).all()
+
+@app.post("/relationships/edges", response_model=schemas.RelationshipEdgeOut, status_code=201)
+def create_relationship_edge(data: schemas.RelationshipEdgeCreate, db: Session = Depends(get_db)):
+    edge = models.RelationshipEdge(**data.model_dump())
+    db.add(edge)
+    db.commit()
+    db.refresh(edge)
+    return edge
+
+@app.delete("/relationships/edges/{edge_id}")
+def delete_relationship_edge(edge_id: int, db: Session = Depends(get_db)):
+    edge = db.query(models.RelationshipEdge).filter(models.RelationshipEdge.id == edge_id).first()
+    if not edge:
+        raise HTTPException(status_code=404, detail="Edge not found")
+    db.delete(edge)
+    db.commit()
+    return {"deleted": edge_id}
+
+@app.get("/relationships/positions", response_model=list[schemas.RelationshipNodePosOut])
+def list_relationship_positions(db: Session = Depends(get_db)):
+    return db.query(models.RelationshipNodePos).all()
+
+@app.post("/relationships/positions", response_model=schemas.RelationshipNodePosOut)
+def upsert_relationship_position(data: schemas.RelationshipNodePosUpsert, db: Session = Depends(get_db)):
+    pos = db.query(models.RelationshipNodePos).filter(
+        models.RelationshipNodePos.entity_type == data.entity_type,
+        models.RelationshipNodePos.entity_id   == data.entity_id,
+    ).first()
+    if pos:
+        pos.x = data.x
+        pos.y = data.y
+    else:
+        pos = models.RelationshipNodePos(**data.model_dump())
+        db.add(pos)
+    db.commit()
+    db.refresh(pos)
+    return pos

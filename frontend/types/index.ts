@@ -227,4 +227,20 @@ export interface Rumour {
 export type SidebarTab =
   | 'location' | 'npcs' | 'quests' | 'sessions'
   | 'party' | 'factions' | 'calendar' | 'path'
-  | 'loot';
+  | 'loot' | 'web';
+
+export interface RelationshipEdge {
+  id:        number;
+  from_type: 'npc' | 'faction';
+  from_id:   number;
+  to_type:   'npc' | 'faction';
+  to_id:     number;
+  label:     string;
+}
+
+export interface RelationshipNodePos {
+  entity_type: 'npc' | 'faction';
+  entity_id:   number;
+  x:           number;
+  y:           number;
+}

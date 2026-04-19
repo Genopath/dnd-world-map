@@ -1,6 +1,6 @@
 import type {
   CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, MapConfig,
-  NPC, PartyMember, PathEntry, Quest, Rumour, SearchResults, SessionEntry,
+  NPC, PartyMember, PathEntry, Quest, RelationshipEdge, RelationshipNodePos, Rumour, SearchResults, SessionEntry,
 } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -196,6 +196,15 @@ export const api = {
       req<Rumour>(`/rumours/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) =>
       req<{ deleted: number }>(`/rumours/${id}`, { method: 'DELETE' }),
+  },
+  relationships: {
+    listEdges:     () => req<RelationshipEdge[]>('/relationships/edges'),
+    createEdge:    (data: Omit<RelationshipEdge, 'id'>) =>
+      req<RelationshipEdge>('/relationships/edges', { method: 'POST', body: JSON.stringify(data) }),
+    deleteEdge:    (id: number) => req<{ deleted: number }>(`/relationships/edges/${id}`, { method: 'DELETE' }),
+    listPositions: () => req<RelationshipNodePos[]>('/relationships/positions'),
+    upsertPosition:(data: RelationshipNodePos) =>
+      req<RelationshipNodePos>('/relationships/positions', { method: 'POST', body: JSON.stringify(data) }),
   },
   data: {
     export: () => req<object>('/export'),

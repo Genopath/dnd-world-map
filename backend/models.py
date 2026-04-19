@@ -224,6 +224,28 @@ class QuestNPCLink(Base):
     npc_id   = Column(Integer, primary_key=True)
 
 
+class RelationshipEdge(Base):
+    __tablename__ = "relationship_edges"
+
+    id        = Column(Integer, primary_key=True, index=True)
+    from_type = Column(String(20), nullable=False)   # 'npc' | 'faction'
+    from_id   = Column(Integer, nullable=False)
+    to_type   = Column(String(20), nullable=False)
+    to_id     = Column(Integer, nullable=False)
+    label     = Column(String(200), default="")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RelationshipNodePos(Base):
+    __tablename__ = "relationship_node_positions"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    entity_type = Column(String(20), nullable=False)   # 'npc' | 'faction'
+    entity_id   = Column(Integer, nullable=False)
+    x           = Column(Float, nullable=False)
+    y           = Column(Float, nullable=False)
+
+
 class LootItem(Base):
     __tablename__ = "loot_items"
 

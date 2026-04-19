@@ -9,6 +9,7 @@ import MarkdownText from './MarkdownText';
 import NPCPanel from './NPCPanel';
 import PartyPanel from './PartyPanel';
 import QuestPanel from './QuestPanel';
+import RelationshipWeb from './RelationshipWeb';
 import SessionPanel from './SessionPanel';
 
 // ── Travel type metadata ──────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ const TABS_ROW2: { key: SidebarTab; label: string; icon: string }[] = [
   { key: 'calendar', label: 'Calendar', icon: '🗓️' },
   { key: 'path',     label: 'Path',     icon: '🧭' },
   { key: 'loot',     label: 'Loot',     icon: '💰' },
+  { key: 'web',      label: 'Rel. Web', icon: '🕸️' },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -394,6 +396,10 @@ export default function Sidebar({
             onCreate={onCreateLoot} onUpdate={onUpdateLoot} onDelete={onDeleteLoot}
             onUpdateMemberGold={onUpdateMemberGold} onUpdatePoolGold={onUpdatePoolGold}
           />
+        )}
+
+        {activeTab === 'web' && (
+          <RelationshipWeb npcs={npcs} factions={factions} isDMMode={isDMMode} />
         )}
 
       </div>

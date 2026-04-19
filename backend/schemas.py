@@ -520,3 +520,35 @@ class RumourOut(BaseModel):
     is_visible:  bool = True
     created_at:  Optional[datetime] = None
     model_config = {"from_attributes": True}
+
+
+# ── Relationship Web ──────────────────────────────────────────────────────────
+
+class RelationshipEdgeCreate(BaseModel):
+    from_type: str
+    from_id:   int
+    to_type:   str
+    to_id:     int
+    label:     str = ""
+
+class RelationshipEdgeOut(BaseModel):
+    id:        int
+    from_type: str
+    from_id:   int
+    to_type:   str
+    to_id:     int
+    label:     str
+    model_config = {"from_attributes": True}
+
+class RelationshipNodePosUpsert(BaseModel):
+    entity_type: str
+    entity_id:   int
+    x:           float
+    y:           float
+
+class RelationshipNodePosOut(BaseModel):
+    entity_type: str
+    entity_id:   int
+    x:           float
+    y:           float
+    model_config = {"from_attributes": True}
