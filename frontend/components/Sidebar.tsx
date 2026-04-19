@@ -138,8 +138,8 @@ interface Props {
   onCreateLoot:        (data: Omit<LootItem, 'id' | 'created_at'>) => Promise<void>;
   onUpdateLoot:        (id: number, data: Partial<LootItem>) => Promise<void>;
   onDeleteLoot:        (id: number) => Promise<void>;
-  onUpdateMemberGold:  (id: number, gold: number) => Promise<void>;
-  onUpdatePoolGold:    (gold: number) => Promise<void>;
+  onUpdateMemberGold:  (id: number, data: Partial<PartyMember>) => Promise<void>;
+  onUpdatePoolGold:    (data: Partial<CampaignSettings>) => Promise<void>;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────

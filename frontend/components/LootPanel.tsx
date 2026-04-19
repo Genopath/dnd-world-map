@@ -46,6 +46,18 @@ function fromEdit(e: EditState): Omit<LootItem, 'id' | 'created_at'> {
 
 type Filter = 'all' | Rarity | 'party' | `char-${number}`;
 
+type CurrencyKey = 'gold' | 'silver' | 'copper' | 'electrum';
+type PoolKey = 'pool_gold' | 'pool_silver' | 'pool_copper' | 'pool_electrum';
+type CurrencyData = Partial<Record<CurrencyKey, number>>;
+type PoolData = Partial<Record<PoolKey, number>>;
+
+const CURRENCIES: { key: CurrencyKey; poolKey: PoolKey; label: string; color: string }[] = [
+  { key: 'gold',     poolKey: 'pool_gold',     label: 'gp', color: '#c9a84c' },
+  { key: 'silver',   poolKey: 'pool_silver',   label: 'sp', color: '#aab0c0' },
+  { key: 'copper',   poolKey: 'pool_copper',   label: 'cp', color: '#b87333' },
+  { key: 'electrum', poolKey: 'pool_electrum', label: 'ep', color: '#8cb88c' },
+];
+
 interface Props {
   loot: LootItem[];
   party: PartyMember[];
@@ -55,8 +67,8 @@ interface Props {
   onCreate: (data: Omit<LootItem, 'id' | 'created_at'>) => Promise<void>;
   onUpdate: (id: number, data: Partial<LootItem>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
-  onUpdateMemberGold: (id: number, gold: number) => Promise<void>;
-  onUpdatePoolGold: (gold: number) => Promise<void>;
+  onUpdateMemberGold: (id: number, data: Partial<PartyMember>) => Promise<void>;
+  onUpdatePoolGold: (data: Partial<CampaignSettings>) => Promise<void>;
 }
 
 export default function LootPanel({ loot, party, sessions, campaign, isDMMode, onCreate, onUpdate, onDelete, onUpdateMemberGold, onUpdatePoolGold }: Props) {
@@ -65,8 +77,8 @@ export default function LootPanel({ loot, party, sessions, campaign, isDMMode, o
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
-  const [editingGoldId, setEditingGoldId] = useState<number | 'pool' | null>(null);
-  const [goldInput, setGoldInput] = useState('');
+  const [editingCell, setEditingCell] = useState<{ owner: number | 'pool'; currency: CurrencyKey } | null>(null);
+  const [cellInput, setCellInput] = useState('');
 
   const startNew = () => { setEditState(blank()); setEditingId('new'); };
   const startEdit = (item: LootItem) => { setEditState(toEdit(item)); setEditingId(item.id); };
@@ -102,69 +114,91 @@ export default function LootPanel({ loot, party, sessions, campaign, isDMMode, o
     return s ? `Session ${s.session_number}${s.title ? ` — ${s.title}` : ''}` : null;
   };
 
-  // Filter buttons: recipients present in visible loot
   const recipientIds = new Set(visible.map(i => i.recipient_id));
 
-  const commitGold = async () => {
-    const val = Math.max(0, parseInt(goldInput) || 0);
-    if (editingGoldId === 'pool') await onUpdatePoolGold(val);
-    else if (typeof editingGoldId === 'number') await onUpdateMemberGold(editingGoldId, val);
-    setEditingGoldId(null);
-    setGoldInput('');
+  const startEditCell = (owner: number | 'pool', currency: CurrencyKey, current: number) => {
+    if (!isDMMode) return;
+    setEditingCell({ owner, currency });
+    setCellInput(String(current));
   };
 
-  const totalGold = (campaign?.pool_gold ?? 0) + party.reduce((s, m) => s + (m.gold ?? 0), 0);
+  const commitCell = async () => {
+    if (!editingCell) return;
+    const val = Math.max(0, parseInt(cellInput) || 0);
+    const { owner, currency } = editingCell;
+    if (owner === 'pool') {
+      const poolKey = CURRENCIES.find(c => c.key === currency)!.poolKey;
+      await onUpdatePoolGold({ [poolKey]: val } as Partial<CampaignSettings>);
+    } else {
+      await onUpdateMemberGold(owner, { [currency]: val } as Partial<PartyMember>);
+    }
+    setEditingCell(null);
+    setCellInput('');
+  };
+
+  const gpTotal = (campaign?.pool_gold ?? 0) + party.reduce((s, m) => s + (m.gold ?? 0), 0);
+
+  const CurrencyCell = ({ owner, currency, value }: { owner: number | 'pool'; currency: CurrencyKey; value: number }) => {
+    const cur = CURRENCIES.find(c => c.key === currency)!;
+    const isEditing = editingCell?.owner === owner && editingCell?.currency === currency;
+    if (isEditing) return (
+      <span className="gold-cell-edit">
+        <input className="gold-input" type="number" min={0} value={cellInput}
+          onChange={e => setCellInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') commitCell(); if (e.key === 'Escape') setEditingCell(null); }}
+          onBlur={commitCell}
+          autoFocus />
+      </span>
+    );
+    return (
+      <span className="gold-cell" style={{ '--cur-color': cur.color } as React.CSSProperties}
+        onClick={() => startEditCell(owner, currency, value)}
+        title={isDMMode ? `Click to edit ${cur.label}` : undefined}
+      >
+        <span className="gold-cell-val">{value > 0 ? value.toLocaleString() : '—'}</span>
+        <span className="gold-cell-label">{cur.label}</span>
+      </span>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* ── Gold Tracker ──────────────────────────────────────────────── */}
+      {/* ── Currency Tracker ─────────────────────────────────────────── */}
       <div className="gold-tracker">
         <div className="gold-tracker-header">
-          <span className="gold-tracker-title">🪙 Gold</span>
-          <span className="gold-tracker-total">{totalGold.toLocaleString()} gp total</span>
+          <span className="gold-tracker-title">🪙 Currency</span>
+          <span className="gold-tracker-total">{gpTotal.toLocaleString()} gp pool</span>
         </div>
-        <div className="gold-tracker-rows">
+        <div className="gold-tracker-table">
+          {/* Header row */}
+          <div className="gold-table-row gold-table-header">
+            <span className="gold-table-name" />
+            {CURRENCIES.map(c => (
+              <span key={c.key} className="gold-table-cur-head" style={{ color: c.color }}>{c.label}</span>
+            ))}
+          </div>
           {/* Party pool */}
-          <div className="gold-row gold-row--pool">
-            <span className="gold-row-label">⚔️ Party Pool</span>
-            {editingGoldId === 'pool' ? (
-              <span className="gold-row-edit">
-                <input className="gold-input" type="number" min={0} value={goldInput}
-                  onChange={e => setGoldInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') commitGold(); if (e.key === 'Escape') setEditingGoldId(null); }}
-                  autoFocus />
-                <button className="gold-confirm-btn" onClick={commitGold}>✓</button>
-              </span>
-            ) : (
-              <span className="gold-row-amount" onClick={() => { if (isDMMode) { setEditingGoldId('pool'); setGoldInput(String(campaign?.pool_gold ?? 0)); } }}>
-                {(campaign?.pool_gold ?? 0).toLocaleString()} gp{isDMMode && <span className="gold-edit-hint">✏</span>}
-              </span>
-            )}
+          <div className="gold-table-row gold-table-row--pool">
+            <span className="gold-table-name">⚔️ Party Pool</span>
+            {CURRENCIES.map(c => (
+              <CurrencyCell key={c.key} owner="pool" currency={c.key} value={campaign?.[c.poolKey] ?? 0} />
+            ))}
           </div>
           {/* Per-member */}
           {party.map(m => (
-            <div key={m.id} className="gold-row">
-              <span className="gold-row-label">
+            <div key={m.id} className="gold-table-row">
+              <span className="gold-table-name">
                 <span className="gold-dot" style={{ background: m.path_color }} />
                 {m.name}
               </span>
-              {editingGoldId === m.id ? (
-                <span className="gold-row-edit">
-                  <input className="gold-input" type="number" min={0} value={goldInput}
-                    onChange={e => setGoldInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') commitGold(); if (e.key === 'Escape') setEditingGoldId(null); }}
-                    autoFocus />
-                  <button className="gold-confirm-btn" onClick={commitGold}>✓</button>
-                </span>
-              ) : (
-                <span className="gold-row-amount" onClick={() => { if (isDMMode) { setEditingGoldId(m.id); setGoldInput(String(m.gold ?? 0)); } }}>
-                  {(m.gold ?? 0).toLocaleString()} gp{isDMMode && <span className="gold-edit-hint">✏</span>}
-                </span>
-              )}
+              {CURRENCIES.map(c => (
+                <CurrencyCell key={c.key} owner={m.id} currency={c.key} value={m[c.key] ?? 0} />
+              ))}
             </div>
           ))}
         </div>
+        {isDMMode && <div className="gold-tracker-hint">Click any amount to edit</div>}
       </div>
 
       {isDMMode && editingId === null && (

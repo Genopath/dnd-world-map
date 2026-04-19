@@ -81,7 +81,13 @@ _MIGRATIONS = [
     "ALTER TABLE rumours ADD COLUMN type VARCHAR(20) DEFAULT 'rumour'",
     "ALTER TABLE rumours ADD COLUMN archived BOOLEAN DEFAULT 0",
     "ALTER TABLE party_members ADD COLUMN gold INTEGER DEFAULT 0",
+    "ALTER TABLE party_members ADD COLUMN silver INTEGER DEFAULT 0",
+    "ALTER TABLE party_members ADD COLUMN copper INTEGER DEFAULT 0",
+    "ALTER TABLE party_members ADD COLUMN electrum INTEGER DEFAULT 0",
     "ALTER TABLE campaign_settings ADD COLUMN pool_gold INTEGER DEFAULT 0",
+    "ALTER TABLE campaign_settings ADD COLUMN pool_silver INTEGER DEFAULT 0",
+    "ALTER TABLE campaign_settings ADD COLUMN pool_copper INTEGER DEFAULT 0",
+    "ALTER TABLE campaign_settings ADD COLUMN pool_electrum INTEGER DEFAULT 0",
 ]
 
 

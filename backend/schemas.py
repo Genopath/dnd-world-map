@@ -252,6 +252,9 @@ class CampaignUpdate(BaseModel):
     cal_month: Optional[int] = None
     cal_year:  Optional[int] = None
     pool_gold:            Optional[int]   = None
+    pool_silver:          Optional[int]   = None
+    pool_copper:          Optional[int]   = None
+    pool_electrum:        Optional[int]   = None
     party_marker_x:       Optional[float] = None
     party_marker_y:       Optional[float] = None
     party_marker_visible: Optional[bool]  = None
@@ -268,6 +271,9 @@ class CampaignOut(BaseModel):
     cal_month: int
     cal_year:  int
     pool_gold:            int = 0
+    pool_silver:          int = 0
+    pool_copper:          int = 0
+    pool_electrum:        int = 0
     party_marker_x:       Optional[float] = None
     party_marker_y:       Optional[float] = None
     party_marker_visible: bool = True
@@ -303,6 +309,9 @@ class PartyMemberUpdate(BaseModel):
     path_color: Optional[str] = None
     portrait_url: Optional[str] = None
     gold:           Optional[int]   = None
+    silver:         Optional[int]   = None
+    copper:         Optional[int]   = None
+    electrum:       Optional[int]   = None
     marker_x:       Optional[float] = None
     marker_y:       Optional[float] = None
     marker_visible: Optional[bool]  = None
@@ -322,6 +331,9 @@ class PartyMemberOut(BaseModel):
     portrait_url: Optional[str] = None
     path_color: str = "#c9a84c"
     gold:           int = 0
+    silver:         int = 0
+    copper:         int = 0
+    electrum:       int = 0
     marker_x:       Optional[float] = None
     marker_y:       Optional[float] = None
     marker_visible: bool = True

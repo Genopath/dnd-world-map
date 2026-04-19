@@ -737,11 +737,11 @@ export default function Home() {
     const updated = await api.campaign.update(data); setCampaign(updated); scheduleIdbBackup();
   }, [scheduleIdbBackup]);
 
-  const handleUpdateMemberGold = useCallback(async (id: number, gold: number) => {
-    await handleUpdateParty(id, { gold });
+  const handleUpdateMemberGold = useCallback(async (id: number, data: Partial<PartyMember>) => {
+    await handleUpdateParty(id, data);
   }, [handleUpdateParty]);
-  const handleUpdatePoolGold = useCallback(async (gold: number) => {
-    await handleUpdateCampaign({ pool_gold: gold });
+  const handleUpdatePoolGold = useCallback(async (data: Partial<Omit<CampaignSettings, 'id'>>) => {
+    await handleUpdateCampaign(data);
   }, [handleUpdateCampaign]);
 
   // ── Party marker handlers ─────────────────────────────────────────────────────
@@ -1284,10 +1284,10 @@ export default function Home() {
         )}
 
         <div className="main" style={{ position: 'relative' }}>
-          {/* ── Rumour Board floating button ── */}
+          {/* ── Quest Board floating button ── */}
           <button
             className={`rumour-board-fab${showRumourBoard ? ' rumour-board-fab--open' : ''}`}
-            title="Rumour Board"
+            title="Quest Board"
             onClick={() => {
               const next = !showRumourBoard;
               setShowRumourBoard(next);
@@ -1295,7 +1295,7 @@ export default function Home() {
             }}
           >
             <span className="rumour-board-fab-icon">📌</span>
-            <span className="rumour-board-fab-label">Board</span>
+            <span className="rumour-board-fab-label">Quests</span>
           </button>
           <MapView
             locations={levelLocations} allLocations={locations}
@@ -1418,7 +1418,7 @@ export default function Home() {
         <div className="rumour-overlay-backdrop" onClick={() => setShowRumourBoard(false)}>
           <div className="rumour-overlay-panel" onClick={e => e.stopPropagation()}>
             <div className="rumour-overlay-header">
-              <span className="rumour-overlay-title">📌 Rumour Board</span>
+              <span className="rumour-overlay-title">📜 Quest Board</span>
               <button className="rumour-overlay-close" onClick={() => setShowRumourBoard(false)}>✕</button>
             </div>
             <div className="rumour-overlay-body">
