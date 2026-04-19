@@ -1054,6 +1054,8 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   text-align: right;
 }
 .thp-nav:hover { color: var(--accent-bright); }
+.thp-camp { color: #7acca8; }
+.thp-camp:hover { color: #a0eec8; }
 
 /* ── Member highlight flash ───────────────────────────────────────────────── */
 @keyframes member-highlight {

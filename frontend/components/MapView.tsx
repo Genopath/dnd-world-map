@@ -1561,8 +1561,8 @@ export default function MapView({
                       onTouchStart={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, loc.x, loc.y, e.touches[0].clientX, e.touches[0].clientY); } : undefined}
                       onMouseEnter={e => showTokenHover('party', undefined, loc.x, loc.y, e)}
                       onMouseLeave={hideTokenHoverSoon}
-                      onClick={e => { e.stopPropagation(); if (hasCampMap && onOpenCampMap) { onOpenCampMap(); } else { onNavigateToParty?.(); } }}
-                      title={hasCampMap ? 'Click to open camp map' : 'Party marker'}
+                      onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
+                      title="Party marker"
                       data-no-draw
                     >⚔</div>
                   );
@@ -1609,9 +1609,9 @@ export default function MapView({
               onTouchStart={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, mx, my, e.touches[0].clientX, e.touches[0].clientY); } : undefined}
               onMouseEnter={e => showTokenHover('party', undefined, mx, my, e)}
               onMouseLeave={hideTokenHoverSoon}
-              onClick={e => { e.stopPropagation(); if (hasCampMap && onOpenCampMap) { onOpenCampMap(); } else { onNavigateToParty?.(); } }}
+              onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
               data-no-draw
-              title={hasCampMap ? 'Click to open camp map' : 'Party marker'}
+              title="Party marker"
             >⚔</div>
           );
         })()}
@@ -1779,6 +1779,9 @@ export default function MapView({
                     </div>
                   ))
                 }
+                {hasCampMap && onOpenCampMap && (
+                  <button className="thp-nav thp-camp" onClick={() => { onOpenCampMap(); setTokenHover(null); }}>⛺ Camp Map →</button>
+                )}
                 <div className="thp-sep" />
                 <button className="thp-nav" onClick={() => { onNavigateToParty?.(); setTokenHover(null); }}>View party →</button>
               </>

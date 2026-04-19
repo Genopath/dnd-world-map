@@ -32,6 +32,13 @@ export default function CampMap({ campaign, party, isDMMode, onClose, onUpdateCa
 
   const campUrl = campaign?.camp_map_url ? API_BASE + campaign.camp_map_url : null;
 
+  // ── Lock body scroll while overlay is open (prevents iOS rubber-band scroll) ──
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   function getPos(m: PartyMember) {
     return positions[m.id] ?? { x: m.camp_x ?? 50, y: m.camp_y ?? 50 };
   }
