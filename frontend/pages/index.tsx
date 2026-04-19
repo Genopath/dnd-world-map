@@ -1038,13 +1038,12 @@ export default function Home() {
     if (!confirm(`Import "${file.name}"? This will overwrite ALL data in the current campaign.`)) return;
     try {
       await api.data.import(file);
-      // Reload everything
-      const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg] =
+      const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg, lootList, rumourList] =
         await Promise.all([
           api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
           api.sessions.list(), api.party.list(), api.factions.list(),
           api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
-          api.fog.get(), api.map.config(),
+          api.fog.get(), api.map.config(), api.loot.list(), api.rumours.list(),
         ]);
       setLocations(locs);
       setPlayerPath(path);
@@ -1058,6 +1057,8 @@ export default function Home() {
       setCharacterPaths(charPaths);
       setFogData(fogResult.data ?? '');
       setMapConfig(mapCfg);
+      setLoot(lootList);
+      setRumours(rumourList);
       setSelectedId(null);
     } catch (err) {
       alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -1066,17 +1067,18 @@ export default function Home() {
 
   // Shared reload helper — used after restoring from an auto-backup
   const _reloadAll = useCallback(async () => {
-    const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg] =
+    const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg, lootList, rumourList] =
       await Promise.all([
         api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
         api.sessions.list(), api.party.list(), api.factions.list(),
         api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
-        api.fog.get(), api.map.config(),
+        api.fog.get(), api.map.config(), api.loot.list(), api.rumours.list(),
       ]);
     setLocations(locs); setPlayerPath(path); setNpcs(npcList); setQuests(questList);
     setSessions(sessionList); setParty(partyList); setFactions(factionList);
     setCampaign(campData); setCalendarConfig(calCfg); setCharacterPaths(charPaths);
-    setFogData(fogResult.data ?? ''); setMapConfig(mapCfg); setSelectedId(null);
+    setFogData(fogResult.data ?? ''); setMapConfig(mapCfg);
+    setLoot(lootList); setRumours(rumourList); setSelectedId(null);
   }, []);
 
   const handleOpenBackupModal = useCallback(async () => {
@@ -1165,7 +1167,6 @@ export default function Home() {
               <span>{campaignName || 'World Map'}</span>
               <button
                 className="btn btn-sm btn-ghost"
-                style={{ fontSize: 11, padding: '2px 8px' }}
                 onClick={() => setShowCampaignSelector(true)}
                 title="Switch campaign"
               >⇄</button>
@@ -1175,7 +1176,7 @@ export default function Home() {
             {isDMMode && (
               <button
                 className="btn btn-sm btn-ghost"
-                style={{ fontSize: 11, padding: '2px 8px', whiteSpace: 'nowrap' }}
+                style={{ whiteSpace: 'nowrap' }}
                 onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); }}
                 title="Preview as player"
               >👁 Player View</button>
@@ -1183,7 +1184,7 @@ export default function Home() {
             {!isDMMode && hasDMAuth && (
               <button
                 className="btn btn-sm btn-ghost"
-                style={{ fontSize: 11, padding: '2px 8px', whiteSpace: 'nowrap' }}
+                style={{ whiteSpace: 'nowrap' }}
                 onClick={() => setIsDMMode(true)}
                 title="Return to DM mode"
               >⚔ DM Mode</button>
@@ -1528,7 +1529,7 @@ export default function Home() {
                   <div className="search-group">
                     <div className="search-group-label">NPCs</div>
                     {searchResults.npcs.map(n => (
-                      <button key={n.id} className="search-result" onClick={() => { setSidebarTab('npcs'); setSearchOpen(false); }}>
+                      <button key={n.id} className="search-result" onClick={() => { setNpcJumpId(n.id); setSidebarTab('npcs'); setSearchOpen(false); if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileSidebarOpen(true); }}>
                         <span className="search-result-name">{n.name}</span>
                         <span className="search-result-type">{n.role || n.status}</span>
                       </button>
@@ -1539,7 +1540,7 @@ export default function Home() {
                   <div className="search-group">
                     <div className="search-group-label">Quests</div>
                     {searchResults.quests.map(q => (
-                      <button key={q.id} className="search-result" onClick={() => { setSidebarTab('quests'); setSearchOpen(false); }}>
+                      <button key={q.id} className="search-result" onClick={() => { setQuestJumpId(q.id); setSidebarTab('quests'); setSearchOpen(false); if (typeof window !== 'undefined' && window.innerWidth <= 768) setMobileSidebarOpen(true); }}>
                         <span className="search-result-name">{q.title}</span>
                         <span className="search-result-type">{q.status}</span>
                       </button>

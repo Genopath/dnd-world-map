@@ -2056,8 +2056,9 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   }
 
   /* ── Touch targets ── */
-  .btn { min-height: 36px; padding: 5px 10px; font-size: 12px; }
-  .btn-icon { min-height: 36px; min-width: 36px; padding: 5px 8px; justify-content: center; }
+  .btn { min-height: 44px; padding: 5px 10px; font-size: 12px; }
+  .btn-sm { min-height: 44px; padding: 5px 10px; font-size: 12px; }
+  .btn-icon { min-height: 44px; min-width: 44px; padding: 5px 8px; justify-content: center; }
   .mode-btn { min-height: 36px; padding: 4px 10px; font-size: 12px; }
   .sidebar-tab { font-size: 10px; padding: 8px 4px; }
 
