@@ -1549,12 +1549,12 @@ export default function MapView({
                     campaign.party_marker_x === loc.x && campaign.party_marker_y === loc.y &&
                     (isDMMode || campaign.party_marker_visible !== false)) {
                   baubles.push(
-                    <div key="party" className={`party-bauble party-bauble--party${pingedToken === 'party' ? ' token-pinged' : ''}`}
+                    <div key="party" className={`party-bauble party-bauble--party${pingedToken === 'party' ? ' token-pinged' : ''}${hasCampMap ? ' party-token--has-camp' : ''}`}
                       onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, loc.x, loc.y, e.clientX, e.clientY); } : undefined}
                       onMouseEnter={e => showTokenHover('party', undefined, loc.x, loc.y, e)}
                       onMouseLeave={hideTokenHoverSoon}
-                      onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: loc.x, mapY: loc.y, tokenKind: 'party' }); } : undefined}
-                      onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
+                      onClick={e => { e.stopPropagation(); if (hasCampMap && onOpenCampMap) { onOpenCampMap(); } else { onNavigateToParty?.(); } }}
+                      title={hasCampMap ? 'Click to open camp map' : 'Party marker'}
                       data-no-draw
                     >⚔</div>
                   );
