@@ -118,6 +118,8 @@ interface Props {
   onUpdatePartyMarker?:  (x: number | null, y: number | null) => void;
   onUpdateCharMarker?:   (memberId: number, x: number | null, y: number | null) => void;
   onNavigateToParty?:    (memberId?: number) => void;
+  onOpenCampMap?:        () => void;
+  hasCampMap?:           boolean;
   pingTarget?:           { kind: 'party' | 'char'; memberId?: number; seq: number } | null;
 }
 
@@ -385,6 +387,8 @@ export default function MapView({
   onUpdatePartyMarker,
   onUpdateCharMarker,
   onNavigateToParty,
+  onOpenCampMap,
+  hasCampMap,
   pingTarget,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1598,7 +1602,16 @@ export default function MapView({
               onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
               onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'party' }); } : undefined}
               data-no-draw
-            >⚔</div>
+            >
+              ⚔
+              {hasCampMap && (
+                <span
+                  className="party-token-camp-badge"
+                  title="Open Camp Map"
+                  onClick={e => { e.stopPropagation(); onOpenCampMap?.(); }}
+                >⛺</span>
+              )}
+            </div>
           );
         })()}
 
@@ -1797,6 +1810,9 @@ export default function MapView({
           {mapCtxMenu.tokenKind === 'party' ? (
             <>
               <div className="pin-context-name">Party Marker</div>
+              {onOpenCampMap && (
+                <button onClick={() => { onOpenCampMap(); setMapCtxMenu(null); }}>⛺ Camp Map</button>
+              )}
               <button className="pin-context-delete" onClick={() => {
                 onUpdatePartyMarker?.(null, null);
                 setMapCtxMenu(null);

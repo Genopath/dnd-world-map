@@ -909,6 +909,19 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   transform: translate(-50%, -50%) scale(1.15);
 }
 .party-token:active { cursor: grabbing; }
+.party-token-camp-badge {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
+  transition: transform 0.12s;
+  z-index: 13;
+}
+.party-token-camp-badge:hover { transform: translateX(-50%) scale(1.25); }
 .party-token--char {
   width: 26px;
   height: 26px;
@@ -2053,6 +2066,10 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   /* ── Modals / overlays full-screen on mobile ── */
   .search-modal { width: 95vw; max-width: 95vw; }
   .passcode-modal { width: 90vw; max-width: 90vw; }
+
+  /* ── FABs: sidebar is overlay on mobile so reset to edge ── */
+  .rumour-board-fab,
+  .camp-map-fab { right: 20px; }
 }
 
 /* ── Campaign selector — Zelda-style splash + file select ───────────────────── */
@@ -3270,7 +3287,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .rumour-board-fab {
   position: absolute;
   bottom: 28px;
-  right: 28px;
+  right: calc(var(--sidebar-w) + 20px);
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -3411,7 +3428,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .camp-map-fab {
   position: absolute;
   bottom: 104px;
-  right: 28px;
+  right: calc(var(--sidebar-w) + 20px);
   z-index: 200;
   display: flex;
   flex-direction: column;

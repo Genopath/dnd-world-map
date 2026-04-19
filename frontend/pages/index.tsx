@@ -1350,6 +1350,8 @@ export default function Home() {
             onUpdatePartyMarker={handleUpdatePartyMarker}
             onUpdateCharMarker={handleUpdateCharMarker}
             onNavigateToParty={handleNavigateToParty}
+            onOpenCampMap={() => setShowCampMap(true)}
+            hasCampMap={!!campaign?.camp_map_url}
             pingTarget={pingTarget}
           />
           <div className={`sidebar-drawer ${mobileSidebarOpen ? 'sidebar-drawer--open' : ''}`}>
