@@ -63,9 +63,10 @@ interface Props {
   onScheduleBackup?: () => void;
   jumpToId?: number | null;
   onPingMarker?: (kind: 'party' | 'char', memberId?: number) => void;
+  onOpenCampMap?: () => void;
 }
 
-export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDelete, onLightbox, onScheduleBackup, jumpToId, onPingMarker }: Props) {
+export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDelete, onLightbox, onScheduleBackup, jumpToId, onPingMarker, onOpenCampMap }: Props) {
   const [editingId,    setEditingId]    = useState<number | 'new' | null>(null);
   const [editState,    setEditState]    = useState<EditState | null>(null);
   const [saving,       setSaving]       = useState(false);
@@ -151,6 +152,11 @@ export default function PartyPanel({ party, isDMMode, onCreate, onUpdate, onDele
         {onPingMarker && (
           <button className="btn btn-sm btn-ghost" title="Locate party on map" onClick={() => onPingMarker('party')} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             📍 Locate Party
+          </button>
+        )}
+        {onOpenCampMap && (
+          <button className="btn btn-sm btn-ghost" title="Open camp battlemap" onClick={onOpenCampMap} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            ⛺ Camp Map
           </button>
         )}
       </div>

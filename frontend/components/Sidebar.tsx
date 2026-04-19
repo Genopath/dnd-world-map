@@ -140,6 +140,7 @@ interface Props {
   onDeleteLoot:        (id: number) => Promise<void>;
   onUpdateMemberGold:  (id: number, data: Partial<PartyMember>) => Promise<void>;
   onUpdatePoolGold:    (data: Partial<CampaignSettings>) => Promise<void>;
+  onOpenCampMap?:      () => void;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -182,6 +183,7 @@ export default function Sidebar({
   onDuplicateLocation,
   onScheduleBackup,
   loot, onCreateLoot, onUpdateLoot, onDeleteLoot, onUpdateMemberGold, onUpdatePoolGold,
+  onOpenCampMap,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [editState,  setEditState]  = useState<EditState | null>(null);
@@ -334,6 +336,7 @@ export default function Sidebar({
             onScheduleBackup={onScheduleBackup}
             jumpToId={partyJumpId}
             onPingMarker={onPingMarker}
+            onOpenCampMap={onOpenCampMap}
           />
         )}
 

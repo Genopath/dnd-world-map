@@ -1413,6 +1413,7 @@ export default function Home() {
             onDeleteLoot={handleDeleteLoot}
             onUpdateMemberGold={handleUpdateMemberGold}
             onUpdatePoolGold={handleUpdatePoolGold}
+            onOpenCampMap={() => setShowCampMap(true)}
           />
           </div>
         </div>
