@@ -1594,24 +1594,16 @@ export default function MapView({
           if (!partyDragging && visibleLocations.some(l => l.x === campaign.party_marker_x && l.y === campaign.party_marker_y)) return null;
           return (
             <div
-              className={`party-token${pingedToken === 'party' ? ' token-pinged' : ''}`}
+              className={`party-token${pingedToken === 'party' ? ' token-pinged' : ''}${hasCampMap ? ' party-token--has-camp' : ''}`}
               style={{ left: `${mx}%`, top: `${my}%` }}
               onMouseDown={isDMMode ? e => { e.stopPropagation(); startTokenDrag('party', undefined, mx, my, e.clientX, e.clientY); } : undefined}
               onMouseEnter={e => showTokenHover('party', undefined, mx, my, e)}
               onMouseLeave={hideTokenHoverSoon}
-              onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
+              onClick={e => { e.stopPropagation(); hasCampMap && onOpenCampMap ? onOpenCampMap() : onNavigateToParty?.(); }}
               onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); setMapCtxMenu({ screenX: e.clientX, screenY: e.clientY, mapX: mx, mapY: my, tokenKind: 'party' }); } : undefined}
               data-no-draw
-            >
-              ⚔
-              {hasCampMap && (
-                <span
-                  className="party-token-camp-badge"
-                  title="Open Camp Map"
-                  onClick={e => { e.stopPropagation(); onOpenCampMap?.(); }}
-                >⛺</span>
-              )}
-            </div>
+              title={hasCampMap ? 'Click to open camp map' : 'Party marker'}
+            >⚔</div>
           );
         })()}
 

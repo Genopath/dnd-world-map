@@ -909,19 +909,13 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   transform: translate(-50%, -50%) scale(1.15);
 }
 .party-token:active { cursor: grabbing; }
-.party-token-camp-badge {
-  position: absolute;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
-  transition: transform 0.12s;
-  z-index: 13;
+.party-token--has-camp {
+  /* Subtle green glow when a camp map is linked */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.65), 0 0 14px rgba(80,200,100,0.5);
 }
-.party-token-camp-badge:hover { transform: translateX(-50%) scale(1.25); }
+.party-token--has-camp:hover {
+  box-shadow: 0 3px 14px rgba(0,0,0,0.75), 0 0 22px rgba(80,200,100,0.75);
+}
 .party-token--char {
   width: 26px;
   height: 26px;
@@ -3476,6 +3470,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   justify-content: center;
   animation: fadeInOverlay 0.18s ease;
 }
+.camp-overlay--fullscreen { background: #0a1010; }
 .camp-panel {
   position: relative;
   width: min(92vw, 900px);
@@ -3523,6 +3518,18 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .camp-btn-sm:disabled { opacity: 0.5; cursor: default; }
 .camp-btn-danger { color: #e07070; border-color: rgba(200,80,80,0.35); background: rgba(200,80,80,0.1); }
 .camp-btn-danger:hover { background: rgba(200,80,80,0.22); }
+.camp-panel--fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+.camp-zoom-btns {
+  display: flex;
+  gap: 2px;
+}
+.camp-btn-reset { padding: 4px 7px; font-size: 13px; }
+.camp-btn-icon { padding: 4px 8px; font-size: 14px; }
 .camp-close {
   background: none;
   border: none;
@@ -3545,6 +3552,13 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   height: 100%;
   overflow: hidden;
   background: #0a1010;
+  cursor: grab;
+}
+.camp-map-wrap:active { cursor: grabbing; }
+.camp-map-transform {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 .camp-map-img {
   width: 100%;
@@ -3553,6 +3567,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   display: block;
   user-select: none;
   -webkit-user-drag: none;
+  pointer-events: none;
 }
 .camp-empty {
   display: flex;

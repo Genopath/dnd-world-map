@@ -1356,6 +1356,8 @@ def export_data(db: Session = Depends(get_db)):
     # Campaign settings
     camp = db.query(models.CampaignSettings).first()
     campaign_out = _row(camp, models.CampaignSettings) if camp else {}
+    if camp:
+        campaign_out['_camp_map_data'] = _enc(getattr(camp, 'camp_map_url', None))
 
     # Calendar config
     cal = db.query(models.CalendarConfig).first()
@@ -1439,7 +1441,11 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
     cs = payload.get("campaign_settings") or {}
     if cs:
         cols = {c.name for c in models.CampaignSettings.__table__.columns}
-        db.add(models.CampaignSettings(**{k: v for k, v in cs.items() if k in cols}))
+        cs_filtered = {k: v for k, v in cs.items() if k in cols}
+        camp_map_restored = _restore(cs.get("_camp_map_data"))
+        if camp_map_restored:
+            cs_filtered['camp_map_url'] = camp_map_restored
+        db.add(models.CampaignSettings(**cs_filtered))
 
     # ── Calendar config ────────────────────────────────────────────────────────
     cal = payload.get("calendar_config") or {}
