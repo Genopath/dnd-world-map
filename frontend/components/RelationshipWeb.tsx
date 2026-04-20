@@ -273,6 +273,11 @@ export default function RelationshipWeb({
     setEdges(prev => prev.filter(e => e.id !== id));
   };
 
+  const toggleEdge = async (id: number, current: boolean) => {
+    const updated = await api.relationships.toggleEdge(id, !current);
+    setEdges(prev => prev.map(e => e.id === id ? updated : e));
+  };
+
   // ── Quick-add ─────────────────────────────────────────────────────────────
   const submitAdd = async () => {
     if (!addName.trim()) return;
@@ -344,7 +349,7 @@ export default function RelationshipWeb({
           {selecting
             ? '🔗 Click second node to link · click background to cancel'
             : hasNodes
-              ? 'Click to link · drag to move · hover to highlight · right-click node to delete'
+              ? 'Click node to link · click edge to toggle on/off · hover to highlight · right-click node to delete'
               : 'Use "+ Add Node" to add NPCs or factions'}
         </div>
       )}
@@ -373,21 +378,25 @@ export default function RelationshipWeb({
           {edges.map(edge => {
             const { x1, y1, x2, y2 } = edgeEndpoints(edge);
             const mx = (x1 + x2) / 2; const my = (y1 + y2) / 2;
-            const color = edgeColor(edge.label);
+            const color = edge.active ? edgeColor(edge.label) : '#555566';
             const lk = edge.label.toLowerCase();
-            const markerId = EDGE_COLORS[lk] ? `arrow-${lk}` : 'arrow-default';
+            const markerId = edge.active && EDGE_COLORS[lk] ? `arrow-${lk}` : 'arrow-default';
             const dxx = x2 - x1; const dyy = y2 - y1;
             const len = Math.sqrt(dxx * dxx + dyy * dyy) || 1;
             const ux = dxx / len; const uy = dyy / len;
             const pad = edge.to_type === 'npc' ? NPC_R + 6 : FACT_H / 2 + 6;
-            const opacity = dimEdge(edge.id);
+            const baseOpacity = edge.active ? 1 : 0.35;
+            const opacity = baseOpacity * dimEdge(edge.id);
             return (
               <g key={edge.id} className="rel-edge" style={{ opacity }}
+                onClick={isDMMode ? e => { e.stopPropagation(); toggleEdge(edge.id, edge.active); } : undefined}
                 onContextMenu={isDMMode ? e => { e.preventDefault(); e.stopPropagation(); deleteEdge(edge.id); } : undefined}
               >
                 <line x1={x1} y1={y1} x2={x2 - ux * pad} y2={y2 - uy * pad}
                   stroke={color} strokeWidth={2.5} strokeOpacity={0.85}
+                  strokeDasharray={edge.active ? undefined : '8 5'}
                   markerEnd={`url(#${markerId})`} />
+                {/* wider invisible hit target */}
                 <line x1={x1} y1={y1} x2={x2 - ux * pad} y2={y2 - uy * pad}
                   stroke="transparent" strokeWidth={16} />
                 {edge.label && (

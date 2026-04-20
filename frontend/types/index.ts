@@ -236,6 +236,7 @@ export interface RelationshipEdge {
   to_type:   'npc' | 'faction';
   to_id:     number;
   label:     string;
+  active:    boolean;
 }
 
 export interface RelationshipNodePos {

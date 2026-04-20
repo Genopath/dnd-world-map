@@ -538,6 +538,7 @@ class RelationshipEdgeOut(BaseModel):
     to_type:   str
     to_id:     int
     label:     str
+    active:    bool = True
     model_config = {"from_attributes": True}
 
 class RelationshipNodePosUpsert(BaseModel):

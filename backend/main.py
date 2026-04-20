@@ -1724,6 +1724,17 @@ def create_relationship_edge(data: schemas.RelationshipEdgeCreate, db: Session =
     db.refresh(edge)
     return edge
 
+@app.patch("/relationships/edges/{edge_id}", response_model=schemas.RelationshipEdgeOut)
+def patch_relationship_edge(edge_id: int, data: dict, db: Session = Depends(get_db)):
+    edge = db.query(models.RelationshipEdge).filter(models.RelationshipEdge.id == edge_id).first()
+    if not edge:
+        raise HTTPException(status_code=404, detail="Edge not found")
+    if "active" in data:
+        edge.active = data["active"]
+    db.commit()
+    db.refresh(edge)
+    return edge
+
 @app.delete("/relationships/edges/{edge_id}")
 def delete_relationship_edge(edge_id: int, db: Session = Depends(get_db)):
     edge = db.query(models.RelationshipEdge).filter(models.RelationshipEdge.id == edge_id).first()

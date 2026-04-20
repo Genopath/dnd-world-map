@@ -199,9 +199,10 @@ export const api = {
   },
   relationships: {
     listEdges:     () => req<RelationshipEdge[]>('/relationships/edges'),
-    createEdge:    (data: Omit<RelationshipEdge, 'id'>) =>
+    createEdge:    (data: Omit<RelationshipEdge, 'id' | 'active'>) =>
       req<RelationshipEdge>('/relationships/edges', { method: 'POST', body: JSON.stringify(data) }),
     deleteEdge:    (id: number) => req<{ deleted: number }>(`/relationships/edges/${id}`, { method: 'DELETE' }),
+    toggleEdge:    (id: number, active: boolean) => req<RelationshipEdge>(`/relationships/edges/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }),
     listPositions: () => req<RelationshipNodePos[]>('/relationships/positions'),
     upsertPosition:(data: RelationshipNodePos) =>
       req<RelationshipNodePos>('/relationships/positions', { method: 'POST', body: JSON.stringify(data) }),
