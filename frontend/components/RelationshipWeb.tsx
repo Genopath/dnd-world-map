@@ -37,7 +37,8 @@ interface Props {
 }
 
 export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Props) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const svgRef  = useRef<SVGSVGElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   const [edges,     setEdges]     = useState<RelationshipEdge[]>([]);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
@@ -225,6 +226,29 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
     return undefined;
   };
 
+  // ── Position helpers for overlays (relative to wrap, clamped) ───────────
+  const getPickerPos = useCallback((clientX: number, clientY: number) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return { x: 200, y: 150 };
+    const r = wrap.getBoundingClientRect();
+    // picker uses transform: translate(-50%,-50%), so center it on click and clamp half-dims
+    return {
+      x: Math.min(Math.max(115, clientX - r.left), r.width  - 115),
+      y: Math.min(Math.max(130, clientY - r.top),  r.height - 130),
+    };
+  }, []);
+
+  const getCtxPos = useCallback((clientX: number, clientY: number) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return { x: 0, y: 0 };
+    const r = wrap.getBoundingClientRect();
+    // ctx menu top-left at click point — clamp so it doesn't overflow
+    return {
+      x: Math.min(clientX - r.left, r.width  - 190),
+      y: Math.min(clientY - r.top,  r.height - 90),
+    };
+  }, []);
+
   // ── Handlers ─────────────────────────────────────────────────────────────
   const dismissAll = () => { setPicker(null); setNodeCtx(null); };
 
@@ -235,7 +259,14 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
     panOrigin.current = { mx: e.clientX, my: e.clientY, tx, ty };
   };
   const onSvgClick = () => {
-    if (movedPx.current < 6) { setSelecting(null); setSelectedKey(null); dismissAll(); }
+    if (movedPx.current < 6) {
+      if (selecting) {
+        setSelecting(null); // cancel link mode but keep bottom panel selection
+      } else {
+        setSelectedKey(null);
+      }
+      dismissAll();
+    }
   };
 
   const onNodeMouseDown = (e: React.MouseEvent, type: NodeKind, id: number) => {
@@ -259,9 +290,7 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
       setSelecting({ type, id });
     } else {
       if (selecting.type === type && selecting.id === id) { setSelecting(null); return; }
-      const rect = svgRef.current!.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
+      const { x: px, y: py } = getPickerPos(e.clientX, e.clientY);
       setPicker({ currentLabel: '', x: px, y: py, from: selecting, to: { type, id } });
       setLabelDraft(''); setSelecting(null);
     }
@@ -270,16 +299,16 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
   const onNodeContextMenu = (e: React.MouseEvent, type: NodeKind, id: number, name: string) => {
     if (!isDMMode) return;
     e.preventDefault(); e.stopPropagation();
-    const rect = svgRef.current!.getBoundingClientRect();
-    setNodeCtx({ type, id, name, x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const { x, y } = getCtxPos(e.clientX, e.clientY);
+    setNodeCtx({ type, id, name, x, y });
     setPicker(null);
   };
 
   const onEdgeClick = (e: React.MouseEvent, edge: RelationshipEdge) => {
     e.stopPropagation();
     if (!isDMMode) return;
-    const rect = svgRef.current!.getBoundingClientRect();
-    setPicker({ edgeId: edge.id, currentLabel: edge.label, x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const { x, y } = getPickerPos(e.clientX, e.clientY);
+    setPicker({ edgeId: edge.id, currentLabel: edge.label, x, y });
     setNodeCtx(null); setSelecting(null);
   };
 
@@ -339,7 +368,7 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
   const selNodeKey = selecting ? nodeKey(selecting.type, selecting.id) : null;
 
   return (
-    <div className="rel-web-wrap">
+    <div className="rel-web-wrap" ref={wrapRef}>
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="rel-toolbar">
@@ -587,8 +616,14 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
                       <span className="rel-detail-edge-name">{other?.name ?? '(unknown)'}</span>
                       {isDMMode && (
                         <button className="rel-detail-edge-edit" onClick={() => {
-                          const rect = svgRef.current!.getBoundingClientRect();
-                          setPicker({ edgeId: edge.id, currentLabel: edge.label, x: rect.width / 2, y: rect.height / 2 });
+                          const wrap = wrapRef.current;
+                          const svg  = svgRef.current;
+                          if (!wrap || !svg) return;
+                          const wr = wrap.getBoundingClientRect();
+                          const sr = svg.getBoundingClientRect();
+                          const x = sr.left - wr.left + sr.width  / 2;
+                          const y = sr.top  - wr.top  + sr.height / 2;
+                          setPicker({ edgeId: edge.id, currentLabel: edge.label, x, y });
                         }}>✏</button>
                       )}
                     </div>
