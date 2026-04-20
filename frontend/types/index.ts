@@ -19,6 +19,7 @@ export interface Location {
   pin_size?:    'sm' | 'md' | 'lg';
   pin_style?:   'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane' | 'swords' | 'arrows' | 'quake';
   pin_border?:  'none' | 'siege' | 'blessed' | 'warded' | 'cursed' | 'haunted' | 'plague' | 'frozen' | 'burning';
+  pin_shape?:   'circle' | 'square' | 'diamond' | 'star' | 'hexagon' | 'shield';
   is_visible?:  boolean;
   scale_value?: number | null;
   scale_unit?:  string | null;

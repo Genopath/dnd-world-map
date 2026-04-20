@@ -1390,6 +1390,7 @@ export default function MapView({
                 'pin',
                 `pin-${loc.type}`,
                 loc.pin_size && loc.pin_size !== 'md' ? `pin-size-${loc.pin_size}` : '',
+                loc.pin_shape && loc.pin_shape !== 'circle' ? `pin-shape-${loc.pin_shape}` : '',
                 loc.id === selectedId ? 'selected' : '',
                 !loc.discovered && !isDMMode ? 'undiscovered' : '',
                 override ? 'pin-dragging' : '',

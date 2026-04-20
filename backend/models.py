@@ -23,9 +23,10 @@ class Location(Base):
     parent_id = Column(Integer, nullable=True)            # null = root map level
     submap_image_url = Column(String(500), nullable=True) # interior map image
     fog_data         = Column(Text, nullable=True)         # per-submap fog (10000-char '0'/'1')
-    pin_size         = Column(String(10), default='md')    # 'sm' | 'md' | 'lg'
-    pin_style        = Column(String(20), default='default') # 'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane'
-    pin_border       = Column(String(20), default='none')    # 'none' | 'siege' | 'blessed' | 'warded' | 'cursed' | 'haunted' | 'plague' | 'frozen' | 'burning'
+    pin_size         = Column(String(10), default='md')      # 'sm' | 'md' | 'lg'
+    pin_style        = Column(String(20), default='default') # 'default' | 'flame' | 'frost' | etc.
+    pin_border       = Column(String(20), default='none')    # 'none' | 'siege' | 'blessed' | etc.
+    pin_shape        = Column(String(20), default='circle')  # 'circle' | 'square' | 'diamond' | 'star' | 'hexagon' | 'shield'
     is_visible       = Column(Boolean, default=True)         # shown to players?
     scale_value      = Column(Float, nullable=True)         # per-submap scale: map is X units wide
     scale_unit       = Column(String(50), nullable=True)
