@@ -3816,6 +3816,50 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   padding: 2px 4px;
   width: auto;
 }
+.rel-add-section-title {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+.rel-add-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin: 8px 0;
+}
+.rel-restore-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 140px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+.rel-restore-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.rel-restore-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.rel-restore-tag {
+  font-size: 9px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
 
 /* Node shapes rendered via SVG — text labels */
 .rel-node { cursor: pointer; }

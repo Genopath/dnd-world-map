@@ -1731,6 +1731,8 @@ def patch_relationship_edge(edge_id: int, data: dict, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Edge not found")
     if "active" in data:
         edge.active = data["active"]
+    if "label" in data:
+        edge.label = data["label"]
     db.commit()
     db.refresh(edge)
     return edge
