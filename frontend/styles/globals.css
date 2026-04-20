@@ -4435,3 +4435,90 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-star    .pin-shape-ring { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
 .pin-shape-hexagon .pin-shape-ring { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
 .pin-shape-shield  .pin-shape-ring { clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%); }
+
+/* ── Ring span hover / selected scaling ─────────────────────────────────── */
+.pin-shape-ring { transition: transform 0.15s ease, filter 0.25s ease; }
+.pin:hover .pin-shape-ring--outer,
+.pin.selected .pin-shape-ring--outer {
+  transform: translateX(-50%) scale(1.2) translateY(-1px);
+}
+.pin:hover .pin-shape-ring--inner,
+.pin.selected .pin-shape-ring--inner {
+  transform: translateX(-50%) scale(1.2) translateY(-1px);
+}
+
+/* ── Remove box-shadow ring/drop from non-circle icons (ring spans take over) */
+.pin-shape-square .pin-icon-default,   .pin-shape-square .pin-icon-img,
+.pin-shape-diamond .pin-icon-default,  .pin-shape-diamond .pin-icon-img,
+.pin-shape-star .pin-icon-default,     .pin-shape-star .pin-icon-img,
+.pin-shape-hexagon .pin-icon-default,  .pin-shape-hexagon .pin-icon-img,
+.pin-shape-shield .pin-icon-default,   .pin-shape-shield .pin-icon-img {
+  box-shadow: inset 0 -4px 8px rgba(0,0,0,0.45), inset 0 2px 5px rgba(255,255,255,0.13);
+}
+.pin-shape-square:hover .pin-icon-default,   .pin-shape-square.selected .pin-icon-default,
+.pin-shape-square:hover .pin-icon-img,       .pin-shape-square.selected .pin-icon-img,
+.pin-shape-diamond:hover .pin-icon-default,  .pin-shape-diamond.selected .pin-icon-default,
+.pin-shape-diamond:hover .pin-icon-img,      .pin-shape-diamond.selected .pin-icon-img,
+.pin-shape-star:hover .pin-icon-default,     .pin-shape-star.selected .pin-icon-default,
+.pin-shape-star:hover .pin-icon-img,         .pin-shape-star.selected .pin-icon-img,
+.pin-shape-hexagon:hover .pin-icon-default,  .pin-shape-hexagon.selected .pin-icon-default,
+.pin-shape-hexagon:hover .pin-icon-img,      .pin-shape-hexagon.selected .pin-icon-img,
+.pin-shape-shield:hover .pin-icon-default,   .pin-shape-shield.selected .pin-icon-default,
+.pin-shape-shield:hover .pin-icon-img,       .pin-shape-shield.selected .pin-icon-img {
+  box-shadow: inset 0 -4px 8px rgba(0,0,0,0.45), inset 0 2px 5px rgba(255,255,255,0.18);
+}
+
+/* ── Hide circle border on clip-path shapes (border doesn't follow polygon) */
+.pin-shape-diamond .pin-border-ring,
+.pin-shape-star    .pin-border-ring,
+.pin-shape-hexagon .pin-border-ring,
+.pin-shape-shield  .pin-border-ring { border: none; }
+
+/* ── Border style glows for non-circle shapes via filter: drop-shadow ────── */
+/* Sibling combinator: .pin-border-ring--{style} comes before .pin-shape-ring--outer in DOM */
+.pin-border-ring--siege   ~ .pin-shape-ring--outer { animation: shape-glow-siege   2s   ease-in-out infinite; }
+.pin-border-ring--blessed ~ .pin-shape-ring--outer { animation: shape-glow-blessed 3s   ease-in-out infinite; }
+.pin-border-ring--warded  ~ .pin-shape-ring--outer { animation: shape-glow-warded  4s   linear      infinite; }
+.pin-border-ring--cursed  ~ .pin-shape-ring--outer { animation: shape-glow-cursed  3.5s ease-in-out infinite; }
+.pin-border-ring--haunted ~ .pin-shape-ring--outer { animation: shape-glow-haunted 4.5s ease-in-out infinite; }
+.pin-border-ring--plague  ~ .pin-shape-ring--outer { animation: shape-glow-plague  2.5s ease-in-out infinite; }
+.pin-border-ring--frozen  ~ .pin-shape-ring--outer { animation: shape-glow-frozen  5s   ease-in-out infinite; }
+.pin-border-ring--burning ~ .pin-shape-ring--outer { animation: shape-glow-burning 1.8s ease-in-out infinite; }
+
+@keyframes shape-glow-siege {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(239,68,68,0.85))   drop-shadow(0 0 8px  rgba(220,38,38,0.4)); }
+  50%     { filter: drop-shadow(0 0 9px rgba(248,113,113,1.0))  drop-shadow(0 0 18px rgba(220,38,38,0.6)); }
+}
+@keyframes shape-glow-blessed {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(251,191,36,0.75))  drop-shadow(0 0 10px rgba(251,191,36,0.3)); }
+  50%     { filter: drop-shadow(0 0 8px rgba(255,255,200,1.0))  drop-shadow(0 0 20px rgba(251,191,36,0.6)); }
+}
+@keyframes shape-glow-warded {
+  0%   { filter: drop-shadow(0 0 5px rgba(139,92,246,0.9))  drop-shadow(0 0 12px rgba(139,92,246,0.5)); }
+  25%  { filter: drop-shadow(0 0 5px rgba(217,70,239,0.9))  drop-shadow(0 0 12px rgba(217,70,239,0.5)); }
+  50%  { filter: drop-shadow(0 0 5px rgba(99,102,241,0.9))  drop-shadow(0 0 12px rgba(99,102,241,0.5)); }
+  75%  { filter: drop-shadow(0 0 5px rgba(168,85,247,1.0))  drop-shadow(0 0 12px rgba(236,72,153,0.5)); }
+  100% { filter: drop-shadow(0 0 5px rgba(139,92,246,0.9))  drop-shadow(0 0 12px rgba(139,92,246,0.5)); }
+}
+@keyframes shape-glow-cursed {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(74,222,128,0.8))  drop-shadow(0 0 10px rgba(21,128,61,0.5)); }
+  40%     { filter: drop-shadow(0 0 1px rgba(21,128,61,0.3))   drop-shadow(0 0 3px  rgba(0,0,0,0.7)); }
+  70%     { filter: drop-shadow(0 0 8px rgba(74,222,128,0.95)) drop-shadow(0 0 16px rgba(21,128,61,0.7)); }
+}
+@keyframes shape-glow-haunted {
+  0%,100% { filter: drop-shadow(0 0 3px rgba(186,230,253,0.5))  drop-shadow(0 0 7px  rgba(186,230,253,0.2)); }
+  40%     { filter: drop-shadow(0 0 7px rgba(224,242,254,0.95)) drop-shadow(0 0 16px rgba(186,230,253,0.6)); }
+  70%     { filter: drop-shadow(0 0 1px rgba(147,197,253,0.3))  drop-shadow(0 0 3px  rgba(186,230,253,0.1)); }
+}
+@keyframes shape-glow-plague {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(163,230,53,0.85)) drop-shadow(0 0 10px rgba(101,163,13,0.4)); }
+  50%     { filter: drop-shadow(0 0 8px rgba(163,230,53,1.0))  drop-shadow(0 0 18px rgba(132,204,22,0.6)); }
+}
+@keyframes shape-glow-frozen {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(186,230,253,0.85)) drop-shadow(0 0 12px rgba(56,189,248,0.5)); }
+  60%     { filter: drop-shadow(0 0 9px rgba(224,242,254,1.0))  drop-shadow(0 0 22px rgba(56,189,248,0.8)); }
+}
+@keyframes shape-glow-burning {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(249,115,22,0.85)) drop-shadow(0 0 10px rgba(239,68,68,0.5)); }
+  50%     { filter: drop-shadow(0 0 9px rgba(253,186,116,1.0)) drop-shadow(0 0 20px rgba(249,115,22,0.8)); }
+}
