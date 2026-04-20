@@ -3853,6 +3853,44 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   user-select: none;
 }
 
+/* Node right-click context menu */
+.rel-ctx-menu {
+  position: absolute;
+  background: #1e1d30;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 7px;
+  padding: 4px;
+  z-index: 25;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+}
+.rel-ctx-title {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 4px 8px 6px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rel-ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #ccc;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rel-ctx-item:hover { background: rgba(255,255,255,0.08); }
+.rel-ctx-danger { color: #d46060; }
+.rel-ctx-danger:hover { background: rgba(212,96,96,0.15); }
+
 /* Label picker popup */
 .rel-label-picker {
   position: absolute;

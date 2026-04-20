@@ -402,6 +402,7 @@ export default function Sidebar({
           <RelationshipWeb
             npcs={npcs} factions={factions} isDMMode={isDMMode}
             onCreateNPC={onCreateNPC} onCreateFaction={onCreateFaction}
+            onDeleteNPC={onDeleteNPC} onDeleteFaction={onDeleteFaction}
           />
         )}
 
