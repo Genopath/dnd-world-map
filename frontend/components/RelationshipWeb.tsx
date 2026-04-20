@@ -26,47 +26,40 @@ function defaultPos(type: NodeKind, id: number) {
   return { x: W / 2 + r * Math.cos(angle), y: H / 2 + r * Math.sin(angle) };
 }
 
-interface EdgeMenu  { edge: RelationshipEdge; x: number; y: number; }
-interface NodeCtx   { type: NodeKind; id: number; name: string; x: number; y: number; }
-interface EditLabel { edgeId: number; currentLabel: string; x: number; y: number; }
+interface LabelPicker { edgeId?: number; currentLabel: string; x: number; y: number; from?: { type: NodeKind; id: number }; to?: { type: NodeKind; id: number }; }
+interface NodeCtx     { type: NodeKind; id: number; name: string; x: number; y: number; }
 
 interface Props {
-  npcs:      NPC[];
-  factions:  Faction[];
-  party:     PartyMember[];
-  isDMMode:  boolean;
+  npcs:     NPC[];
+  factions: Faction[];
+  party:    PartyMember[];
+  isDMMode: boolean;
 }
 
 export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const [edges,     setEdges]     = useState<RelationshipEdge[]>([]);
-  // positions = source of truth for what's on canvas; entities NOT in positions go to roster
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [loading,   setLoading]   = useState(true);
 
-  // Transform
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
   const [scale, setScale] = useState(1);
   const xfRef = useRef({ tx: 0, ty: 0, scale: 1 });
   xfRef.current = { tx, ty, scale };
 
-  // Interaction
   const mode      = useRef<'idle' | 'pan' | 'drag'>('idle');
   const panOrigin = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
   const dragState = useRef<{ key: string; origX: number; origY: number; startCx: number; startCy: number } | null>(null);
   const movedPx   = useRef(0);
 
-  // UI state
-  const [selecting,   setSelecting]   = useState<{ type: NodeKind; id: number } | null>(null);
-  const [pendingEdge, setPendingEdge] = useState<{ from: { type: NodeKind; id: number }; to: { type: NodeKind; id: number }; screenX: number; screenY: number } | null>(null);
-  const [labelDraft,  setLabelDraft]  = useState('');
-  const [hoveredKey,  setHoveredKey]  = useState<string | null>(null);
-  const [edgeMenu,    setEdgeMenu]    = useState<EdgeMenu | null>(null);
-  const [editLabel,   setEditLabel]   = useState<EditLabel | null>(null);
-  const [nodeCtx,     setNodeCtx]     = useState<NodeCtx | null>(null);
-  const [showRoster,  setShowRoster]  = useState(false);
+  const [selecting,    setSelecting]    = useState<{ type: NodeKind; id: number } | null>(null);
+  const [picker,       setPicker]       = useState<LabelPicker | null>(null);
+  const [labelDraft,   setLabelDraft]   = useState('');
+  const [hoveredKey,   setHoveredKey]   = useState<string | null>(null);
+  const [selectedKey,  setSelectedKey]  = useState<string | null>(null); // for bottom panel detail
+  const [nodeCtx,      setNodeCtx]      = useState<NodeCtx | null>(null);
   const [rosterSearch, setRosterSearch] = useState('');
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -81,37 +74,33 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
       .finally(() => setLoading(false));
   }, []);
 
-  // entities on canvas = those with a saved position
   const isOnCanvas = (type: NodeKind, id: number) => nodeKey(type, id) in positions;
-  const getPos     = useCallback((type: NodeKind, id: number) =>
+  const getPos = useCallback((type: NodeKind, id: number) =>
     positions[nodeKey(type, id)] ?? defaultPos(type, id), [positions]);
 
   const canvasNpcs     = npcs.filter(n => isOnCanvas('npc',     n.id));
   const canvasFactions = factions.filter(f => isOnCanvas('faction', f.id));
   const canvasParty    = party.filter(m => isOnCanvas('party',   m.id));
-
   const rosterNpcs     = npcs.filter(n => !isOnCanvas('npc',     n.id));
   const rosterFactions = factions.filter(f => !isOnCanvas('faction', f.id));
   const rosterParty    = party.filter(m => !isOnCanvas('party',   m.id));
 
   const q = rosterSearch.toLowerCase();
-  const filteredRosterNpcs     = rosterNpcs.filter(n => n.name.toLowerCase().includes(q));
-  const filteredRosterFactions = rosterFactions.filter(f => f.name.toLowerCase().includes(q));
-  const filteredRosterParty    = rosterParty.filter(m => m.name.toLowerCase().includes(q));
-  const rosterEmpty = filteredRosterNpcs.length + filteredRosterFactions.length + filteredRosterParty.length === 0;
+  const filtRosterNpcs     = rosterNpcs.filter(n => n.name.toLowerCase().includes(q) || (n.role||'').toLowerCase().includes(q));
+  const filtRosterFactions = rosterFactions.filter(f => f.name.toLowerCase().includes(q));
+  const filtRosterParty    = rosterParty.filter(m => m.name.toLowerCase().includes(q) || (m.class_name||'').toLowerCase().includes(q));
 
-  // ── Add entity to canvas ──────────────────────────────────────────────────
+  // ── Add / remove from canvas ──────────────────────────────────────────────
   const addToCanvas = (type: NodeKind, id: number) => {
     const pos = defaultPos(type, id);
     api.relationships.upsertPosition({ entity_type: type, entity_id: id, x: pos.x, y: pos.y });
     setPositions(prev => ({ ...prev, [nodeKey(type, id)]: pos }));
   };
-
-  // ── Remove entity from canvas (back to roster) ────────────────────────────
   const removeFromCanvas = async (type: NodeKind, id: number) => {
     await api.relationships.deletePosition(type, id);
     const key = nodeKey(type, id);
     setPositions(prev => { const n = { ...prev }; delete n[key]; return n; });
+    if (selectedKey === key) setSelectedKey(null);
   };
 
   // ── Fit / zoom ────────────────────────────────────────────────────────────
@@ -131,42 +120,35 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
     if (!rect.width || !rect.height) return;
     const s = Math.min(rect.width / W, rect.height / H) * 0.88;
     setScale(s);
-    setTx(rect.width  / 2 - (W / 2) * s);
+    setTx(rect.width / 2 - (W / 2) * s);
     setTy(rect.height / 2 - (H / 2) * s);
   }, []);
 
   useEffect(() => { if (!loading) requestAnimationFrame(fitView); }, [loading, fitView]);
 
-  // ── Wheel + pinch (SVG always in DOM — no conditional render) ─────────────
+  // ── Wheel + pinch (SVG always in DOM) ─────────────────────────────────────
   useEffect(() => {
     const svg = svgRef.current; if (!svg) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      applyZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY);
-    };
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); applyZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); };
     let lastDist = 0;
-    const onTouchStart = (e: TouchEvent) => {
+    const onTS = (e: TouchEvent) => {
       if (e.touches.length === 2)
         lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     };
-    const onTouchMove = (e: TouchEvent) => {
+    const onTM = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
       e.preventDefault();
       const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      if (lastDist > 0) applyZoom(dist / lastDist, midX, midY);
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      if (lastDist > 0) applyZoom(dist / lastDist, mx, my);
       lastDist = dist;
     };
-    svg.addEventListener('wheel',      onWheel,      { passive: false });
-    svg.addEventListener('touchstart', onTouchStart, { passive: true });
-    svg.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    svg.addEventListener('wheel',      onWheel, { passive: false });
+    svg.addEventListener('touchstart', onTS,    { passive: true });
+    svg.addEventListener('touchmove',  onTM,    { passive: false });
     svg.addEventListener('touchend',   () => { lastDist = 0; });
-    return () => {
-      svg.removeEventListener('wheel',      onWheel);
-      svg.removeEventListener('touchstart', onTouchStart);
-      svg.removeEventListener('touchmove',  onTouchMove);
-    };
+    return () => { svg.removeEventListener('wheel', onWheel); svg.removeEventListener('touchstart', onTS); svg.removeEventListener('touchmove', onTM); };
   }, [applyZoom]);
 
   const zoomBy = (f: number) => {
@@ -208,23 +190,43 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
   }, []);
 
   // ── Hover highlight ───────────────────────────────────────────────────────
-  const connectedKeys    = hoveredKey ? new Set<string>([hoveredKey]) : null;
-  const connectedEdgeIds = hoveredKey ? new Set<number>() : null;
-  if (hoveredKey && connectedKeys && connectedEdgeIds) {
+  const hk = hoveredKey || selectedKey;
+  const connectedKeys    = hk ? new Set<string>([hk]) : null;
+  const connectedEdgeIds = hk ? new Set<number>() : null;
+  if (hk && connectedKeys && connectedEdgeIds) {
     edges.forEach(e => {
       const fk = nodeKey(e.from_type as NodeKind, e.from_id);
-      const tk = nodeKey(e.to_type   as NodeKind, e.to_id);
-      if (fk === hoveredKey || tk === hoveredKey) {
-        connectedEdgeIds.add(e.id); connectedKeys.add(fk); connectedKeys.add(tk);
-      }
+      const tk = nodeKey(e.to_type as NodeKind, e.to_id);
+      if (fk === hk || tk === hk) { connectedEdgeIds.add(e.id); connectedKeys.add(fk); connectedKeys.add(tk); }
     });
   }
-  const nodeOpacity = (key: string) => hoveredKey && !connectedKeys!.has(key) ? 0.1 : 1;
-  const edgeOpacity = (e: RelationshipEdge) =>
-    (e.active ? 1 : 0.35) * (hoveredKey && !connectedEdgeIds!.has(e.id) ? 0.06 : 1);
+  const nodeOp = (key: string) => hk && !connectedKeys!.has(key) ? 0.1 : 1;
+  const edgeOp = (e: RelationshipEdge) => (e.active ? 1 : 0.35) * (hk && !connectedEdgeIds!.has(e.id) ? 0.06 : 1);
 
-  // ── Event handlers ────────────────────────────────────────────────────────
-  const dismissAll = () => { setEdgeMenu(null); setNodeCtx(null); setEditLabel(null); };
+  // ── Bottom panel: connections for selected node ───────────────────────────
+  const detailEntity = selectedKey ? (() => {
+    const [t, idStr] = selectedKey.split('-');
+    const id = Number(idStr);
+    if (t === 'npc')     return { kind: 'npc'     as NodeKind, id, entity: npcs.find(n => n.id === id) };
+    if (t === 'faction') return { kind: 'faction' as NodeKind, id, entity: factions.find(f => f.id === id) };
+    if (t === 'party')   return { kind: 'party'   as NodeKind, id, entity: party.find(m => m.id === id) };
+    return null;
+  })() : null;
+
+  const detailEdges = selectedKey ? edges.filter(e =>
+    (nodeKey(e.from_type as NodeKind, e.from_id) === selectedKey) ||
+    (nodeKey(e.to_type   as NodeKind, e.to_id)   === selectedKey)
+  ) : [];
+
+  const resolveEntity = (type: string, id: number) => {
+    if (type === 'npc')     return npcs.find(n => n.id === id);
+    if (type === 'faction') return factions.find(f => f.id === id);
+    if (type === 'party')   return party.find(m => m.id === id);
+    return undefined;
+  };
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const dismissAll = () => { setPicker(null); setNodeCtx(null); };
 
   const onSvgMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -232,7 +234,9 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
     mode.current = 'pan';
     panOrigin.current = { mx: e.clientX, my: e.clientY, tx, ty };
   };
-  const onSvgClick = () => { if (movedPx.current < 6) { setSelecting(null); dismissAll(); } };
+  const onSvgClick = () => {
+    if (movedPx.current < 6) { setSelecting(null); setSelectedKey(null); dismissAll(); }
+  };
 
   const onNodeMouseDown = (e: React.MouseEvent, type: NodeKind, id: number) => {
     if (e.button !== 0 || !isDMMode) return;
@@ -246,13 +250,19 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
     e.stopPropagation();
     if (movedPx.current > 6) return;
     dismissAll();
+    const key = nodeKey(type, id);
+    // Always select for bottom panel detail
+    setSelectedKey(prev => prev === key ? null : key);
+
     if (!isDMMode) return;
     if (!selecting) {
       setSelecting({ type, id });
     } else {
       if (selecting.type === type && selecting.id === id) { setSelecting(null); return; }
       const rect = svgRef.current!.getBoundingClientRect();
-      setPendingEdge({ from: selecting, to: { type, id }, screenX: e.clientX - rect.left, screenY: e.clientY - rect.top });
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      setPicker({ currentLabel: '', x: px, y: py, from: selecting, to: { type, id } });
       setLabelDraft(''); setSelecting(null);
     }
   };
@@ -262,165 +272,99 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
     e.preventDefault(); e.stopPropagation();
     const rect = svgRef.current!.getBoundingClientRect();
     setNodeCtx({ type, id, name, x: e.clientX - rect.left, y: e.clientY - rect.top });
-    setEdgeMenu(null); setEditLabel(null);
+    setPicker(null);
   };
 
   const onEdgeClick = (e: React.MouseEvent, edge: RelationshipEdge) => {
     e.stopPropagation();
     if (!isDMMode) return;
     const rect = svgRef.current!.getBoundingClientRect();
-    setEdgeMenu({ edge, x: e.clientX - rect.left, y: e.clientY - rect.top });
-    setNodeCtx(null); setEditLabel(null); setSelecting(null);
+    setPicker({ edgeId: edge.id, currentLabel: edge.label, x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setNodeCtx(null); setSelecting(null);
   };
 
   // ── Edge CRUD ─────────────────────────────────────────────────────────────
-  const confirmEdge = async (label: string) => {
-    if (!pendingEdge || !label.trim()) { setPendingEdge(null); return; }
-    const edge = await api.relationships.createEdge({
-      from_type: pendingEdge.from.type, from_id: pendingEdge.from.id,
-      to_type:   pendingEdge.to.type,   to_id:   pendingEdge.to.id, label: label.trim(),
-    });
-    setEdges(prev => [...prev, edge]); setPendingEdge(null);
-  };
+  const confirmPicker = async (label: string) => {
+    if (!picker) return;
+    const trimmed = label.trim();
 
-  // Clicking same preset as current label = delete the edge (toggle off)
-  const confirmLabelEdit = async (label: string) => {
-    if (!editLabel) return;
-    if (label.trim() === editLabel.currentLabel) {
-      // toggle off — delete the edge
-      await api.relationships.deleteEdge(editLabel.edgeId);
-      setEdges(prev => prev.filter(e => e.id !== editLabel.edgeId));
-    } else {
-      const updated = await api.relationships.patchEdge(editLabel.edgeId, { label: label.trim() });
-      setEdges(prev => prev.map(e => e.id === editLabel.edgeId ? updated : e));
+    if (picker.edgeId !== undefined) {
+      // Editing existing edge
+      if (trimmed === picker.currentLabel || !trimmed) {
+        // Same label or empty = remove the edge
+        await api.relationships.deleteEdge(picker.edgeId);
+        setEdges(prev => prev.filter(e => e.id !== picker.edgeId));
+      } else {
+        const updated = await api.relationships.patchEdge(picker.edgeId, { label: trimmed });
+        setEdges(prev => prev.map(e => e.id === picker.edgeId ? updated : e));
+      }
+    } else if (picker.from && picker.to && trimmed) {
+      // Creating new edge
+      const edge = await api.relationships.createEdge({
+        from_type: picker.from.type, from_id: picker.from.id,
+        to_type: picker.to.type, to_id: picker.to.id, label: trimmed,
+      });
+      setEdges(prev => [...prev, edge]);
     }
-    setEditLabel(null);
+    setPicker(null);
   };
 
-  const toggleEdge = async () => {
-    if (!edgeMenu) return;
-    const updated = await api.relationships.patchEdge(edgeMenu.edge.id, { active: !edgeMenu.edge.active });
-    setEdges(prev => prev.map(e => e.id === edgeMenu.edge.id ? updated : e));
-    setEdgeMenu(null);
-  };
-
-  const deleteEdge = async () => {
-    if (!edgeMenu) return;
-    await api.relationships.deleteEdge(edgeMenu.edge.id);
-    setEdges(prev => prev.filter(e => e.id !== edgeMenu.edge.id));
-    setEdgeMenu(null);
+  const removeEdge = async () => {
+    if (!picker?.edgeId) return;
+    await api.relationships.deleteEdge(picker.edgeId);
+    setEdges(prev => prev.filter(e => e.id !== picker.edgeId));
+    setPicker(null);
   };
 
   // ── Position helpers ──────────────────────────────────────────────────────
   const anyPos = (type: string, id: number) => getPos(type as NodeKind, id);
-  const edgeEndpoints = (e: RelationshipEdge) => ({
-    x1: anyPos(e.from_type, e.from_id).x, y1: anyPos(e.from_type, e.from_id).y,
-    x2: anyPos(e.to_type,   e.to_id).x,   y2: anyPos(e.to_type,   e.to_id).y,
-  });
   const toPad = (type: string) => type === 'npc' ? NPC_R + 6 : type === 'party' ? PARTY_R + 6 : FACT_H / 2 + 6;
 
-  const selectedKey = selecting ? nodeKey(selecting.type, selecting.id) : null;
+  // Group visible edges by normalized pair key for multi-edge curved rendering
+  const edgePairGroups = new Map<string, RelationshipEdge[]>();
+  edges.forEach(edge => {
+    if (!isOnCanvas(edge.from_type as NodeKind, edge.from_id) || !isOnCanvas(edge.to_type as NodeKind, edge.to_id)) return;
+    const fk = nodeKey(edge.from_type as NodeKind, edge.from_id);
+    const tk = nodeKey(edge.to_type as NodeKind, edge.to_id);
+    const pairKey = fk < tk ? `${fk}|${tk}` : `${tk}|${fk}`;
+    if (!edgePairGroups.has(pairKey)) edgePairGroups.set(pairKey, []);
+    edgePairGroups.get(pairKey)!.push(edge);
+  });
 
-  // Active label picker — new edge or edit existing
-  const activePicker = pendingEdge
-    ? { x: pendingEdge.screenX, y: pendingEdge.screenY, currentLabel: '', onConfirm: confirmEdge, onCancel: () => setPendingEdge(null) }
-    : editLabel
-    ? { x: editLabel.x, y: editLabel.y, currentLabel: editLabel.currentLabel, onConfirm: confirmLabelEdit, onCancel: () => setEditLabel(null) }
-    : null;
+  const edgePairIndex = new Map<number, { groupSize: number; groupIdx: number }>();
+  edgePairGroups.forEach(group => {
+    group.forEach((edge, idx) => edgePairIndex.set(edge.id, { groupSize: group.length, groupIdx: idx }));
+  });
 
-  // ── Render helpers ────────────────────────────────────────────────────────
-  const Shield = ({ r }: { r: number }) => (
-    <circle r={r} fill="transparent"
-      onMouseEnter={() => setHoveredKey(null)} onMouseLeave={() => setHoveredKey(null)} />
-  );
+  const selNodeKey = selecting ? nodeKey(selecting.type, selecting.id) : null;
 
   return (
     <div className="rel-web-wrap">
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="rel-toolbar">
-        {isDMMode && (
-          <button className={`rel-tb-btn ${showRoster ? 'rel-tb-active' : 'rel-tb-add'}`}
-            onClick={() => { setShowRoster(v => !v); dismissAll(); setSelecting(null); }}>
-            {showRoster ? '✕ Close Roster' : '＋ Roster'}
-          </button>
-        )}
         <div className="rel-tb-spacer" />
         <button className="rel-tb-btn" onClick={() => zoomBy(1.25)} title="Zoom in">＋</button>
         <button className="rel-tb-btn" onClick={() => zoomBy(1 / 1.25)} title="Zoom out">－</button>
         <button className="rel-tb-btn" onClick={fitView} title="Fit view">⊡</button>
       </div>
 
-      {/* ── Roster panel ─────────────────────────────────────────────────── */}
-      {showRoster && isDMMode && (
-        <div className="rel-roster">
-          <input className="rel-label-input rel-roster-search" placeholder="Search…"
-            value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} />
-          {rosterEmpty && <div className="rel-roster-empty">All entities are on the canvas</div>}
-
-          {filteredRosterParty.length > 0 && (
-            <div className="rel-roster-section">
-              <div className="rel-roster-heading">Party Members</div>
-              {filteredRosterParty.map(m => (
-                <button key={m.id} className="rel-roster-item" onClick={() => addToCanvas('party', m.id)}>
-                  {m.portrait_url
-                    ? <img src={API_BASE + m.portrait_url} className="rel-roster-avatar" alt="" />
-                    : <span className="rel-roster-initial" style={{ background: m.path_color || '#c9a84c' }}>{m.name[0]}</span>}
-                  <span className="rel-roster-name">{m.name}</span>
-                  <span className="rel-roster-sub">{m.class_name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {filteredRosterNpcs.length > 0 && (
-            <div className="rel-roster-section">
-              <div className="rel-roster-heading">NPCs</div>
-              {filteredRosterNpcs.map(n => (
-                <button key={n.id} className="rel-roster-item" onClick={() => addToCanvas('npc', n.id)}>
-                  {n.portrait_url
-                    ? <img src={API_BASE + n.portrait_url} className="rel-roster-avatar" alt="" />
-                    : <span className="rel-roster-initial">{n.name[0]}</span>}
-                  <span className="rel-roster-name">{n.name}</span>
-                  <span className="rel-roster-sub">{n.role}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {filteredRosterFactions.length > 0 && (
-            <div className="rel-roster-section">
-              <div className="rel-roster-heading">Factions</div>
-              {filteredRosterFactions.map(f => (
-                <button key={f.id} className="rel-roster-item" onClick={() => addToCanvas('faction', f.id)}>
-                  <span className="rel-roster-color-chip" style={{ background: f.color || '#666' }} />
-                  <span className="rel-roster-name">{f.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── Hint ──────────────────────────────────────────────────────────── */}
-      {isDMMode && !showRoster && (
+      {isDMMode && (
         <div className="rel-web-hint">
           {selecting
             ? '🔗 Click second node to link · click background to cancel'
-            : canvasNpcs.length + canvasFactions.length + canvasParty.length === 0
-              ? 'Open "＋ Roster" to add entities to the canvas'
-              : 'Click node to link · click edge to manage · drag to move · hover to highlight · right-click to remove'}
+            : 'Click node to link or view · click edge to change label · drag to move · right-click to remove'}
         </div>
       )}
 
-      {/* ── SVG — always in DOM so wheel listener attaches correctly ─────── */}
+      {/* ── SVG ───────────────────────────────────────────────────────────── */}
       <svg ref={svgRef} className="rel-web-svg"
         onMouseDown={onSvgMouseDown} onClick={onSvgClick}
-        onKeyDown={e => { if (e.key === 'Escape') { setSelecting(null); dismissAll(); } }}
+        onKeyDown={e => { if (e.key === 'Escape') { setSelecting(null); setSelectedKey(null); dismissAll(); } }}
         tabIndex={0}
       >
         {loading && <text x="50%" y="50%" textAnchor="middle" fill="#666" fontSize={13} dominantBaseline="middle">Loading…</text>}
-
         <defs>
           {Object.entries(EDGE_COLORS).map(([k, c]) => (
             <marker key={k} id={`arrow-${k}`} markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto">
@@ -434,35 +378,45 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
 
         {!loading && (
           <g transform={`translate(${tx},${ty}) scale(${scale})`}>
-
             {/* Edges */}
             {edges.map(edge => {
-              // only render edges where both ends are on canvas
               if (!isOnCanvas(edge.from_type as NodeKind, edge.from_id) || !isOnCanvas(edge.to_type as NodeKind, edge.to_id)) return null;
-              const { x1, y1, x2, y2 } = edgeEndpoints(edge);
-              const mx = (x1 + x2) / 2; const my = (y1 + y2) / 2;
+              const p1 = anyPos(edge.from_type, edge.from_id);
+              const p2 = anyPos(edge.to_type,   edge.to_id);
+              const x1 = p1.x; const y1 = p1.y;
+              const x2 = p2.x; const y2 = p2.y;
               const color = edge.active ? edgeColor(edge.label) : '#555566';
               const lk = edge.label.toLowerCase();
               const markerId = edge.active && EDGE_COLORS[lk] ? `arrow-${lk}` : 'arrow-default';
-              const dxx = x2 - x1; const dyy = y2 - y1;
-              const len = Math.sqrt(dxx * dxx + dyy * dyy) || 1;
-              const ux = dxx / len; const uy = dyy / len;
+              const dx = x2 - x1; const dy = y2 - y1;
+              const len = Math.sqrt(dx * dx + dy * dy) || 1;
+              const ux = dx / len; const uy = dy / len;
               const pad = toPad(edge.to_type);
-              const isOpen = edgeMenu?.edge.id === edge.id;
+              // adjusted endpoint backed off from node center
+              const ex = x2 - ux * pad; const ey = y2 - uy * pad;
+              // curve offset for multi-edge pairs (perpendicular to line)
+              const { groupSize = 1, groupIdx = 0 } = edgePairIndex.get(edge.id) ?? {};
+              const offset = (groupIdx - (groupSize - 1) / 2) * 52;
+              // perpendicular unit vector
+              const nx = -uy; const ny = ux;
+              const cpx = (x1 + ex) / 2 + nx * offset;
+              const cpy = (y1 + ey) / 2 + ny * offset;
+              // bezier midpoint at t=0.5 for label placement
+              const lx = 0.25 * x1 + 0.5 * cpx + 0.25 * ex;
+              const ly = 0.25 * y1 + 0.5 * cpy + 0.25 * ey;
+              const pathD = `M ${x1} ${y1} Q ${cpx} ${cpy} ${ex} ${ey}`;
+              const isEditing = picker?.edgeId === edge.id;
               return (
-                <g key={edge.id} className="rel-edge" style={{ opacity: edgeOpacity(edge) }}
+                <g key={edge.id} className="rel-edge" style={{ opacity: edgeOp(edge) }}
                   onClick={e => onEdgeClick(e, edge)}>
-                  <line x1={x1} y1={y1} x2={x2 - ux * pad} y2={y2 - uy * pad}
-                    stroke={color} strokeWidth={isOpen ? 3.5 : 2.5} strokeOpacity={0.9}
+                  <path d={pathD} fill="none"
+                    stroke={color} strokeWidth={isEditing ? 3.5 : 2.5} strokeOpacity={0.9}
                     strokeDasharray={edge.active ? undefined : '8 5'}
                     markerEnd={`url(#${markerId})`} />
-                  <line x1={x1} y1={y1} x2={x2 - ux * pad} y2={y2 - uy * pad}
-                    stroke="transparent" strokeWidth={18}
-                    style={{ cursor: isDMMode ? 'pointer' : 'default' }} />
+                  <path d={pathD} fill="none"
+                    stroke="transparent" strokeWidth={18} style={{ cursor: isDMMode ? 'pointer' : 'default' }} />
                   {edge.label && (
-                    <text x={mx} y={my - 9} textAnchor="middle" className="rel-edge-label" fill={color}>
-                      {edge.label}
-                    </text>
+                    <text x={lx} y={ly - 9} textAnchor="middle" className="rel-edge-label" fill={color}>{edge.label}</text>
                   )}
                 </g>
               );
@@ -472,19 +426,20 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
             {canvasFactions.map(f => {
               const pos = getPos('faction', f.id);
               const key = nodeKey('faction', f.id);
-              const isSel = key === selectedKey;
+              const isSel = key === selNodeKey;
+              const isDetail = key === selectedKey;
               return (
-                <g key={key} className="rel-node" style={{ opacity: nodeOpacity(key), transition: 'opacity 0.15s' }}
+                <g key={key} className="rel-node" style={{ opacity: nodeOp(key), transition: 'opacity 0.15s' }}
                   transform={`translate(${pos.x},${pos.y})`}
                   onMouseDown={e => onNodeMouseDown(e, 'faction', f.id)}
                   onClick={e => onNodeClick(e, 'faction', f.id)}
                   onContextMenu={e => onNodeContextMenu(e, 'faction', f.id, f.name)}
                   onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)}>
-                  {isSel && <rect x={-FACT_W/2-6} y={-FACT_H/2-6} width={FACT_W+12} height={FACT_H+12} rx={10}
+                  {(isSel || isDetail) && <rect x={-FACT_W/2-6} y={-FACT_H/2-6} width={FACT_W+12} height={FACT_H+12} rx={10}
                     fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
                   <rect x={-FACT_W/2} y={-FACT_H/2} width={FACT_W} height={FACT_H} rx={7}
                     fill={f.color || '#555577'} fillOpacity={0.9}
-                    stroke={isSel ? '#e8c870' : '#ffffff44'} strokeWidth={isSel ? 2.5 : 1} />
+                    stroke={(isSel || isDetail) ? '#e8c870' : '#ffffff44'} strokeWidth={(isSel || isDetail) ? 2.5 : 1} />
                   <text x={0} y={6} textAnchor="middle" className="rel-node-label rel-node-label--faction">
                     {f.name.length > 13 ? f.name.slice(0, 12) + '…' : f.name}
                   </text>
@@ -498,25 +453,24 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
             {canvasParty.map(m => {
               const pos = getPos('party', m.id);
               const key = nodeKey('party', m.id);
-              const isSel = key === selectedKey;
+              const isSel = key === selNodeKey;
+              const isDetail = key === selectedKey;
               return (
-                <g key={key} className="rel-node" style={{ opacity: nodeOpacity(key), transition: 'opacity 0.15s' }}
+                <g key={key} className="rel-node" style={{ opacity: nodeOp(key), transition: 'opacity 0.15s' }}
                   transform={`translate(${pos.x},${pos.y})`}
                   onMouseDown={e => onNodeMouseDown(e, 'party', m.id)}
                   onClick={e => onNodeClick(e, 'party', m.id)}
                   onContextMenu={e => onNodeContextMenu(e, 'party', m.id, m.name)}
                   onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)}>
-                  {isSel && <circle r={PARTY_R+9} fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
-                  <circle r={PARTY_R} fill="#1a2236" stroke={m.path_color || '#c9a84c'} strokeWidth={isSel ? 3.5 : 2.5} />
-                  {m.portrait_url ? (
-                    <><defs><clipPath id={`clip-party-${m.id}`}><circle r={PARTY_R-3} /></clipPath></defs>
-                      <image href={API_BASE + m.portrait_url} x={-(PARTY_R-3)} y={-(PARTY_R-3)}
-                        width={(PARTY_R-3)*2} height={(PARTY_R-3)*2}
-                        clipPath={`url(#clip-party-${m.id})`} preserveAspectRatio="xMidYMid slice" /></>
-                  ) : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{m.name[0].toUpperCase()}</text>}
+                  {(isSel || isDetail) && <circle r={PARTY_R+9} fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
+                  <circle r={PARTY_R} fill="#1a2236" stroke={m.path_color || '#c9a84c'} strokeWidth={(isSel || isDetail) ? 3.5 : 2.5} />
+                  {m.portrait_url
+                    ? <><defs><clipPath id={`clip-party-${m.id}`}><circle r={PARTY_R-3} /></clipPath></defs>
+                        <image href={API_BASE + m.portrait_url} x={-(PARTY_R-3)} y={-(PARTY_R-3)} width={(PARTY_R-3)*2} height={(PARTY_R-3)*2} clipPath={`url(#clip-party-${m.id})`} preserveAspectRatio="xMidYMid slice" /></>
+                    : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{m.name[0].toUpperCase()}</text>}
                   <text x={0} y={PARTY_R+17} textAnchor="middle" className="rel-node-label">{m.name.length > 14 ? m.name.slice(0, 13) + '…' : m.name}</text>
                   <text x={0} y={PARTY_R+30} textAnchor="middle" className="rel-node-sublabel">{m.class_name || 'Party'}</text>
-                  <Shield r={PARTY_R} />
+                  <circle r={PARTY_R} fill="transparent" />
                 </g>
               );
             })}
@@ -525,50 +479,65 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
             {canvasNpcs.map(n => {
               const pos = getPos('npc', n.id);
               const key = nodeKey('npc', n.id);
-              const isSel = key === selectedKey;
+              const isSel = key === selNodeKey;
+              const isDetail = key === selectedKey;
               const ringColor = n.status === 'dead' ? '#d46060' : n.status === 'unknown' ? '#8a8098' : '#72b86e';
               return (
-                <g key={key} className="rel-node" style={{ opacity: nodeOpacity(key), transition: 'opacity 0.15s' }}
+                <g key={key} className="rel-node" style={{ opacity: nodeOp(key), transition: 'opacity 0.15s' }}
                   transform={`translate(${pos.x},${pos.y})`}
                   onMouseDown={e => onNodeMouseDown(e, 'npc', n.id)}
                   onClick={e => onNodeClick(e, 'npc', n.id)}
                   onContextMenu={e => onNodeContextMenu(e, 'npc', n.id, n.name)}
                   onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)}>
-                  {isSel && <circle r={NPC_R+9} fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
-                  <circle r={NPC_R} fill="#1c1b32" stroke={ringColor} strokeWidth={isSel ? 3.5 : 2.5} />
-                  {n.portrait_url ? (
-                    <><defs><clipPath id={`clip-npc-${n.id}`}><circle r={NPC_R-3} /></clipPath></defs>
-                      <image href={API_BASE + n.portrait_url} x={-(NPC_R-3)} y={-(NPC_R-3)}
-                        width={(NPC_R-3)*2} height={(NPC_R-3)*2}
-                        clipPath={`url(#clip-npc-${n.id})`} preserveAspectRatio="xMidYMid slice" /></>
-                  ) : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{n.name[0].toUpperCase()}</text>}
+                  {(isSel || isDetail) && <circle r={NPC_R+9} fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
+                  <circle r={NPC_R} fill="#1c1b32" stroke={ringColor} strokeWidth={(isSel || isDetail) ? 3.5 : 2.5} />
+                  {n.portrait_url
+                    ? <><defs><clipPath id={`clip-npc-${n.id}`}><circle r={NPC_R-3} /></clipPath></defs>
+                        <image href={API_BASE + n.portrait_url} x={-(NPC_R-3)} y={-(NPC_R-3)} width={(NPC_R-3)*2} height={(NPC_R-3)*2} clipPath={`url(#clip-npc-${n.id})`} preserveAspectRatio="xMidYMid slice" /></>
+                    : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{n.name[0].toUpperCase()}</text>}
                   <text x={0} y={NPC_R+17} textAnchor="middle" className="rel-node-label">{n.name.length > 14 ? n.name.slice(0, 13) + '…' : n.name}</text>
                   {n.role && <text x={0} y={NPC_R+30} textAnchor="middle" className="rel-node-sublabel">{n.role.length > 18 ? n.role.slice(0, 17) + '…' : n.role}</text>}
-                  <Shield r={NPC_R} />
+                  <circle r={NPC_R} fill="transparent" />
                 </g>
               );
             })}
-
           </g>
         )}
       </svg>
 
-      {/* Edge action menu */}
-      {edgeMenu && isDMMode && (
-        <div className="rel-ctx-menu" style={{ left: edgeMenu.x, top: edgeMenu.y }} onMouseDown={e => e.stopPropagation()}>
-          <div className="rel-ctx-title">{edgeMenu.edge.label || '(unlabelled)'}</div>
-          <button className="rel-ctx-item" onClick={() => {
-            setEditLabel({ edgeId: edgeMenu.edge.id, currentLabel: edgeMenu.edge.label, x: edgeMenu.x, y: edgeMenu.y });
-            setEdgeMenu(null);
-          }}>✏️ Change label</button>
-          <button className="rel-ctx-item" onClick={toggleEdge}>
-            {edgeMenu.edge.active ? '○ Disable' : '● Enable'}
-          </button>
-          <button className="rel-ctx-item rel-ctx-danger" onClick={deleteEdge}>🗑 Delete edge</button>
+      {/* ── Label picker (new edge or edit) ───────────────────────────────── */}
+      {picker && isDMMode && (
+        <div className="rel-label-picker" style={{ left: picker.x, top: picker.y }}>
+          <div className="rel-label-picker-title">
+            {picker.edgeId !== undefined
+              ? picker.currentLabel ? `Editing: "${picker.currentLabel}"` : 'Set label'
+              : 'Relationship type'}
+          </div>
+          <div className="rel-label-presets">
+            {PRESET_LABELS.map(l => (
+              <button key={l}
+                className={`rel-label-preset ${l === picker.currentLabel ? 'rel-label-preset--current' : ''}`}
+                style={{ '--preset-color': edgeColor(l) } as React.CSSProperties}
+                onClick={() => confirmPicker(l)}>
+                {l}{l === picker.currentLabel ? ' ✕' : ''}
+              </button>
+            ))}
+          </div>
+          <div className="rel-label-custom">
+            <input className="rel-label-input" placeholder="custom label…" autoFocus
+              defaultValue={picker.currentLabel}
+              onChange={e => setLabelDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') confirmPicker(labelDraft); if (e.key === 'Escape') setPicker(null); }} />
+            <button className="rel-label-ok" onClick={() => confirmPicker(labelDraft)}>✓</button>
+          </div>
+          {picker.edgeId !== undefined && (
+            <button className="rel-label-remove" onClick={removeEdge}>✕ Remove this connection</button>
+          )}
+          <button className="rel-label-cancel" onClick={() => setPicker(null)}>Cancel</button>
         </div>
       )}
 
-      {/* Node context menu */}
+      {/* ── Node context menu (right-click) ───────────────────────────────── */}
       {nodeCtx && isDMMode && (
         <div className="rel-ctx-menu" style={{ left: nodeCtx.x, top: nodeCtx.y }} onMouseDown={e => e.stopPropagation()}>
           <div className="rel-ctx-title">{nodeCtx.name}</div>
@@ -578,43 +547,96 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
         </div>
       )}
 
-      {/* Label picker */}
-      {activePicker && (
-        <div className="rel-label-picker" style={{ left: activePicker.x, top: activePicker.y }}>
-          <div className="rel-label-picker-title">
-            {editLabel ? 'Change label · click current to remove' : 'Relationship type'}
+      {/* ── Bottom panel: detail or roster ───────────────────────────────── */}
+      <div className="rel-bottom-panel">
+        {detailEntity ? (
+          // ── Selected node detail view ──────────────────────────────────
+          <div className="rel-detail-wrap">
+            <div className="rel-detail-header">
+              {detailEntity.entity && 'portrait_url' in detailEntity.entity && (detailEntity.entity as NPC | PartyMember).portrait_url
+                ? <img src={API_BASE + (detailEntity.entity as NPC | PartyMember).portrait_url!} className="rel-detail-portrait" alt="" />
+                : 'color' in (detailEntity.entity || {})
+                  ? <span className="rel-detail-portrait" style={{ background: (detailEntity.entity as Faction).color || '#555' }} />
+                  : <span className="rel-detail-portrait rel-detail-portrait--initial">
+                      {detailEntity.entity?.name?.[0]?.toUpperCase()}
+                    </span>}
+              <div className="rel-detail-info">
+                <div className="rel-detail-name">{detailEntity.entity?.name}</div>
+                <div className="rel-detail-sub">
+                  {'role' in (detailEntity.entity || {}) ? (detailEntity.entity as NPC).role : ''}
+                  {'class_name' in (detailEntity.entity || {}) ? (detailEntity.entity as PartyMember).class_name : ''}
+                  {'description' in (detailEntity.entity || {}) && detailEntity.kind === 'faction' ? (detailEntity.entity as Faction).description?.slice(0, 80) : ''}
+                </div>
+              </div>
+              <button className="rel-detail-close" onClick={() => setSelectedKey(null)}>✕</button>
+            </div>
+            <div className="rel-detail-connections">
+              {detailEdges.length === 0
+                ? <span className="rel-detail-none">No connections yet — click another node while this one is selected to link them.</span>
+                : detailEdges.map(edge => {
+                  const isFrom = nodeKey(edge.from_type as NodeKind, edge.from_id) === selectedKey;
+                  const otherType = isFrom ? edge.to_type : edge.from_type;
+                  const otherId   = isFrom ? edge.to_id   : edge.from_id;
+                  const other = resolveEntity(otherType, otherId);
+                  const color = edge.active ? edgeColor(edge.label) : '#555566';
+                  return (
+                    <div key={edge.id} className="rel-detail-edge" style={{ opacity: edge.active ? 1 : 0.45 }}>
+                      <span className="rel-detail-edge-dot" style={{ background: color }} />
+                      <span className="rel-detail-edge-label" style={{ color }}>{edge.label || '—'}</span>
+                      <span className="rel-detail-edge-arrow">{isFrom ? '→' : '←'}</span>
+                      <span className="rel-detail-edge-name">{other?.name ?? '(unknown)'}</span>
+                      {isDMMode && (
+                        <button className="rel-detail-edge-edit" onClick={() => {
+                          const rect = svgRef.current!.getBoundingClientRect();
+                          setPicker({ edgeId: edge.id, currentLabel: edge.label, x: rect.width / 2, y: rect.height / 2 });
+                        }}>✏</button>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
           </div>
-          <div className="rel-label-presets">
-            {PRESET_LABELS.map(l => (
-              <button key={l} className={`rel-label-preset ${l === activePicker.currentLabel ? 'rel-label-preset--current' : ''}`}
-                style={{ '--preset-color': edgeColor(l) } as React.CSSProperties}
-                onClick={() => { setLabelDraft(l); activePicker.onConfirm(l); }}>
-                {l}{l === activePicker.currentLabel ? ' ✕' : ''}
-              </button>
-            ))}
+        ) : (
+          // ── Roster view ────────────────────────────────────────────────
+          <div className="rel-roster-wrap">
+            <div className="rel-roster-top">
+              <span className="rel-roster-title">Roster</span>
+              <input className="rel-label-input rel-roster-search-sm" placeholder="Search…"
+                value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} />
+            </div>
+            {(filtRosterParty.length + filtRosterNpcs.length + filtRosterFactions.length) === 0
+              ? <div className="rel-roster-all-on">All entities are on the canvas</div>
+              : (
+                <div className="rel-roster-cards">
+                  {filtRosterParty.map(m => (
+                    <button key={`party-${m.id}`} className="rel-roster-card" onClick={() => addToCanvas('party', m.id)}>
+                      {m.portrait_url
+                        ? <img src={API_BASE + m.portrait_url} className="rel-roster-card-img" alt="" />
+                        : <span className="rel-roster-card-initial" style={{ background: m.path_color || '#c9a84c' }}>{m.name[0]}</span>}
+                      <span className="rel-roster-card-name">{m.name}</span>
+                      <span className="rel-roster-card-sub">{m.class_name}</span>
+                    </button>
+                  ))}
+                  {filtRosterNpcs.map(n => (
+                    <button key={`npc-${n.id}`} className="rel-roster-card" onClick={() => addToCanvas('npc', n.id)}>
+                      {n.portrait_url
+                        ? <img src={API_BASE + n.portrait_url} className="rel-roster-card-img" alt="" />
+                        : <span className="rel-roster-card-initial">{n.name[0]}</span>}
+                      <span className="rel-roster-card-name">{n.name}</span>
+                      <span className="rel-roster-card-sub">{n.role}</span>
+                    </button>
+                  ))}
+                  {filtRosterFactions.map(f => (
+                    <button key={`faction-${f.id}`} className="rel-roster-card" onClick={() => addToCanvas('faction', f.id)}>
+                      <span className="rel-roster-card-initial" style={{ background: f.color || '#555', borderRadius: 4 }}>{f.name[0]}</span>
+                      <span className="rel-roster-card-name">{f.name}</span>
+                      <span className="rel-roster-card-sub">Faction</span>
+                    </button>
+                  ))}
+                </div>
+              )}
           </div>
-          <div className="rel-label-custom">
-            <input className="rel-label-input" placeholder="custom label…" autoFocus
-              defaultValue={activePicker.currentLabel}
-              onChange={e => setLabelDraft(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') activePicker.onConfirm(labelDraft);
-                if (e.key === 'Escape') activePicker.onCancel();
-              }} />
-            <button className="rel-label-ok" onClick={() => activePicker.onConfirm(labelDraft)}>✓</button>
-          </div>
-          <button className="rel-label-cancel" onClick={activePicker.onCancel}>Cancel</button>
-        </div>
-      )}
-
-      {/* Legend */}
-      <div className="rel-legend">
-        {Object.entries(EDGE_COLORS).map(([label, color]) => (
-          <span key={label} className="rel-legend-item">
-            <span className="rel-legend-dot" style={{ background: color }} />
-            {label}
-          </span>
-        ))}
+        )}
       </div>
     </div>
   );

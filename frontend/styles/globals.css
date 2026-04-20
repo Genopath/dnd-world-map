@@ -4098,3 +4098,245 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* ── Bottom panel ────────────────────────────────────────────────────────── */
+.rel-bottom-panel {
+  flex-shrink: 0;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  min-height: 160px;
+  max-height: 220px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Detail view (when a node is selected) */
+.rel-detail-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.rel-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.rel-detail-portrait {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+.rel-detail-portrait--initial {
+  background: var(--surface4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  border-radius: 50%;
+}
+.rel-detail-info { flex: 1; min-width: 0; }
+.rel-detail-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rel-detail-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rel-detail-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+}
+.rel-detail-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.rel-detail-connections {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rel-detail-edge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.03);
+  font-size: 12px;
+  color: var(--text);
+}
+.rel-detail-edge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rel-detail-edge-label {
+  font-weight: 600;
+  min-width: 48px;
+  font-size: 11px;
+}
+.rel-detail-edge-arrow { color: var(--text-dim); font-size: 11px; }
+.rel-detail-edge-name { flex: 1; color: var(--text-muted); }
+.rel-detail-edge-edit {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: var(--radius);
+  font-size: 11px;
+}
+.rel-detail-edge-edit:hover { color: var(--accent); background: rgba(255,255,255,0.06); }
+.rel-detail-none {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 6px 0;
+}
+
+/* Roster view (when nothing is selected) */
+.rel-roster-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.rel-roster-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.rel-roster-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.rel-roster-search-sm {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 8px;
+  height: 28px;
+}
+.rel-roster-cards {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+}
+.rel-roster-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 8px 10px;
+  cursor: pointer;
+  min-width: 72px;
+  max-width: 90px;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.rel-roster-card:hover {
+  border-color: var(--accent-dim);
+  background: var(--surface4);
+}
+.rel-roster-card-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.rel-roster-card-initial {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.rel-roster-card-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+.rel-roster-card-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+.rel-roster-all-on {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 12px;
+}
+
+/* Remove / label button in picker */
+.rel-label-remove {
+  display: block;
+  width: 100%;
+  background: rgba(212,96,96,0.12);
+  border: 1px solid rgba(212,96,96,0.3);
+  border-radius: var(--radius);
+  color: #d46060;
+  font-size: 12px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 4px;
+}
+.rel-label-remove:hover { background: rgba(212,96,96,0.22); }
