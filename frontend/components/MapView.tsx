@@ -1511,6 +1511,13 @@ export default function MapView({
                     ) : null}
                   </div>
                 )}
+                {/* Shape-matching color ring for non-circle shapes (replaces box-shadow which is clipped) */}
+                {loc.pin_shape && loc.pin_shape !== 'circle' && (
+                  <>
+                    <span className="pin-shape-ring pin-shape-ring--outer" />
+                    <span className="pin-shape-ring pin-shape-ring--inner" />
+                  </>
+                )}
                 {/* Normal pin icon — always rendered */}
                 {loc.icon_url ? (
                   <img

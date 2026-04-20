@@ -4348,8 +4348,8 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .rel-label-remove:hover { background: rgba(212,96,96,0.22); }
 
 /* ── Pin Shapes ─────────────────────────────────────────────────────────── */
-/* Shape classes are added to the root .pin div and cascade to children.    */
-/* Circle is the default — no extra CSS needed.                             */
+/* Shape classes are added to the root .pin div and cascade to all children. */
+/* Circle is the default — no extra CSS needed.                              */
 
 /* Square */
 .pin-shape-square .pin-dot,
@@ -4357,6 +4357,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-square .pin-icon-default::before,
 .pin-shape-square .pin-icon-img { border-radius: 4px; }
 .pin-shape-square .pin-body::after { display: none; }
+.pin-shape-square .pin-border-ring { border-radius: 6px; }
 
 /* Diamond */
 .pin-shape-diamond .pin-dot,
@@ -4367,6 +4368,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border-radius: 0;
 }
 .pin-shape-diamond .pin-body::after { display: none; }
+.pin-shape-diamond .pin-border-ring { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); border-radius: 0; }
 
 /* Star (5-point) */
 .pin-shape-star .pin-dot,
@@ -4377,6 +4379,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border-radius: 0;
 }
 .pin-shape-star .pin-body::after { display: none; }
+.pin-shape-star .pin-border-ring { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); border-radius: 0; }
 
 /* Hexagon */
 .pin-shape-hexagon .pin-dot,
@@ -4387,6 +4390,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border-radius: 0;
 }
 .pin-shape-hexagon .pin-body::after { display: none; }
+.pin-shape-hexagon .pin-border-ring { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); border-radius: 0; }
 
 /* Shield (heraldic — square top, pointed bottom) */
 .pin-shape-shield .pin-dot,
@@ -4397,3 +4401,37 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border-radius: 0;
 }
 .pin-shape-shield .pin-body::after { display: none; }
+.pin-shape-shield .pin-border-ring { clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%); border-radius: 0; }
+
+/* ── Shape color ring (replaces box-shadow which clip-path clips away) ───── */
+/* Two concentric sibling elements before the icon: outer=loc-color, inner=dark separator */
+.pin-shape-ring {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.pin-shape-ring--outer {
+  width: 47px; height: 47px;
+  top: -4.5px;
+  background: var(--loc-color, var(--accent));
+  z-index: 0;
+}
+.pin-shape-ring--inner {
+  width: 43px; height: 43px;
+  top: -2.5px;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 0;
+}
+/* Small pins (icon 26px → rings 35/31px) */
+.pin.pin-size-sm .pin-shape-ring--outer { width: 35px; height: 35px; }
+.pin.pin-size-sm .pin-shape-ring--inner { width: 31px; height: 31px; }
+/* Large pins (icon 50px → rings 59/55px) */
+.pin.pin-size-lg .pin-shape-ring--outer { width: 59px; height: 59px; }
+.pin.pin-size-lg .pin-shape-ring--inner { width: 55px; height: 55px; }
+/* Apply matching clip-path to ring elements */
+.pin-shape-square  .pin-shape-ring { border-radius: 4px; }
+.pin-shape-diamond .pin-shape-ring { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+.pin-shape-star    .pin-shape-ring { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.pin-shape-hexagon .pin-shape-ring { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+.pin-shape-shield  .pin-shape-ring { clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%); }
