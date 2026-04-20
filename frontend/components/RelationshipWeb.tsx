@@ -127,29 +127,54 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
 
   useEffect(() => { if (!loading) requestAnimationFrame(fitView); }, [loading, fitView]);
 
-  // ── Wheel + pinch (SVG always in DOM) ─────────────────────────────────────
+  // ── Wheel + pinch + single-finger pan (SVG always in DOM) ───────────────
   useEffect(() => {
     const svg = svgRef.current; if (!svg) return;
     const onWheel = (e: WheelEvent) => { e.preventDefault(); applyZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); };
     let lastDist = 0;
+    let panTx = 0, panTy = 0, panActive = false;
+
     const onTS = (e: TouchEvent) => {
-      if (e.touches.length === 2)
+      if (e.touches.length === 1) {
+        panTx = e.touches[0].clientX;
+        panTy = e.touches[0].clientY;
+        panActive = true;
+        lastDist = 0;
+      } else if (e.touches.length === 2) {
+        panActive = false;
         lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      }
     };
     const onTM = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
       e.preventDefault();
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      if (lastDist > 0) applyZoom(dist / lastDist, mx, my);
-      lastDist = dist;
+      if (e.touches.length === 1 && panActive) {
+        const dx = e.touches[0].clientX - panTx;
+        const dy = e.touches[0].clientY - panTy;
+        panTx = e.touches[0].clientX;
+        panTy = e.touches[0].clientY;
+        setTx(prev => prev + dx);
+        setTy(prev => prev + dy);
+      } else if (e.touches.length === 2) {
+        panActive = false;
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        if (lastDist > 0) applyZoom(dist / lastDist, mx, my);
+        lastDist = dist;
+      }
     };
+    const onTE = () => { lastDist = 0; panActive = false; };
+
     svg.addEventListener('wheel',      onWheel, { passive: false });
-    svg.addEventListener('touchstart', onTS,    { passive: true });
+    svg.addEventListener('touchstart', onTS,    { passive: false });
     svg.addEventListener('touchmove',  onTM,    { passive: false });
-    svg.addEventListener('touchend',   () => { lastDist = 0; });
-    return () => { svg.removeEventListener('wheel', onWheel); svg.removeEventListener('touchstart', onTS); svg.removeEventListener('touchmove', onTM); };
+    svg.addEventListener('touchend',   onTE);
+    return () => {
+      svg.removeEventListener('wheel',      onWheel);
+      svg.removeEventListener('touchstart', onTS);
+      svg.removeEventListener('touchmove',  onTM);
+      svg.removeEventListener('touchend',   onTE);
+    };
   }, [applyZoom]);
 
   const zoomBy = (f: number) => {
@@ -635,39 +660,57 @@ export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Pro
           // ── Roster view ────────────────────────────────────────────────
           <div className="rel-roster-wrap">
             <div className="rel-roster-top">
-              <span className="rel-roster-title">Roster</span>
+              <span className="rel-roster-title">Roster — click to add to canvas</span>
               <input className="rel-label-input rel-roster-search-sm" placeholder="Search…"
                 value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} />
             </div>
             {(filtRosterParty.length + filtRosterNpcs.length + filtRosterFactions.length) === 0
               ? <div className="rel-roster-all-on">All entities are on the canvas</div>
               : (
-                <div className="rel-roster-cards">
-                  {filtRosterParty.map(m => (
-                    <button key={`party-${m.id}`} className="rel-roster-card" onClick={() => addToCanvas('party', m.id)}>
-                      {m.portrait_url
-                        ? <img src={API_BASE + m.portrait_url} className="rel-roster-card-img" alt="" />
-                        : <span className="rel-roster-card-initial" style={{ background: m.path_color || '#c9a84c' }}>{m.name[0]}</span>}
-                      <span className="rel-roster-card-name">{m.name}</span>
-                      <span className="rel-roster-card-sub">{m.class_name}</span>
-                    </button>
-                  ))}
-                  {filtRosterNpcs.map(n => (
-                    <button key={`npc-${n.id}`} className="rel-roster-card" onClick={() => addToCanvas('npc', n.id)}>
-                      {n.portrait_url
-                        ? <img src={API_BASE + n.portrait_url} className="rel-roster-card-img" alt="" />
-                        : <span className="rel-roster-card-initial">{n.name[0]}</span>}
-                      <span className="rel-roster-card-name">{n.name}</span>
-                      <span className="rel-roster-card-sub">{n.role}</span>
-                    </button>
-                  ))}
-                  {filtRosterFactions.map(f => (
-                    <button key={`faction-${f.id}`} className="rel-roster-card" onClick={() => addToCanvas('faction', f.id)}>
-                      <span className="rel-roster-card-initial" style={{ background: f.color || '#555', borderRadius: 4 }}>{f.name[0]}</span>
-                      <span className="rel-roster-card-name">{f.name}</span>
-                      <span className="rel-roster-card-sub">Faction</span>
-                    </button>
-                  ))}
+                <div className="rel-roster-list">
+                  {filtRosterParty.length > 0 && (
+                    <>
+                      <div className="rel-roster-section-hdr">Party</div>
+                      {filtRosterParty.map(m => (
+                        <button key={`party-${m.id}`} className="rel-roster-row" onClick={() => addToCanvas('party', m.id)}>
+                          {m.portrait_url
+                            ? <img src={API_BASE + m.portrait_url} className="rel-roster-row-avatar" alt="" />
+                            : <span className="rel-roster-row-initial" style={{ background: m.path_color || '#c9a84c' }}>{m.name[0]}</span>}
+                          <span className="rel-roster-row-name">{m.name}</span>
+                          <span className="rel-roster-row-sub">{m.class_name}</span>
+                          <span className="rel-roster-row-add">＋</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {filtRosterNpcs.length > 0 && (
+                    <>
+                      <div className="rel-roster-section-hdr">NPCs</div>
+                      {filtRosterNpcs.map(n => (
+                        <button key={`npc-${n.id}`} className="rel-roster-row" onClick={() => addToCanvas('npc', n.id)}>
+                          {n.portrait_url
+                            ? <img src={API_BASE + n.portrait_url} className="rel-roster-row-avatar" alt="" />
+                            : <span className="rel-roster-row-initial">{n.name[0]}</span>}
+                          <span className="rel-roster-row-name">{n.name}</span>
+                          <span className="rel-roster-row-sub">{n.role}</span>
+                          <span className="rel-roster-row-add">＋</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {filtRosterFactions.length > 0 && (
+                    <>
+                      <div className="rel-roster-section-hdr">Factions</div>
+                      {filtRosterFactions.map(f => (
+                        <button key={`faction-${f.id}`} className="rel-roster-row" onClick={() => addToCanvas('faction', f.id)}>
+                          <span className="rel-roster-row-initial" style={{ background: f.color || '#555', borderRadius: 4 }}>{f.name[0]}</span>
+                          <span className="rel-roster-row-name">{f.name}</span>
+                          <span className="rel-roster-row-sub">Faction</span>
+                          <span className="rel-roster-row-add">＋</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
           </div>

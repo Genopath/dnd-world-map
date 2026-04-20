@@ -4104,8 +4104,8 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   flex-shrink: 0;
   background: var(--surface2);
   border-top: 1px solid var(--border);
-  min-height: 160px;
-  max-height: 220px;
+  min-height: 180px;
+  max-height: 280px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -4230,7 +4230,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px 6px;
+  padding: 7px 12px 6px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -4239,8 +4239,9 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 .rel-roster-search-sm {
   flex: 1;
@@ -4249,70 +4250,75 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   padding: 4px 8px;
   height: 28px;
 }
-.rel-roster-cards {
+.rel-roster-list {
   flex: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 0 6px;
 }
-.rel-roster-card {
+.rel-roster-section-hdr {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 12px 3px;
+}
+.rel-roster-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  background: var(--surface3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 8px 10px;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 12px;
+  background: none;
+  border: none;
+  color: var(--text);
   cursor: pointer;
-  min-width: 72px;
-  max-width: 90px;
-  flex-shrink: 0;
-  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  transition: background 0.1s;
+  box-sizing: border-box;
 }
-.rel-roster-card:hover {
-  border-color: var(--accent-dim);
-  background: var(--surface4);
-}
-.rel-roster-card-img {
-  width: 40px;
-  height: 40px;
+.rel-roster-row:hover { background: rgba(255,255,255,0.06); }
+.rel-roster-row-avatar {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 }
-.rel-roster-card-initial {
-  width: 40px;
-  height: 40px;
+.rel-roster-row-initial {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--surface4);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--accent);
+  flex-shrink: 0;
 }
-.rel-roster-card-name {
+.rel-roster-row-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rel-roster-row-sub {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text);
-  text-align: center;
+  color: var(--text-muted);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 80px;
+  flex-shrink: 0;
 }
-.rel-roster-card-sub {
-  font-size: 10px;
-  color: var(--text-dim);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 80px;
+.rel-roster-row-add {
+  font-size: 14px;
+  color: var(--accent-dim);
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: 2px;
 }
 .rel-roster-all-on {
   flex: 1;
