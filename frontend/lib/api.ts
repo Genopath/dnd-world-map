@@ -204,8 +204,10 @@ export const api = {
     deleteEdge:    (id: number) => req<{ deleted: number }>(`/relationships/edges/${id}`, { method: 'DELETE' }),
     patchEdge:     (id: number, data: { active?: boolean; label?: string }) => req<RelationshipEdge>(`/relationships/edges/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     listPositions: () => req<RelationshipNodePos[]>('/relationships/positions'),
-    upsertPosition:(data: RelationshipNodePos) =>
+    upsertPosition: (data: RelationshipNodePos) =>
       req<RelationshipNodePos>('/relationships/positions', { method: 'POST', body: JSON.stringify(data) }),
+    deletePosition: (entity_type: string, entity_id: number) =>
+      req<{ deleted: boolean }>(`/relationships/positions/${entity_type}/${entity_id}`, { method: 'DELETE' }),
   },
   data: {
     export: () => req<object>('/export'),

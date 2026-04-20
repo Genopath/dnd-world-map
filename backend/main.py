@@ -1765,3 +1765,14 @@ def upsert_relationship_position(data: schemas.RelationshipNodePosUpsert, db: Se
     db.commit()
     db.refresh(pos)
     return pos
+
+@app.delete("/relationships/positions/{entity_type}/{entity_id}")
+def delete_relationship_position(entity_type: str, entity_id: int, db: Session = Depends(get_db)):
+    pos = db.query(models.RelationshipNodePos).filter(
+        models.RelationshipNodePos.entity_type == entity_type,
+        models.RelationshipNodePos.entity_id   == entity_id,
+    ).first()
+    if pos:
+        db.delete(pos)
+        db.commit()
+    return {"deleted": True}

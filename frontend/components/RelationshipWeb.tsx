@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { Faction, NPC, PartyMember, RelationshipEdge } from '../types';
 
-// ── Canvas constants ──────────────────────────────────────────────────────────
 const W = 1000;
 const H = 700;
 const NPC_R   = 30;
@@ -27,59 +26,39 @@ function defaultPos(type: NodeKind, id: number) {
   return { x: W / 2 + r * Math.cos(angle), y: H / 2 + r * Math.sin(angle) };
 }
 
-// ── Hidden-node persistence (localStorage, per-browser) ───────────────────────
-const LS_KEY = 'rel-web-hidden-v1';
-function loadHidden(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-function saveHidden(s: Set<string>) {
-  localStorage.setItem(LS_KEY, JSON.stringify(Array.from(s)));
-}
-
-const FACTION_COLORS = ['#7b5ea7', '#5e8a7b', '#a7695e', '#5e7ba7', '#a79c5e', '#a75e7b'];
-const randColor = () => FACTION_COLORS[Math.floor(Math.random() * FACTION_COLORS.length)];
-
 interface EdgeMenu  { edge: RelationshipEdge; x: number; y: number; }
 interface NodeCtx   { type: NodeKind; id: number; name: string; x: number; y: number; }
-interface EditLabel { edgeId: number; current: string; x: number; y: number; }
+interface EditLabel { edgeId: number; currentLabel: string; x: number; y: number; }
 
 interface Props {
-  npcs:             NPC[];
-  factions:         Faction[];
-  party:            PartyMember[];
-  isDMMode:         boolean;
-  onCreateNPC?:     (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => Promise<NPC>;
-  onCreateFaction?: (data: Omit<Faction, 'id' | 'created_at'>) => Promise<Faction>;
-  onDeleteNPC?:     (id: number) => Promise<void>;
-  onDeleteFaction?: (id: number) => Promise<void>;
+  npcs:      NPC[];
+  factions:  Faction[];
+  party:     PartyMember[];
+  isDMMode:  boolean;
 }
 
-export default function RelationshipWeb({
-  npcs, factions, party, isDMMode,
-  onCreateNPC, onCreateFaction, onDeleteNPC, onDeleteFaction,
-}: Props) {
+export default function RelationshipWeb({ npcs, factions, party, isDMMode }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const [edges,     setEdges]     = useState<RelationshipEdge[]>([]);
+  // positions = source of truth for what's on canvas; entities NOT in positions go to roster
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [loading,   setLoading]   = useState(true);
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(loadHidden);
 
-  // ── Transform ─────────────────────────────────────────────────────────────
+  // Transform
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
   const [scale, setScale] = useState(1);
   const xfRef = useRef({ tx: 0, ty: 0, scale: 1 });
   xfRef.current = { tx, ty, scale };
 
-  // ── Interaction ───────────────────────────────────────────────────────────
-  const mode       = useRef<'idle' | 'pan' | 'drag'>('idle');
-  const panOrigin  = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
-  const dragState  = useRef<{ key: string; origX: number; origY: number; startCx: number; startCy: number } | null>(null);
-  const movedPx    = useRef(0);
+  // Interaction
+  const mode      = useRef<'idle' | 'pan' | 'drag'>('idle');
+  const panOrigin = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+  const dragState = useRef<{ key: string; origX: number; origY: number; startCx: number; startCy: number } | null>(null);
+  const movedPx   = useRef(0);
 
-  // ── UI state ──────────────────────────────────────────────────────────────
+  // UI state
   const [selecting,   setSelecting]   = useState<{ type: NodeKind; id: number } | null>(null);
   const [pendingEdge, setPendingEdge] = useState<{ from: { type: NodeKind; id: number }; to: { type: NodeKind; id: number }; screenX: number; screenY: number } | null>(null);
   const [labelDraft,  setLabelDraft]  = useState('');
@@ -87,12 +66,8 @@ export default function RelationshipWeb({
   const [edgeMenu,    setEdgeMenu]    = useState<EdgeMenu | null>(null);
   const [editLabel,   setEditLabel]   = useState<EditLabel | null>(null);
   const [nodeCtx,     setNodeCtx]     = useState<NodeCtx | null>(null);
-  const [showAdd,     setShowAdd]     = useState(false);
-  const [addSearch,   setAddSearch]   = useState('');
-  const [addBusy,     setAddBusy]     = useState(false);
-  const [addNew,      setAddNew]      = useState(false);
-  const [newKind,     setNewKind]     = useState<'npc' | 'faction'>('npc');
-  const [newName,     setNewName]     = useState('');
+  const [showRoster,  setShowRoster]  = useState(false);
+  const [rosterSearch, setRosterSearch] = useState('');
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -106,8 +81,38 @@ export default function RelationshipWeb({
       .finally(() => setLoading(false));
   }, []);
 
-  const getPos = useCallback((type: NodeKind, id: number) =>
+  // entities on canvas = those with a saved position
+  const isOnCanvas = (type: NodeKind, id: number) => nodeKey(type, id) in positions;
+  const getPos     = useCallback((type: NodeKind, id: number) =>
     positions[nodeKey(type, id)] ?? defaultPos(type, id), [positions]);
+
+  const canvasNpcs     = npcs.filter(n => isOnCanvas('npc',     n.id));
+  const canvasFactions = factions.filter(f => isOnCanvas('faction', f.id));
+  const canvasParty    = party.filter(m => isOnCanvas('party',   m.id));
+
+  const rosterNpcs     = npcs.filter(n => !isOnCanvas('npc',     n.id));
+  const rosterFactions = factions.filter(f => !isOnCanvas('faction', f.id));
+  const rosterParty    = party.filter(m => !isOnCanvas('party',   m.id));
+
+  const q = rosterSearch.toLowerCase();
+  const filteredRosterNpcs     = rosterNpcs.filter(n => n.name.toLowerCase().includes(q));
+  const filteredRosterFactions = rosterFactions.filter(f => f.name.toLowerCase().includes(q));
+  const filteredRosterParty    = rosterParty.filter(m => m.name.toLowerCase().includes(q));
+  const rosterEmpty = filteredRosterNpcs.length + filteredRosterFactions.length + filteredRosterParty.length === 0;
+
+  // ── Add entity to canvas ──────────────────────────────────────────────────
+  const addToCanvas = (type: NodeKind, id: number) => {
+    const pos = defaultPos(type, id);
+    api.relationships.upsertPosition({ entity_type: type, entity_id: id, x: pos.x, y: pos.y });
+    setPositions(prev => ({ ...prev, [nodeKey(type, id)]: pos }));
+  };
+
+  // ── Remove entity from canvas (back to roster) ────────────────────────────
+  const removeFromCanvas = async (type: NodeKind, id: number) => {
+    await api.relationships.deletePosition(type, id);
+    const key = nodeKey(type, id);
+    setPositions(prev => { const n = { ...prev }; delete n[key]; return n; });
+  };
 
   // ── Fit / zoom ────────────────────────────────────────────────────────────
   const applyZoom = useCallback((factor: number, cx: number, cy: number) => {
@@ -116,7 +121,7 @@ export default function RelationshipWeb({
     const { tx, ty, scale } = xfRef.current;
     const mx = cx - rect.left; const my = cy - rect.top;
     const ns = Math.max(0.1, Math.min(6, scale * factor));
-    const r  = ns / scale;
+    const r = ns / scale;
     setScale(ns); setTx(mx - (mx - tx) * r); setTy(my - (my - ty) * r);
   }, []);
 
@@ -130,18 +135,15 @@ export default function RelationshipWeb({
     setTy(rect.height / 2 - (H / 2) * s);
   }, []);
 
-  // Run fitView once the SVG is visible (after loading resolves)
   useEffect(() => { if (!loading) requestAnimationFrame(fitView); }, [loading, fitView]);
 
-  // ── Wheel + pinch zoom (native listeners on SVG — always in DOM) ──────────
+  // ── Wheel + pinch (SVG always in DOM — no conditional render) ─────────────
   useEffect(() => {
     const svg = svgRef.current; if (!svg) return;
-
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       applyZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY);
     };
-
     let lastDist = 0;
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2)
@@ -156,24 +158,21 @@ export default function RelationshipWeb({
       if (lastDist > 0) applyZoom(dist / lastDist, midX, midY);
       lastDist = dist;
     };
-    const onTouchEnd = () => { lastDist = 0; };
-
     svg.addEventListener('wheel',      onWheel,      { passive: false });
     svg.addEventListener('touchstart', onTouchStart, { passive: true });
     svg.addEventListener('touchmove',  onTouchMove,  { passive: false });
-    svg.addEventListener('touchend',   onTouchEnd);
+    svg.addEventListener('touchend',   () => { lastDist = 0; });
     return () => {
       svg.removeEventListener('wheel',      onWheel);
       svg.removeEventListener('touchstart', onTouchStart);
       svg.removeEventListener('touchmove',  onTouchMove);
-      svg.removeEventListener('touchend',   onTouchEnd);
     };
-  }, [applyZoom]); // no conditional render before this — SVG always in DOM
+  }, [applyZoom]);
 
   const zoomBy = (f: number) => {
     const svg = svgRef.current; if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    applyZoom(f, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const r = svg.getBoundingClientRect();
+    applyZoom(f, r.left + r.width / 2, r.top + r.height / 2);
   };
 
   // ── Global mouse ─────────────────────────────────────────────────────────
@@ -224,23 +223,7 @@ export default function RelationshipWeb({
   const edgeOpacity = (e: RelationshipEdge) =>
     (e.active ? 1 : 0.35) * (hoveredKey && !connectedEdgeIds!.has(e.id) ? 0.06 : 1);
 
-  // ── Hidden node helpers ───────────────────────────────────────────────────
-  const hideNode = (key: string) => setHiddenKeys(prev => { const n = new Set(prev); n.add(key); saveHidden(n); return n; });
-  const showNode = (key: string) => setHiddenKeys(prev => { const n = new Set(prev); n.delete(key); saveHidden(n); return n; });
-
-  const visibleNpcs     = npcs.filter(n => !hiddenKeys.has(nodeKey('npc',     n.id)));
-  const visibleFactions = factions.filter(f => !hiddenKeys.has(nodeKey('faction', f.id)));
-  const visibleParty    = party.filter(m => !hiddenKeys.has(nodeKey('party',   m.id)));
-
-  // Nodes hidden from web (available to restore)
-  const hiddenNodes = [
-    ...npcs.filter(n => hiddenKeys.has(nodeKey('npc', n.id))).map(n => ({ type: 'npc' as NodeKind, id: n.id, name: n.name })),
-    ...factions.filter(f => hiddenKeys.has(nodeKey('faction', f.id))).map(f => ({ type: 'faction' as NodeKind, id: f.id, name: f.name })),
-    ...party.filter(m => hiddenKeys.has(nodeKey('party', m.id))).map(m => ({ type: 'party' as NodeKind, id: m.id, name: m.name })),
-  ];
-  const filteredHidden = hiddenNodes.filter(n => n.name.toLowerCase().includes(addSearch.toLowerCase()));
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // ── Event handlers ────────────────────────────────────────────────────────
   const dismissAll = () => { setEdgeMenu(null); setNodeCtx(null); setEditLabel(null); };
 
   const onSvgMouseDown = (e: React.MouseEvent) => {
@@ -258,6 +241,7 @@ export default function RelationshipWeb({
     mode.current = 'drag';
     dragState.current = { key: nodeKey(type, id), origX: pos.x, origY: pos.y, startCx: e.clientX, startCy: e.clientY };
   };
+
   const onNodeClick = (e: React.MouseEvent, type: NodeKind, id: number) => {
     e.stopPropagation();
     if (movedPx.current > 6) return;
@@ -272,6 +256,7 @@ export default function RelationshipWeb({
       setLabelDraft(''); setSelecting(null);
     }
   };
+
   const onNodeContextMenu = (e: React.MouseEvent, type: NodeKind, id: number, name: string) => {
     if (!isDMMode) return;
     e.preventDefault(); e.stopPropagation();
@@ -279,6 +264,7 @@ export default function RelationshipWeb({
     setNodeCtx({ type, id, name, x: e.clientX - rect.left, y: e.clientY - rect.top });
     setEdgeMenu(null); setEditLabel(null);
   };
+
   const onEdgeClick = (e: React.MouseEvent, edge: RelationshipEdge) => {
     e.stopPropagation();
     if (!isDMMode) return;
@@ -297,10 +283,17 @@ export default function RelationshipWeb({
     setEdges(prev => [...prev, edge]); setPendingEdge(null);
   };
 
+  // Clicking same preset as current label = delete the edge (toggle off)
   const confirmLabelEdit = async (label: string) => {
     if (!editLabel) return;
-    const updated = await api.relationships.patchEdge(editLabel.edgeId, { label: label.trim() });
-    setEdges(prev => prev.map(e => e.id === editLabel.edgeId ? updated : e));
+    if (label.trim() === editLabel.currentLabel) {
+      // toggle off — delete the edge
+      await api.relationships.deleteEdge(editLabel.edgeId);
+      setEdges(prev => prev.filter(e => e.id !== editLabel.edgeId));
+    } else {
+      const updated = await api.relationships.patchEdge(editLabel.edgeId, { label: label.trim() });
+      setEdges(prev => prev.map(e => e.id === editLabel.edgeId ? updated : e));
+    }
     setEditLabel(null);
   };
 
@@ -318,30 +311,6 @@ export default function RelationshipWeb({
     setEdgeMenu(null);
   };
 
-  // ── Node delete ───────────────────────────────────────────────────────────
-  const deleteNodePermanently = async () => {
-    if (!nodeCtx) return;
-    const { type, id } = nodeCtx; setNodeCtx(null);
-    const toRemove = edges.filter(e => (e.from_type === type && e.from_id === id) || (e.to_type === type && e.to_id === id));
-    await Promise.all(toRemove.map(e => api.relationships.deleteEdge(e.id)));
-    setEdges(prev => prev.filter(e => !((e.from_type === type && e.from_id === id) || (e.to_type === type && e.to_id === id))));
-    if (type === 'npc')     onDeleteNPC?.(id);
-    if (type === 'faction') onDeleteFaction?.(id);
-  };
-
-  // ── Quick-add / restore ───────────────────────────────────────────────────
-  const submitNew = async () => {
-    if (!newName.trim()) return;
-    setAddBusy(true);
-    try {
-      if (newKind === 'npc' && onCreateNPC)
-        await onCreateNPC({ name: newName.trim(), role: '', status: 'alive', notes: '', location_id: null, is_visible: true, linked_quest_ids: [] });
-      else if (newKind === 'faction' && onCreateFaction)
-        await onCreateFaction({ name: newName.trim(), description: '', reputation: 0, notes: '', color: randColor(), is_visible: true });
-      setNewName(''); setAddNew(false); setShowAdd(false);
-    } finally { setAddBusy(false); }
-  };
-
   // ── Position helpers ──────────────────────────────────────────────────────
   const anyPos = (type: string, id: number) => getPos(type as NodeKind, id);
   const edgeEndpoints = (e: RelationshipEdge) => ({
@@ -351,14 +320,19 @@ export default function RelationshipWeb({
   const toPad = (type: string) => type === 'npc' ? NPC_R + 6 : type === 'party' ? PARTY_R + 6 : FACT_H / 2 + 6;
 
   const selectedKey = selecting ? nodeKey(selecting.type, selecting.id) : null;
-  const hasNodes = visibleNpcs.length > 0 || visibleFactions.length > 0 || visibleParty.length > 0;
 
-  // Active label picker — either new edge or edit existing
+  // Active label picker — new edge or edit existing
   const activePicker = pendingEdge
-    ? { x: pendingEdge.screenX, y: pendingEdge.screenY, current: '', onConfirm: confirmEdge, onCancel: () => setPendingEdge(null) }
+    ? { x: pendingEdge.screenX, y: pendingEdge.screenY, currentLabel: '', onConfirm: confirmEdge, onCancel: () => setPendingEdge(null) }
     : editLabel
-    ? { x: editLabel.x, y: editLabel.y, current: editLabel.current, onConfirm: confirmLabelEdit, onCancel: () => setEditLabel(null) }
+    ? { x: editLabel.x, y: editLabel.y, currentLabel: editLabel.currentLabel, onConfirm: confirmLabelEdit, onCancel: () => setEditLabel(null) }
     : null;
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+  const Shield = ({ r }: { r: number }) => (
+    <circle r={r} fill="transparent"
+      onMouseEnter={() => setHoveredKey(null)} onMouseLeave={() => setHoveredKey(null)} />
+  );
 
   return (
     <div className="rel-web-wrap">
@@ -366,8 +340,9 @@ export default function RelationshipWeb({
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="rel-toolbar">
         {isDMMode && (
-          <button className="rel-tb-btn rel-tb-add" onClick={() => { setShowAdd(v => !v); setSelecting(null); dismissAll(); }}>
-            + Add / Restore
+          <button className={`rel-tb-btn ${showRoster ? 'rel-tb-active' : 'rel-tb-add'}`}
+            onClick={() => { setShowRoster(v => !v); dismissAll(); setSelecting(null); }}>
+            {showRoster ? '✕ Close Roster' : '＋ Roster'}
           </button>
         )}
         <div className="rel-tb-spacer" />
@@ -376,78 +351,75 @@ export default function RelationshipWeb({
         <button className="rel-tb-btn" onClick={fitView} title="Fit view">⊡</button>
       </div>
 
-      {/* ── Add / Restore panel ───────────────────────────────────────────── */}
-      {showAdd && isDMMode && (
-        <div className="rel-add-panel">
-          {/* Restore hidden nodes */}
-          {hiddenNodes.length > 0 && (
-            <>
-              <div className="rel-add-section-title">Restore hidden nodes</div>
-              <input className="rel-label-input" style={{ marginBottom: 6 }}
-                placeholder="Search…" value={addSearch}
-                onChange={e => setAddSearch(e.target.value)} />
-              <div className="rel-restore-list">
-                {filteredHidden.map(n => (
-                  <button key={`${n.type}-${n.id}`} className="rel-restore-item"
-                    onClick={() => showNode(nodeKey(n.type, n.id))}>
-                    <span className="rel-restore-tag">{n.type}</span>
-                    {n.name}
-                  </button>
-                ))}
-                {filteredHidden.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No matches</div>}
-              </div>
-              <div className="rel-add-divider" />
-            </>
+      {/* ── Roster panel ─────────────────────────────────────────────────── */}
+      {showRoster && isDMMode && (
+        <div className="rel-roster">
+          <input className="rel-label-input rel-roster-search" placeholder="Search…"
+            value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} />
+          {rosterEmpty && <div className="rel-roster-empty">All entities are on the canvas</div>}
+
+          {filteredRosterParty.length > 0 && (
+            <div className="rel-roster-section">
+              <div className="rel-roster-heading">Party Members</div>
+              {filteredRosterParty.map(m => (
+                <button key={m.id} className="rel-roster-item" onClick={() => addToCanvas('party', m.id)}>
+                  {m.portrait_url
+                    ? <img src={API_BASE + m.portrait_url} className="rel-roster-avatar" alt="" />
+                    : <span className="rel-roster-initial" style={{ background: m.path_color || '#c9a84c' }}>{m.name[0]}</span>}
+                  <span className="rel-roster-name">{m.name}</span>
+                  <span className="rel-roster-sub">{m.class_name}</span>
+                </button>
+              ))}
+            </div>
           )}
-          {/* Create new */}
-          {!addNew ? (
-            <button className="rel-tb-btn" style={{ width: '100%', marginTop: 4 }} onClick={() => setAddNew(true)}>
-              + Create new NPC or Faction
-            </button>
-          ) : (
-            <>
-              <div className="rel-add-section-title">Create new</div>
-              <div className="rel-add-toggle">
-                <button className={`rel-add-kind ${newKind === 'npc' ? 'active' : ''}`} onClick={() => setNewKind('npc')}>NPC</button>
-                <button className={`rel-add-kind ${newKind === 'faction' ? 'active' : ''}`} onClick={() => setNewKind('faction')}>Faction</button>
-              </div>
-              <div className="rel-add-row">
-                <input className="rel-label-input" placeholder={newKind === 'npc' ? 'NPC name…' : 'Faction name…'}
-                  value={newName} autoFocus
-                  onChange={e => setNewName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') submitNew(); if (e.key === 'Escape') setAddNew(false); }} />
-                <button className="rel-label-ok" onClick={submitNew} disabled={addBusy || !newName.trim()}>{addBusy ? '…' : '✓'}</button>
-                <button className="rel-add-x" onClick={() => setAddNew(false)}>✕</button>
-              </div>
-            </>
+
+          {filteredRosterNpcs.length > 0 && (
+            <div className="rel-roster-section">
+              <div className="rel-roster-heading">NPCs</div>
+              {filteredRosterNpcs.map(n => (
+                <button key={n.id} className="rel-roster-item" onClick={() => addToCanvas('npc', n.id)}>
+                  {n.portrait_url
+                    ? <img src={API_BASE + n.portrait_url} className="rel-roster-avatar" alt="" />
+                    : <span className="rel-roster-initial">{n.name[0]}</span>}
+                  <span className="rel-roster-name">{n.name}</span>
+                  <span className="rel-roster-sub">{n.role}</span>
+                </button>
+              ))}
+            </div>
           )}
-          <button className="rel-label-cancel" style={{ marginTop: 8 }} onClick={() => { setShowAdd(false); setAddNew(false); setAddSearch(''); }}>Close</button>
+
+          {filteredRosterFactions.length > 0 && (
+            <div className="rel-roster-section">
+              <div className="rel-roster-heading">Factions</div>
+              {filteredRosterFactions.map(f => (
+                <button key={f.id} className="rel-roster-item" onClick={() => addToCanvas('faction', f.id)}>
+                  <span className="rel-roster-color-chip" style={{ background: f.color || '#666' }} />
+                  <span className="rel-roster-name">{f.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* ── Hint ──────────────────────────────────────────────────────────── */}
-      {isDMMode && !showAdd && (
+      {isDMMode && !showRoster && (
         <div className="rel-web-hint">
           {selecting
             ? '🔗 Click second node to link · click background to cancel'
-            : hasNodes
-              ? 'Click node to link · click edge to manage · drag to move · hover to highlight · right-click node for options'
-              : 'Use "+ Add / Restore" to add nodes'}
+            : canvasNpcs.length + canvasFactions.length + canvasParty.length === 0
+              ? 'Open "＋ Roster" to add entities to the canvas'
+              : 'Click node to link · click edge to manage · drag to move · hover to highlight · right-click to remove'}
         </div>
       )}
 
-      {/* ── SVG canvas — always rendered so wheel listener works ──────────── */}
+      {/* ── SVG — always in DOM so wheel listener attaches correctly ─────── */}
       <svg ref={svgRef} className="rel-web-svg"
-        onMouseDown={onSvgMouseDown}
-        onClick={onSvgClick}
-        onKeyDown={e => { if (e.key === 'Escape') { setSelecting(null); setShowAdd(false); dismissAll(); } }}
+        onMouseDown={onSvgMouseDown} onClick={onSvgClick}
+        onKeyDown={e => { if (e.key === 'Escape') { setSelecting(null); dismissAll(); } }}
         tabIndex={0}
       >
-        {loading && (
-          <text x="50%" y="50%" textAnchor="middle" fill="#888" fontSize={14} dominantBaseline="middle">
-            Loading…
-          </text>
-        )}
+        {loading && <text x="50%" y="50%" textAnchor="middle" fill="#666" fontSize={13} dominantBaseline="middle">Loading…</text>}
 
         <defs>
           {Object.entries(EDGE_COLORS).map(([k, c]) => (
@@ -465,6 +437,8 @@ export default function RelationshipWeb({
 
             {/* Edges */}
             {edges.map(edge => {
+              // only render edges where both ends are on canvas
+              if (!isOnCanvas(edge.from_type as NodeKind, edge.from_id) || !isOnCanvas(edge.to_type as NodeKind, edge.to_id)) return null;
               const { x1, y1, x2, y2 } = edgeEndpoints(edge);
               const mx = (x1 + x2) / 2; const my = (y1 + y2) / 2;
               const color = edge.active ? edgeColor(edge.label) : '#555566';
@@ -495,7 +469,7 @@ export default function RelationshipWeb({
             })}
 
             {/* Faction nodes */}
-            {visibleFactions.map(f => {
+            {canvasFactions.map(f => {
               const pos = getPos('faction', f.id);
               const key = nodeKey('faction', f.id);
               const isSel = key === selectedKey;
@@ -504,7 +478,8 @@ export default function RelationshipWeb({
                   transform={`translate(${pos.x},${pos.y})`}
                   onMouseDown={e => onNodeMouseDown(e, 'faction', f.id)}
                   onClick={e => onNodeClick(e, 'faction', f.id)}
-                  onContextMenu={e => onNodeContextMenu(e, 'faction', f.id, f.name)}>
+                  onContextMenu={e => onNodeContextMenu(e, 'faction', f.id, f.name)}
+                  onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)}>
                   {isSel && <rect x={-FACT_W/2-6} y={-FACT_H/2-6} width={FACT_W+12} height={FACT_H+12} rx={10}
                     fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
                   <rect x={-FACT_W/2} y={-FACT_H/2} width={FACT_W} height={FACT_H} rx={7}
@@ -514,14 +489,13 @@ export default function RelationshipWeb({
                     {f.name.length > 13 ? f.name.slice(0, 12) + '…' : f.name}
                   </text>
                   <text x={0} y={-FACT_H/2-8} textAnchor="middle" className="rel-node-sublabel">Faction</text>
-                  <rect x={-FACT_W/2} y={-FACT_H/2} width={FACT_W} height={FACT_H} rx={7} fill="transparent"
-                    onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)} />
+                  <rect x={-FACT_W/2} y={-FACT_H/2} width={FACT_W} height={FACT_H} rx={7} fill="transparent" />
                 </g>
               );
             })}
 
             {/* Party nodes */}
-            {visibleParty.map(m => {
+            {canvasParty.map(m => {
               const pos = getPos('party', m.id);
               const key = nodeKey('party', m.id);
               const isSel = key === selectedKey;
@@ -530,7 +504,8 @@ export default function RelationshipWeb({
                   transform={`translate(${pos.x},${pos.y})`}
                   onMouseDown={e => onNodeMouseDown(e, 'party', m.id)}
                   onClick={e => onNodeClick(e, 'party', m.id)}
-                  onContextMenu={e => onNodeContextMenu(e, 'party', m.id, m.name)}>
+                  onContextMenu={e => onNodeContextMenu(e, 'party', m.id, m.name)}
+                  onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)}>
                   {isSel && <circle r={PARTY_R+9} fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
                   <circle r={PARTY_R} fill="#1a2236" stroke={m.path_color || '#c9a84c'} strokeWidth={isSel ? 3.5 : 2.5} />
                   {m.portrait_url ? (
@@ -538,17 +513,16 @@ export default function RelationshipWeb({
                       <image href={API_BASE + m.portrait_url} x={-(PARTY_R-3)} y={-(PARTY_R-3)}
                         width={(PARTY_R-3)*2} height={(PARTY_R-3)*2}
                         clipPath={`url(#clip-party-${m.id})`} preserveAspectRatio="xMidYMid slice" /></>
-                  ) : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{m.name.charAt(0).toUpperCase()}</text>}
+                  ) : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{m.name[0].toUpperCase()}</text>}
                   <text x={0} y={PARTY_R+17} textAnchor="middle" className="rel-node-label">{m.name.length > 14 ? m.name.slice(0, 13) + '…' : m.name}</text>
                   <text x={0} y={PARTY_R+30} textAnchor="middle" className="rel-node-sublabel">{m.class_name || 'Party'}</text>
-                  <circle r={PARTY_R} fill="transparent"
-                    onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)} />
+                  <Shield r={PARTY_R} />
                 </g>
               );
             })}
 
             {/* NPC nodes */}
-            {visibleNpcs.map(n => {
+            {canvasNpcs.map(n => {
               const pos = getPos('npc', n.id);
               const key = nodeKey('npc', n.id);
               const isSel = key === selectedKey;
@@ -558,7 +532,8 @@ export default function RelationshipWeb({
                   transform={`translate(${pos.x},${pos.y})`}
                   onMouseDown={e => onNodeMouseDown(e, 'npc', n.id)}
                   onClick={e => onNodeClick(e, 'npc', n.id)}
-                  onContextMenu={e => onNodeContextMenu(e, 'npc', n.id, n.name)}>
+                  onContextMenu={e => onNodeContextMenu(e, 'npc', n.id, n.name)}
+                  onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)}>
                   {isSel && <circle r={NPC_R+9} fill="none" stroke="#e8c870" strokeWidth={2} strokeDasharray="5 3" />}
                   <circle r={NPC_R} fill="#1c1b32" stroke={ringColor} strokeWidth={isSel ? 3.5 : 2.5} />
                   {n.portrait_url ? (
@@ -566,11 +541,10 @@ export default function RelationshipWeb({
                       <image href={API_BASE + n.portrait_url} x={-(NPC_R-3)} y={-(NPC_R-3)}
                         width={(NPC_R-3)*2} height={(NPC_R-3)*2}
                         clipPath={`url(#clip-npc-${n.id})`} preserveAspectRatio="xMidYMid slice" /></>
-                  ) : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{n.name.charAt(0).toUpperCase()}</text>}
+                  ) : <text x={0} y={7} textAnchor="middle" className="rel-node-initial">{n.name[0].toUpperCase()}</text>}
                   <text x={0} y={NPC_R+17} textAnchor="middle" className="rel-node-label">{n.name.length > 14 ? n.name.slice(0, 13) + '…' : n.name}</text>
                   {n.role && <text x={0} y={NPC_R+30} textAnchor="middle" className="rel-node-sublabel">{n.role.length > 18 ? n.role.slice(0, 17) + '…' : n.role}</text>}
-                  <circle r={NPC_R} fill="transparent"
-                    onMouseEnter={() => setHoveredKey(key)} onMouseLeave={() => setHoveredKey(null)} />
+                  <Shield r={NPC_R} />
                 </g>
               );
             })}
@@ -579,12 +553,12 @@ export default function RelationshipWeb({
         )}
       </svg>
 
-      {/* ── Edge action menu ─────────────────────────────────────────────── */}
+      {/* Edge action menu */}
       {edgeMenu && isDMMode && (
         <div className="rel-ctx-menu" style={{ left: edgeMenu.x, top: edgeMenu.y }} onMouseDown={e => e.stopPropagation()}>
-          <div className="rel-ctx-title">{edgeMenu.edge.label || '(no label)'}</div>
+          <div className="rel-ctx-title">{edgeMenu.edge.label || '(unlabelled)'}</div>
           <button className="rel-ctx-item" onClick={() => {
-            setEditLabel({ edgeId: edgeMenu.edge.id, current: edgeMenu.edge.label, x: edgeMenu.x, y: edgeMenu.y });
+            setEditLabel({ edgeId: edgeMenu.edge.id, currentLabel: edgeMenu.edge.label, x: edgeMenu.x, y: edgeMenu.y });
             setEdgeMenu(null);
           }}>✏️ Change label</button>
           <button className="rel-ctx-item" onClick={toggleEdge}>
@@ -594,45 +568,46 @@ export default function RelationshipWeb({
         </div>
       )}
 
-      {/* ── Node context menu ─────────────────────────────────────────────── */}
+      {/* Node context menu */}
       {nodeCtx && isDMMode && (
         <div className="rel-ctx-menu" style={{ left: nodeCtx.x, top: nodeCtx.y }} onMouseDown={e => e.stopPropagation()}>
           <div className="rel-ctx-title">{nodeCtx.name}</div>
-          <button className="rel-ctx-item" onClick={() => { hideNode(nodeKey(nodeCtx.type, nodeCtx.id)); setNodeCtx(null); }}>
-            👁 Hide from web
+          <button className="rel-ctx-item" onClick={() => { removeFromCanvas(nodeCtx.type, nodeCtx.id); setNodeCtx(null); }}>
+            ← Remove from canvas
           </button>
-          {nodeCtx.type !== 'party' && (
-            <button className="rel-ctx-item rel-ctx-danger" onClick={deleteNodePermanently}>
-              🗑 Delete {nodeCtx.type === 'npc' ? 'NPC' : 'Faction'} permanently
-            </button>
-          )}
         </div>
       )}
 
-      {/* ── Label picker (new edge OR edit existing) ──────────────────────── */}
+      {/* Label picker */}
       {activePicker && (
         <div className="rel-label-picker" style={{ left: activePicker.x, top: activePicker.y }}>
-          <div className="rel-label-picker-title">{editLabel ? 'Change label' : 'Relationship type'}</div>
+          <div className="rel-label-picker-title">
+            {editLabel ? 'Change label · click current to remove' : 'Relationship type'}
+          </div>
           <div className="rel-label-presets">
             {PRESET_LABELS.map(l => (
-              <button key={l} className="rel-label-preset"
+              <button key={l} className={`rel-label-preset ${l === activePicker.currentLabel ? 'rel-label-preset--current' : ''}`}
                 style={{ '--preset-color': edgeColor(l) } as React.CSSProperties}
-                onClick={() => activePicker.onConfirm(l)}>{l}</button>
+                onClick={() => { setLabelDraft(l); activePicker.onConfirm(l); }}>
+                {l}{l === activePicker.currentLabel ? ' ✕' : ''}
+              </button>
             ))}
           </div>
           <div className="rel-label-custom">
-            <input className="rel-label-input" placeholder="or type custom…"
-              defaultValue={activePicker.current}
-              autoFocus
+            <input className="rel-label-input" placeholder="custom label…" autoFocus
+              defaultValue={activePicker.currentLabel}
               onChange={e => setLabelDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') activePicker.onConfirm(labelDraft || activePicker.current); if (e.key === 'Escape') activePicker.onCancel(); }} />
-            <button className="rel-label-ok" onClick={() => activePicker.onConfirm(labelDraft || activePicker.current)}>✓</button>
+              onKeyDown={e => {
+                if (e.key === 'Enter') activePicker.onConfirm(labelDraft);
+                if (e.key === 'Escape') activePicker.onCancel();
+              }} />
+            <button className="rel-label-ok" onClick={() => activePicker.onConfirm(labelDraft)}>✓</button>
           </div>
           <button className="rel-label-cancel" onClick={activePicker.onCancel}>Cancel</button>
         </div>
       )}
 
-      {/* ── Legend ───────────────────────────────────────────────────────── */}
+      {/* Legend */}
       <div className="rel-legend">
         {Object.entries(EDGE_COLORS).map(([label, color]) => (
           <span key={label} className="rel-legend-item">
