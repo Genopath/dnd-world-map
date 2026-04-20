@@ -231,16 +231,16 @@ export type SidebarTab =
 
 export interface RelationshipEdge {
   id:        number;
-  from_type: 'npc' | 'faction';
+  from_type: 'npc' | 'faction' | 'party';
   from_id:   number;
-  to_type:   'npc' | 'faction';
+  to_type:   'npc' | 'faction' | 'party';
   to_id:     number;
   label:     string;
   active:    boolean;
 }
 
 export interface RelationshipNodePos {
-  entity_type: 'npc' | 'faction';
+  entity_type: 'npc' | 'faction' | 'party';
   entity_id:   number;
   x:           number;
   y:           number;

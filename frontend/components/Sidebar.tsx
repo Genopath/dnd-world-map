@@ -400,7 +400,7 @@ export default function Sidebar({
 
         {activeTab === 'web' && (
           <RelationshipWeb
-            npcs={npcs} factions={factions} isDMMode={isDMMode}
+            npcs={npcs} factions={factions} party={party} isDMMode={isDMMode}
             onCreateNPC={onCreateNPC} onCreateFaction={onCreateFaction}
             onDeleteNPC={onDeleteNPC} onDeleteFaction={onDeleteFaction}
           />
