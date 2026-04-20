@@ -1391,6 +1391,7 @@ export default function MapView({
                 `pin-${loc.type}`,
                 loc.pin_size && loc.pin_size !== 'md' ? `pin-size-${loc.pin_size}` : '',
                 loc.pin_shape && loc.pin_shape !== 'circle' ? `pin-shape-${loc.pin_shape}` : '',
+                loc.pin_glow ? 'pin-glow' : '',
                 loc.id === selectedId ? 'selected' : '',
                 !loc.discovered && !isDMMode ? 'undiscovered' : '',
                 override ? 'pin-dragging' : '',
@@ -1511,12 +1512,12 @@ export default function MapView({
                     ) : null}
                   </div>
                 )}
-                {/* Shape-matching color ring for non-circle shapes (replaces box-shadow which is clipped) */}
+                {/* Shape color ring + glow wrapper for non-circle shapes */}
                 {loc.pin_shape && loc.pin_shape !== 'circle' && (
-                  <>
+                  <div className="pin-shape-glow-wrap">
                     <span className="pin-shape-ring pin-shape-ring--outer" />
                     <span className="pin-shape-ring pin-shape-ring--inner" />
-                  </>
+                  </div>
                 )}
                 {/* Normal pin icon — always rendered */}
                 {loc.icon_url ? (

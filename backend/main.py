@@ -130,6 +130,7 @@ def _loc_out(loc: models.Location) -> schemas.LocationOut:
         pin_style=getattr(loc, "pin_style", None) or "default",
         pin_border=getattr(loc, "pin_border", None) or "none",
         pin_shape=getattr(loc, "pin_shape", None) or "circle",
+        pin_glow=bool(getattr(loc, "pin_glow", False)),
         is_visible=getattr(loc, "is_visible", True) if getattr(loc, "is_visible", None) is not None else True,
         created_at=loc.created_at,
     )
@@ -1500,6 +1501,7 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
             pin_style=d.get("pin_style") or "default",
             pin_border=d.get("pin_border") or "none",
             pin_shape=d.get("pin_shape") or "circle",
+            pin_glow=bool(d.get("pin_glow", False)),
             is_visible=d.get("is_visible", True),
             scale_value=d.get("scale_value"),
             scale_unit=d.get("scale_unit"),

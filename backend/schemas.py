@@ -37,6 +37,7 @@ class LocationUpdate(BaseModel):
     pin_style:   Optional[str]   = None
     pin_border:  Optional[str]   = None
     pin_shape:   Optional[str]   = None
+    pin_glow:    Optional[bool]  = None
     is_visible:  Optional[bool]  = None
     scale_value: Optional[float] = None
     scale_unit:  Optional[str]   = None
@@ -62,6 +63,7 @@ class LocationOut(BaseModel):
     pin_style:  str  = 'default'
     pin_border: str  = 'none'
     pin_shape:  str  = 'circle'
+    pin_glow:   bool = False
     is_visible: bool = True
     scale_value: Optional[float] = None
     scale_unit:  Optional[str]   = None

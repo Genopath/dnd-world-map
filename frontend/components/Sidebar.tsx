@@ -269,6 +269,7 @@ export default function Sidebar({
               currentPinStyle={location.pin_style ?? 'default'}
               currentPinBorder={location.pin_border ?? 'none'}
               currentPinShape={location.pin_shape ?? 'circle'}
+              currentPinGlow={location.pin_glow ?? false}
               currentIsVisible={location.is_visible ?? true}
               currentIconUrl={location.icon_url} currentImageUrl={location.image_url} currentSubmapUrl={location.submap_image_url}
               onScheduleBackup={onScheduleBackup}
@@ -584,6 +585,7 @@ interface EditFormProps {
   currentPinStyle?: 'default' | 'flame' | 'frost' | 'cursed' | 'divine' | 'storm' | 'shadow' | 'lair' | 'arcane' | 'swords' | 'arrows' | 'quake';
   currentPinBorder?: 'none' | 'siege' | 'blessed' | 'warded' | 'cursed' | 'haunted' | 'plague' | 'frozen' | 'burning';
   currentPinShape?: 'circle' | 'square' | 'diamond' | 'star' | 'hexagon' | 'shield';
+  currentPinGlow?: boolean;
   currentIsVisible?: boolean;
   currentIconUrl?: string | null;
   currentImageUrl?: string | null;
@@ -591,7 +593,7 @@ interface EditFormProps {
   onScheduleBackup?: () => void;
 }
 
-function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentPinStyle = 'default', currentPinBorder = 'none', currentPinShape = 'circle', currentIsVisible = true, currentIconUrl, currentImageUrl, currentSubmapUrl, onScheduleBackup }: EditFormProps) {
+function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, saving, onUpdateLocation, currentPinSize = 'md', currentPinStyle = 'default', currentPinBorder = 'none', currentPinShape = 'circle', currentPinGlow = false, currentIsVisible = true, currentIconUrl, currentImageUrl, currentSubmapUrl, onScheduleBackup }: EditFormProps) {
   const [libraryFor, setLibraryFor] = useState<'icon' | 'image' | 'submap' | null>(null);
   const set = (key: keyof EditState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -714,6 +716,23 @@ function EditForm({ state, isDMMode, locationId, onChange, onSave, onCancel, sav
               onClick={() => onUpdateLocation(locationId, { pin_shape: value })}
             >{icon} {label}</button>
           ))}
+        </div>
+      </div>
+
+      {/* Pin glow toggle */}
+      <div className="form-group">
+        <label className="form-label">Pin Glow</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <button type="button"
+            className={`btn btn-sm${currentPinGlow ? ' btn-active' : ''}`}
+            style={{ flex: 1 }}
+            onClick={() => onUpdateLocation(locationId, { pin_glow: true })}
+          >✦ Glow On</button>
+          <button type="button"
+            className={`btn btn-sm${!currentPinGlow ? ' btn-active' : ''}`}
+            style={{ flex: 1 }}
+            onClick={() => onUpdateLocation(locationId, { pin_glow: false })}
+          >✧ Off</button>
         </div>
       </div>
 

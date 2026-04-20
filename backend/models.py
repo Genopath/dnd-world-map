@@ -27,6 +27,7 @@ class Location(Base):
     pin_style        = Column(String(20), default='default') # 'default' | 'flame' | 'frost' | etc.
     pin_border       = Column(String(20), default='none')    # 'none' | 'siege' | 'blessed' | etc.
     pin_shape        = Column(String(20), default='circle')  # 'circle' | 'square' | 'diamond' | 'star' | 'hexagon' | 'shield'
+    pin_glow         = Column(Boolean, default=False)         # ambient color aura
     is_visible       = Column(Boolean, default=True)         # shown to players?
     scale_value      = Column(Float, nullable=True)         # per-submap scale: map is X units wide
     scale_unit       = Column(String(50), nullable=True)

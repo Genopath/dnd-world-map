@@ -4403,49 +4403,40 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-shield .pin-body::after { display: none; }
 .pin-shape-shield .pin-border-ring { clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%); border-radius: 0; }
 
-/* ── Shape color ring (replaces box-shadow which clip-path clips away) ───── */
-/* Two concentric sibling elements before the icon: outer=loc-color, inner=dark separator */
-.pin-shape-ring {
+/* ── Shape color ring + glow wrapper ─────────────────────────────────────── */
+/* .pin-shape-glow-wrap: absolutely positioned div, NO clip-path on it.      */
+/* filter:drop-shadow on the wrapper traces the span contents' polygon shapes */
+/* and glows outward beyond the clipped boundary — the correct technique.     */
+.pin-shape-glow-wrap {
   position: absolute;
   left: 50%;
+  top: -4px;
+  width: 46px; height: 46px;
   transform: translateX(-50%);
   pointer-events: none;
-}
-.pin-shape-ring--outer {
-  display: block;
-  width: 46px; height: 46px;
-  top: -4px;
-  background: var(--loc-color, var(--accent));
   z-index: 0;
+  transition: transform 0.15s ease, filter 0.25s ease;
 }
-.pin-shape-ring--inner {
-  display: block;
-  width: 42px; height: 42px;
-  top: -2px;
-  background: rgba(0, 0, 0, 0.72);
-  z-index: 0;
+.pin:hover .pin-shape-glow-wrap,
+.pin.selected .pin-shape-glow-wrap {
+  transform: translateX(-50%) scale(1.2) translateY(-1px);
 }
-/* Small pins (icon 26px → rings 34/30px) */
-.pin.pin-size-sm .pin-shape-ring--outer { width: 34px; height: 34px; }
-.pin.pin-size-sm .pin-shape-ring--inner { width: 30px; height: 30px; }
-/* Large pins (icon 50px → rings 58/54px) */
-.pin.pin-size-lg .pin-shape-ring--outer { width: 58px; height: 58px; }
-.pin.pin-size-lg .pin-shape-ring--inner { width: 54px; height: 54px; }
-/* Apply matching clip-path to ring elements */
+.pin.pin-size-sm .pin-shape-glow-wrap { width: 34px; height: 34px; }
+.pin.pin-size-lg .pin-shape-glow-wrap { width: 58px; height: 58px; }
+
+/* Ring spans fill / inset the wrapper — no individual positioning needed */
+.pin-shape-ring         { display: block; position: absolute; pointer-events: none; }
+.pin-shape-ring--outer  { inset: 0;    background: var(--loc-color, var(--accent)); }
+.pin-shape-ring--inner  { inset: 2px;  background: rgba(0, 0, 0, 0.72); }
+
+/* Clip-path per shape applied to both ring spans via ancestor class */
 .pin-shape-square  .pin-shape-ring { border-radius: 4px; }
 .pin-shape-diamond .pin-shape-ring { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
 .pin-shape-star    .pin-shape-ring { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
 .pin-shape-hexagon .pin-shape-ring { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
 .pin-shape-shield  .pin-shape-ring { clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%); }
 
-/* ── Ring span hover / selected scaling ─────────────────────────────────── */
-.pin-shape-ring { transition: transform 0.15s ease; }
-.pin:hover .pin-shape-ring--outer, .pin.selected .pin-shape-ring--outer,
-.pin:hover .pin-shape-ring--inner, .pin.selected .pin-shape-ring--inner {
-  transform: translateX(-50%) scale(1.2) translateY(-1px);
-}
-
-/* ── Remove box-shadow ring/drop from non-circle icons (ring spans take over) */
+/* ── Remove box-shadow ring/drop from non-circle icons (ring wrapper takes over) */
 .pin-shape-square .pin-icon-default,   .pin-shape-square .pin-icon-img,
 .pin-shape-diamond .pin-icon-default,  .pin-shape-diamond .pin-icon-img,
 .pin-shape-star .pin-icon-default,     .pin-shape-star .pin-icon-img,
@@ -4453,22 +4444,31 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-shield .pin-icon-default,   .pin-shape-shield .pin-icon-img {
   box-shadow: inset 0 -4px 8px rgba(0,0,0,0.45), inset 0 2px 5px rgba(255,255,255,0.13);
 }
-.pin-shape-square:hover .pin-icon-default,   .pin-shape-square.selected .pin-icon-default,
-.pin-shape-square:hover .pin-icon-img,       .pin-shape-square.selected .pin-icon-img,
-.pin-shape-diamond:hover .pin-icon-default,  .pin-shape-diamond.selected .pin-icon-default,
-.pin-shape-diamond:hover .pin-icon-img,      .pin-shape-diamond.selected .pin-icon-img,
-.pin-shape-star:hover .pin-icon-default,     .pin-shape-star.selected .pin-icon-default,
-.pin-shape-star:hover .pin-icon-img,         .pin-shape-star.selected .pin-icon-img,
-.pin-shape-hexagon:hover .pin-icon-default,  .pin-shape-hexagon.selected .pin-icon-default,
-.pin-shape-hexagon:hover .pin-icon-img,      .pin-shape-hexagon.selected .pin-icon-img,
-.pin-shape-shield:hover .pin-icon-default,   .pin-shape-shield.selected .pin-icon-default,
-.pin-shape-shield:hover .pin-icon-img,       .pin-shape-shield.selected .pin-icon-img {
+.pin-shape-square:hover .pin-icon-default,    .pin-shape-square.selected .pin-icon-default,
+.pin-shape-square:hover .pin-icon-img,        .pin-shape-square.selected .pin-icon-img,
+.pin-shape-diamond:hover .pin-icon-default,   .pin-shape-diamond.selected .pin-icon-default,
+.pin-shape-diamond:hover .pin-icon-img,       .pin-shape-diamond.selected .pin-icon-img,
+.pin-shape-star:hover .pin-icon-default,      .pin-shape-star.selected .pin-icon-default,
+.pin-shape-star:hover .pin-icon-img,          .pin-shape-star.selected .pin-icon-img,
+.pin-shape-hexagon:hover .pin-icon-default,   .pin-shape-hexagon.selected .pin-icon-default,
+.pin-shape-hexagon:hover .pin-icon-img,       .pin-shape-hexagon.selected .pin-icon-img,
+.pin-shape-shield:hover .pin-icon-default,    .pin-shape-shield.selected .pin-icon-default,
+.pin-shape-shield:hover .pin-icon-img,        .pin-shape-shield.selected .pin-icon-img {
   box-shadow: inset 0 -4px 8px rgba(0,0,0,0.45), inset 0 2px 5px rgba(255,255,255,0.18);
 }
 
-/* ── Hide .pin-border-ring for ALL non-circle shapes ────────────────────── */
-/* The border ring is circle-only (box-shadow doesn't trace polygon paths).  */
-/* Ring spans + filter on .pin-body handle color ring + border style glows.  */
+/* ── Elevation drop-shadow for clip-path icons ─────────────────────────── */
+/* box-shadow y-offset is clipped invisible on clip-path elements; use filter */
+.pin-shape-diamond .pin-icon-default,  .pin-shape-diamond .pin-icon-img,
+.pin-shape-star .pin-icon-default,     .pin-shape-star .pin-icon-img,
+.pin-shape-hexagon .pin-icon-default,  .pin-shape-hexagon .pin-icon-img,
+.pin-shape-shield .pin-icon-default,   .pin-shape-shield .pin-icon-img {
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.75));
+}
+
+/* ── Hide border ring for ALL non-circle shapes ──────────────────────────── */
+/* .pin-border-ring stays in DOM (display:none != removed) so ~ combinator   */
+/* below can still fire when a border style is selected.                      */
 .pin-shape-square .pin-border-ring,
 .pin-shape-diamond .pin-border-ring,
 .pin-shape-star    .pin-border-ring,
@@ -4476,17 +4476,17 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-shield  .pin-border-ring { display: none; }
 
 /* ── Border style glows for non-circle shapes ───────────────────────────── */
-/* Applied to .pin-body (no clip-path) so filter: drop-shadow traces the     */
-/* actual rendered polygon shape and extends outward correctly.               */
-/* :has() checks that BOTH a border style AND non-circle ring spans exist.   */
-.pin:has(.pin-border-ring--siege):has(.pin-shape-ring--outer) .pin-body   { animation: shape-glow-siege   2s   ease-in-out infinite; }
-.pin:has(.pin-border-ring--blessed):has(.pin-shape-ring--outer) .pin-body { animation: shape-glow-blessed 3s   ease-in-out infinite; }
-.pin:has(.pin-border-ring--warded):has(.pin-shape-ring--outer) .pin-body  { animation: shape-glow-warded  4s   linear      infinite; }
-.pin:has(.pin-border-ring--cursed):has(.pin-shape-ring--outer) .pin-body  { animation: shape-glow-cursed  3.5s ease-in-out infinite; }
-.pin:has(.pin-border-ring--haunted):has(.pin-shape-ring--outer) .pin-body { animation: shape-glow-haunted 4.5s ease-in-out infinite; }
-.pin:has(.pin-border-ring--plague):has(.pin-shape-ring--outer) .pin-body  { animation: shape-glow-plague  2.5s ease-in-out infinite; }
-.pin:has(.pin-border-ring--frozen):has(.pin-shape-ring--outer) .pin-body  { animation: shape-glow-frozen  5s   ease-in-out infinite; }
-.pin:has(.pin-border-ring--burning):has(.pin-shape-ring--outer) .pin-body { animation: shape-glow-burning 1.8s ease-in-out infinite; }
+/* .pin-border-ring--{style} is display:none but stays in DOM, so ~ works.   */
+/* Filter on .pin-shape-glow-wrap (no clip-path) traces polygon spans inside  */
+/* and glows outward beyond their clipped boundary — shape-following glow.    */
+.pin-border-ring--siege   ~ .pin-shape-glow-wrap { animation: shape-glow-siege   2s   ease-in-out infinite; }
+.pin-border-ring--blessed ~ .pin-shape-glow-wrap { animation: shape-glow-blessed 3s   ease-in-out infinite; }
+.pin-border-ring--warded  ~ .pin-shape-glow-wrap { animation: shape-glow-warded  4s   linear      infinite; }
+.pin-border-ring--cursed  ~ .pin-shape-glow-wrap { animation: shape-glow-cursed  3.5s ease-in-out infinite; }
+.pin-border-ring--haunted ~ .pin-shape-glow-wrap { animation: shape-glow-haunted 4.5s ease-in-out infinite; }
+.pin-border-ring--plague  ~ .pin-shape-glow-wrap { animation: shape-glow-plague  2.5s ease-in-out infinite; }
+.pin-border-ring--frozen  ~ .pin-shape-glow-wrap { animation: shape-glow-frozen  5s   ease-in-out infinite; }
+.pin-border-ring--burning ~ .pin-shape-glow-wrap { animation: shape-glow-burning 1.8s ease-in-out infinite; }
 
 @keyframes shape-glow-siege {
   0%,100% { filter: drop-shadow(0 0 4px rgba(239,68,68,0.85))   drop-shadow(0 0 8px  rgba(220,38,38,0.4)); }
@@ -4524,4 +4524,11 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 @keyframes shape-glow-burning {
   0%,100% { filter: drop-shadow(0 0 4px rgba(249,115,22,0.85)) drop-shadow(0 0 10px rgba(239,68,68,0.5)); }
   50%     { filter: drop-shadow(0 0 9px rgba(253,186,116,1.0)) drop-shadow(0 0 20px rgba(249,115,22,0.8)); }
+}
+
+/* ── Pin Glow — ambient color aura, works on all shapes ────────────────── */
+.pin.pin-glow .pin-body { animation: pin-ambient-glow 3s ease-in-out infinite; }
+@keyframes pin-ambient-glow {
+  0%,100% { filter: drop-shadow(0 0 5px var(--loc-color))  drop-shadow(0 0 12px var(--loc-color)); }
+  50%     { filter: drop-shadow(0 0 10px var(--loc-color)) drop-shadow(0 0 22px var(--loc-color)); }
 }
