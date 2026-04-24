@@ -263,6 +263,7 @@ class CampaignUpdate(BaseModel):
     party_marker_y:       Optional[float] = None
     party_marker_visible: Optional[bool]  = None
     camp_map_url:         Optional[str]   = None
+    submap_party_markers: Optional[str]   = None  # JSON: {"loc_id": {"x": f, "y": f}}
 
 class CampaignOut(BaseModel):
     id: int
@@ -283,6 +284,7 @@ class CampaignOut(BaseModel):
     party_marker_y:       Optional[float] = None
     party_marker_visible: bool = True
     camp_map_url:         Optional[str]   = None
+    submap_party_markers: Optional[str]   = None
     model_config = {"from_attributes": True}
 
 

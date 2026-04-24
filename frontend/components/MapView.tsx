@@ -116,6 +116,8 @@ interface Props {
   onCancelWaypoints?: () => void;
   // Party / character map tokens
   campaign?:             CampaignSettings | null;
+  partyMarkerX?:         number | null;
+  partyMarkerY?:         number | null;
   onUpdatePartyMarker?:  (x: number | null, y: number | null) => void;
   onUpdateCharMarker?:   (memberId: number, x: number | null, y: number | null) => void;
   onNavigateToParty?:    (memberId?: number) => void;
@@ -388,6 +390,8 @@ export default function MapView({
   onSaveWaypoints,
   onCancelWaypoints,
   campaign,
+  partyMarkerX: propPartyMarkerX,
+  partyMarkerY: propPartyMarkerY,
   onUpdatePartyMarker,
   onUpdateCharMarker,
   onNavigateToParty,
@@ -398,6 +402,10 @@ export default function MapView({
   factions = [],
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Use per-map party marker coords passed from parent (world map vs submap)
+  const partyMarkerX = propPartyMarkerX ?? campaign?.party_marker_x ?? null;
+  const partyMarkerY = propPartyMarkerY ?? campaign?.party_marker_y ?? null;
 
   // Count active quests per location for the indicator dot
   const activeQuestCounts = useMemo(() => {
@@ -498,8 +506,8 @@ export default function MapView({
     let mx: number | null | undefined;
     let my: number | null | undefined;
     if (pingTarget.kind === 'party') {
-      mx = campaign?.party_marker_x;
-      my = campaign?.party_marker_y;
+      mx = partyMarkerX;
+      my = partyMarkerY;
     } else {
       const m = party.find(p => p.id === pingTarget.memberId);
       mx = m?.marker_x;
@@ -1661,7 +1669,7 @@ export default function MapView({
                 const partyDragging = tokenDragPos?.kind === 'party';
                 if (campaign &&
                     !partyDragging &&
-                    campaign.party_marker_x === loc.x && campaign.party_marker_y === loc.y &&
+                    partyMarkerX === loc.x && partyMarkerY === loc.y &&
                     (isDMMode || campaign.party_marker_visible !== false)) {
                   baubles.push(
                     <div key="party" className={`party-bauble party-bauble--party${pingedToken === 'party' ? ' token-pinged' : ''}${hasCampMap ? ' party-token--has-camp' : ''}`}
@@ -1711,12 +1719,12 @@ export default function MapView({
         {/* ── Floating party token (not snapped to any pin) ──────────────── */}
         {campaign != null && (() => {
           const partyDragging = tokenDragPos?.kind === 'party';
-          const mx = partyDragging ? tokenDragPos!.x : campaign.party_marker_x;
-          const my = partyDragging ? tokenDragPos!.y : campaign.party_marker_y;
+          const mx = partyDragging ? tokenDragPos!.x : partyMarkerX;
+          const my = partyDragging ? tokenDragPos!.y : partyMarkerY;
           if (mx == null || my == null) return null;
           if (!isDMMode && campaign.party_marker_visible === false) return null;
           // If snapped to a visible pin and not mid-drag, render as bauble there instead
-          if (!partyDragging && visibleLocations.some(l => l.x === campaign.party_marker_x && l.y === campaign.party_marker_y)) return null;
+          if (!partyDragging && visibleLocations.some(l => l.x === partyMarkerX && l.y === partyMarkerY)) return null;
           return (
             <div
               className={`party-token${pingedToken === 'party' ? ' token-pinged' : ''}${hasCampMap ? ' party-token--has-camp' : ''}`}
@@ -1852,7 +1860,7 @@ export default function MapView({
             <div className="pin-context-sep" />
           )}
           {onUpdatePartyMarker && (() => {
-            const isHere = campaign?.party_marker_x === contextMenu.loc.x && campaign?.party_marker_y === contextMenu.loc.y;
+            const isHere = partyMarkerX === contextMenu.loc.x && partyMarkerY === contextMenu.loc.y;
             return (
               <button
                 className={isHere ? 'pin-context-delete' : undefined}

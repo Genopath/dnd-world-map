@@ -600,6 +600,15 @@ export default function Home() {
   const currentMapUrl = currentMapId != null
     ? (locations.find(l => l.id === currentMapId)?.submap_image_url ?? null)
     : mapConfig.image_url;
+  // Per-map party marker: world map uses campaign.party_marker_x/y, submaps use the JSON blob
+  const _submapMarkers: Record<string, { x: number; y: number }> = campaign
+    ? JSON.parse(campaign.submap_party_markers || '{}') : {};
+  const effectivePartyX: number | null = currentMapId != null
+    ? (_submapMarkers[String(currentMapId)]?.x ?? null)
+    : (campaign?.party_marker_x ?? null);
+  const effectivePartyY: number | null = currentMapId != null
+    ? (_submapMarkers[String(currentMapId)]?.y ?? null)
+    : (campaign?.party_marker_y ?? null);
   const levelLocations = isDMMode
     ? locations.filter(l => (l.parent_id ?? null) === currentMapId)
     : locations.filter(l => (l.parent_id ?? null) === currentMapId && l.discovered);
@@ -864,10 +873,25 @@ export default function Home() {
 
   // ── Party marker handlers ─────────────────────────────────────────────────────
   const handleUpdatePartyMarker = useCallback(async (x: number | null, y: number | null) => {
-    const updated = await api.campaign.update({ party_marker_x: x, party_marker_y: y });
-    setCampaign(updated);
+    const mapId = mapStack.length > 0 ? mapStack[mapStack.length - 1] : null;
+    if (mapId == null) {
+      // World map — use the dedicated x/y columns
+      const updated = await api.campaign.update({ party_marker_x: x, party_marker_y: y });
+      setCampaign(updated);
+    } else {
+      // Submap — patch the JSON blob optimistically then persist
+      setCampaign(prev => {
+        if (!prev) return prev;
+        const blob: Record<string, { x: number; y: number }> = JSON.parse(prev.submap_party_markers || '{}');
+        if (x == null || y == null) { delete blob[String(mapId)]; }
+        else { blob[String(mapId)] = { x, y }; }
+        const newBlob = JSON.stringify(blob);
+        api.campaign.update({ submap_party_markers: newBlob }).then(setCampaign);
+        return { ...prev, submap_party_markers: newBlob };
+      });
+    }
     if (x == null) playTokenRemove(); else playTokenPlace();
-  }, []);
+  }, [mapStack]);
   const handleUpdateCharMarker = useCallback(async (memberId: number, x: number | null, y: number | null) => {
     const updated = await api.party.update(memberId, { marker_x: x, marker_y: y });
     setParty(prev => prev.map(m => m.id === memberId ? updated : m));
@@ -1525,6 +1549,8 @@ export default function Home() {
             gridCellSize={gridCellSize}
             rulerActive={rulerMode}
             campaign={campaign}
+            partyMarkerX={effectivePartyX}
+            partyMarkerY={effectivePartyY}
             onUpdatePartyMarker={handleUpdatePartyMarker}
             onUpdateCharMarker={handleUpdateCharMarker}
             onNavigateToParty={handleNavigateToParty}

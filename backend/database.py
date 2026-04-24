@@ -92,6 +92,7 @@ _MIGRATIONS = [
     "ALTER TABLE party_members ADD COLUMN camp_x REAL",
     "ALTER TABLE party_members ADD COLUMN camp_y REAL",
     "ALTER TABLE party_members ADD COLUMN camp_visible BOOLEAN DEFAULT 1",
+    "ALTER TABLE campaign_settings ADD COLUMN submap_party_markers TEXT DEFAULT '{}'",
     # ── Indexes ───────────────────────────────────────────────────────────────
     "CREATE INDEX IF NOT EXISTS ix_locations_parent_id ON locations (parent_id)",
     "CREATE INDEX IF NOT EXISTS ix_player_path_location_id ON player_path (location_id)",

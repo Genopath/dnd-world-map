@@ -187,6 +187,7 @@ export interface CampaignSettings {
   party_marker_y?: number | null;
   party_marker_visible?: boolean;
   camp_map_url?: string | null;
+  submap_party_markers?: string | null;  // JSON: {"loc_id": {"x": number, "y": number}}
 }
 
 export interface CalendarConfig {

@@ -140,6 +140,7 @@ class CampaignSettings(Base):
     party_marker_y       = Column(Float, nullable=True)
     party_marker_visible = Column(Boolean, default=True)
     camp_map_url         = Column(String(500), nullable=True)
+    submap_party_markers = Column(Text, nullable=True, default='{}')
 
 
 class PartyMember(Base):
