@@ -1672,7 +1672,15 @@ export default function MapView({
                       onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
                       title="Party marker"
                       data-no-draw
-                    >🔥</div>
+                    >
+                      <div className="cf-scene">
+                        <div className="cf-flame cf-flame-l" />
+                        <div className="cf-flame cf-flame-c" />
+                        <div className="cf-flame cf-flame-r" />
+                        <div className="cf-glow" />
+                        <div className="cf-logs"><div className="cf-log" /><div className="cf-log" /><div className="cf-log" /></div>
+                      </div>
+                    </div>
                   );
                 }
                 for (const m of party) {
@@ -1720,7 +1728,16 @@ export default function MapView({
               onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
               data-no-draw
               title="Party marker"
-            >🔥</div>
+            >
+              <div className="cf-scene">
+                <div className="cf-flame cf-flame-l" />
+                <div className="cf-flame cf-flame-c" />
+                <div className="cf-flame cf-flame-r" />
+                <div className="cf-glow" />
+                <div className="cf-ember" /><div className="cf-ember" /><div className="cf-ember" />
+                <div className="cf-logs"><div className="cf-log" /><div className="cf-log" /><div className="cf-log" /></div>
+              </div>
+            </div>
           );
         })()}
 

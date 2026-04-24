@@ -944,15 +944,21 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border: 2px solid rgba(255, 230, 160, 0.85);
   animation: campfire-flicker 2.4s ease-in-out infinite;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  font-size: 16px;
-  line-height: 1;
+  overflow: hidden;
   cursor: grab;
   user-select: none;
   touch-action: none;
   pointer-events: all;
   transition: transform 0.15s ease;
+}
+/* Campfire scaled to fit inside the 32px token circle */
+.party-token > .cf-scene {
+  transform: scale(0.68);
+  transform-origin: center bottom;
+  margin-bottom: -2px;
+  flex-shrink: 0;
 }
 .party-token:hover {
   animation: campfire-flicker-hover 1.6s ease-in-out infinite;
@@ -1000,14 +1006,19 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border: 1.5px solid rgba(255, 220, 130, 0.8);
   animation: campfire-flicker 2.8s ease-in-out infinite;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  font-size: 9px;
-  line-height: 1;
+  overflow: hidden;
   cursor: grab;
   user-select: none;
   touch-action: none;
   transition: transform 0.15s ease;
+}
+.party-bauble > .cf-scene {
+  transform: scale(0.36);
+  transform-origin: center bottom;
+  margin-bottom: -1px;
+  flex-shrink: 0;
 }
 .party-bauble:hover {
   transform: scale(1.3);
