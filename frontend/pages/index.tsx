@@ -302,26 +302,29 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Mobile: swipe from right edge to open sidebar ───────────────────────────
+  // ── Mobile: swipe from right edge to open, swipe left inside sidebar to close ──
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let startX = 0;
     let startY = 0;
-    let tracking = false;
+    let tracking: 'open' | 'close' | null = null;
 
     const onStart = (e: TouchEvent) => {
       const t = e.touches[0];
       startX = t.clientX;
       startY = t.clientY;
-      tracking = t.clientX > window.innerWidth - 32;
+      if (t.clientX > window.innerWidth - 32) tracking = 'open';
+      else if (t.clientX > window.innerWidth - 380) tracking = 'close';
+      else tracking = null;
     };
     const onEnd = (e: TouchEvent) => {
       if (!tracking) return;
-      tracking = false;
       const t = e.changedTouches[0];
       const dx = t.clientX - startX;
       const dy = Math.abs(t.clientY - startY);
-      if (dx < -60 && dy < 100) setMobileSidebarOpen(true);
+      if (tracking === 'open'  && dx < -60 && dy < 100) setMobileSidebarOpen(true);
+      if (tracking === 'close' && dx >  60 && dy < 100) setMobileSidebarOpen(false);
+      tracking = null;
     };
 
     document.addEventListener('touchstart', onStart, { passive: true });
@@ -1411,6 +1414,30 @@ export default function Home() {
             </div>
           )}
         </header>
+
+        {/* ── Mobile bottom nav ─────────────────────────────────────────── */}
+        <nav className="mobile-bottom-nav">
+          <button
+            className={`mobile-nav-btn${!mobileSidebarOpen ? ' active' : ''}`}
+            onClick={() => setMobileSidebarOpen(false)}
+          ><span>🗺️</span><span>Map</span></button>
+          <button
+            className={`mobile-nav-btn${mobileSidebarOpen && ['location','path'].includes(sidebarTab) ? ' active' : ''}`}
+            onClick={() => { setSidebarTab('location'); setMobileSidebarOpen(true); }}
+          ><span>🌍</span><span>World</span></button>
+          <button
+            className={`mobile-nav-btn${mobileSidebarOpen && ['npcs','factions','party'].includes(sidebarTab) ? ' active' : ''}`}
+            onClick={() => { setSidebarTab('npcs'); setMobileSidebarOpen(true); }}
+          ><span>👥</span><span>People</span></button>
+          <button
+            className={`mobile-nav-btn${mobileSidebarOpen && ['quests','sessions','calendar'].includes(sidebarTab) ? ' active' : ''}`}
+            onClick={() => { setSidebarTab('quests'); setMobileSidebarOpen(true); }}
+          ><span>📜</span><span>Story</span></button>
+          <button
+            className={`mobile-nav-btn${mobileSidebarOpen && ['loot','web'].includes(sidebarTab) ? ' active' : ''}`}
+            onClick={() => { setSidebarTab('loot'); setMobileSidebarOpen(true); }}
+          ><span>⚙️</span><span>Extras</span></button>
+        </nav>
 
         {/* ── Main ─────────────────────────────────────────────────────── */}
         {/* Mobile sidebar backdrop */}

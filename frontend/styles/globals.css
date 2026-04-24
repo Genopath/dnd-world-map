@@ -2047,6 +2047,9 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .header-row-main  { display: contents; }
 .header-dm-tools  { display: contents; }
 
+/* ── Mobile bottom nav (hidden on desktop) ─────────────────────────────────── */
+.mobile-bottom-nav { display: none; }
+
 /* Campaign select app title */
 .cs-app-title { text-align: center; }
 .cs-app-name {
@@ -2067,13 +2070,14 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 @media (max-width: 768px) {
   :root { --header-h: auto; }
 
-  /* iOS safe area — prevent content hiding under notch/home bar */
+  /* ── iOS safe area ── */
   .app { padding-bottom: env(safe-area-inset-bottom); }
-  .sidebar-drawer .sidebar { padding-bottom: env(safe-area-inset-bottom); }
+  /* Bottom nav sits above the home bar; sidebar clears both header + bottom nav */
+  .sidebar-drawer .sidebar { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 
-  /* ── Header ── */
+  /* ── Header — compact single row ── */
   .header {
-    height: auto; padding: 8px 12px; gap: 0;
+    height: auto; padding: 7px 10px; gap: 0;
     flex-direction: column; align-items: stretch;
   }
   .header-row-main {
@@ -2081,41 +2085,81 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
     gap: 6px; width: 100%;
     overflow-x: auto; flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .header-row-main::-webkit-scrollbar { display: none; }
   .header-title { font-size: 14px; gap: 5px; white-space: nowrap; }
-  .header-sidebar-toggle { display: flex; flex-shrink: 0; margin-left: auto; }
+  /* Hide ☰ toggle — replaced by bottom nav */
+  .header-sidebar-toggle { display: none; }
   .header-dm-tools {
     display: flex; align-items: center;
     flex-wrap: nowrap;
     overflow-x: auto; overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    padding: 6px 0 8px;
-    gap: 6px;
+    padding: 5px 0 7px;
+    gap: 5px;
     scrollbar-width: none;
   }
   .header-dm-tools::-webkit-scrollbar { display: none; }
 
-  /* ── Layout ── */
+  /* ── Layout — main area shrinks to leave room for bottom nav ── */
   .main { flex-direction: row; position: relative; }
   .map-container { flex: 1; min-width: 0; height: 100%; }
+
+  /* ── Bottom nav ── */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: linear-gradient(180deg, #0e0d1c 0%, #09081a 100%);
+    border-top: 1px solid var(--border-gold);
+    z-index: 210;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
+  }
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    padding: 4px 0 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-nav-btn span:first-child { font-size: 20px; line-height: 1; }
+  .mobile-nav-btn:hover { color: var(--text-muted); }
+  .mobile-nav-btn.active { color: var(--accent); }
+  .mobile-nav-btn.active span:first-child {
+    filter: drop-shadow(0 0 6px rgba(201,168,76,0.6));
+  }
+
+  /* Shrink app content so bottom nav doesn't overlap it */
+  .app { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 
   /* ── Sidebar drawer ── */
   .sidebar-drawer {
     display: block;
     position: fixed;
     right: 0; top: 0; bottom: 0;
-    width: min(360px, 100vw);
+    width: min(380px, 100vw);
     z-index: 200;
     transform: translateX(100%);
-    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    /* Push below header dynamically via padding */
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .sidebar-drawer--open { transform: translateX(0); }
-  .sidebar-drawer .sidebar {
-    width: 100% !important;
-    height: 100%;
-    border-left: 1px solid var(--border-gold);
-  }
+  .sidebar-drawer .sidebar { width: 100% !important; height: 100%; border-left: 1px solid var(--border-gold); }
 
   /* ── Backdrop ── */
   .sidebar-backdrop {
@@ -2130,24 +2174,44 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   .btn-sm { min-height: 44px; padding: 5px 10px; font-size: 12px; }
   .btn-icon { min-height: 44px; min-width: 44px; padding: 5px 8px; justify-content: center; }
   .mode-btn { min-height: 36px; padding: 4px 10px; font-size: 12px; }
-  .sidebar-tab { font-size: 10px; padding: 8px 4px; }
 
-  /* ── Modals / overlays full-screen on mobile ── */
+  /* ── Prevent iOS input zoom (needs 16px to avoid auto-zoom) ── */
+  input, textarea, select { font-size: 16px !important; }
+
+  /* ── Category tabs — bigger touch targets ── */
+  .sidebar-cat { padding: 10px 4px 9px; }
+  .sidebar-cat .cat-icon { font-size: 18px; }
+  .sidebar-subtabs { padding: 8px 10px; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+  .sidebar-subtabs::-webkit-scrollbar { display: none; }
+  .sidebar-subtab { padding: 6px 14px; font-size: 13px; min-height: 36px; }
+
+  /* ── Quest board — no rotation, 2-col grid ── */
+  .quest-board { grid-template-columns: repeat(2, 1fr); }
+  .quest-board-card:nth-child(n) { transform: none; }
+  .quest-board-card:hover { transform: translateY(-2px) !important; }
+
+  /* ── Modals ── */
   .search-modal { width: 95vw; max-width: 95vw; }
   .passcode-modal { width: 90vw; max-width: 90vw; }
 
-  /* ── Camp panel: full-screen on mobile, hide fullscreen toggle ── */
+  /* ── Camp panel full-screen ── */
   .camp-btn-icon { display: none; }
   .camp-panel {
-    width: 100vw !important;
-    height: 100dvh !important;
-    border-radius: 0 !important;
-    border: none !important;
+    width: 100vw !important; height: 100dvh !important;
+    border-radius: 0 !important; border: none !important;
   }
   .camp-overlay { align-items: flex-start; }
   .camp-header { padding: 8px 12px; }
   .camp-header-actions { gap: 4px; }
   .camp-btn-sm { font-size: 10px; padding: 3px 7px; }
+}
+
+/* ── Landscape phone — shrink header further ────────────────────────────────── */
+@media (max-width: 768px) and (orientation: landscape) {
+  .mobile-bottom-nav { height: calc(48px + env(safe-area-inset-bottom)); }
+  .mobile-nav-btn span:first-child { font-size: 16px; }
+  .app { padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+  .sidebar-drawer .sidebar { padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
 }
 
 /* ── Campaign selector — Zelda-style splash + file select ───────────────────── */
