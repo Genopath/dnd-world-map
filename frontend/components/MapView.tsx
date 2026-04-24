@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { CampaignSettings, CharacterPathEntry, Location, PartyMember, PathEntry, Quest } from '../types';
+import type { CampaignSettings, CharacterPathEntry, Location, NPC, PartyMember, PathEntry, Quest } from '../types';
 import { API_BASE } from '../lib/api';
 import { playRulerTick } from '../lib/sounds';
 import FogCanvas from './FogCanvas';
@@ -122,6 +122,7 @@ interface Props {
   onOpenCampMap?:        () => void;
   hasCampMap?:           boolean;
   pingTarget?:           { kind: 'party' | 'char'; memberId?: number; seq: number } | null;
+  npcs?:                 NPC[];
 }
 
 // Parse waypoints JSON string to array of [x, y] pairs
@@ -392,6 +393,7 @@ export default function MapView({
   onOpenCampMap,
   hasCampMap,
   pingTarget,
+  npcs = [],
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -468,6 +470,25 @@ export default function MapView({
     partyX?: number | null; partyY?: number | null;
   } | null>(null);
   const tokenHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Pin hover popup ────────────────────────────────────────────────────────
+  const [pinHover, setPinHover] = useState<{ screenX: number; screenY: number; locId: number } | null>(null);
+  const pinHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showPinHover = useCallback((locId: number, e: React.MouseEvent) => {
+    if (pinHoverTimer.current) clearTimeout(pinHoverTimer.current);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    pinHoverTimer.current = setTimeout(() => {
+      setPinHover({ screenX: rect.left + rect.width / 2, screenY: rect.top, locId });
+    }, 130);
+  }, []);
+  const hidePinHoverSoon = useCallback(() => {
+    if (pinHoverTimer.current) clearTimeout(pinHoverTimer.current);
+    pinHoverTimer.current = setTimeout(() => setPinHover(null), 200);
+  }, []);
+  const cancelPinHide = useCallback(() => {
+    if (pinHoverTimer.current) clearTimeout(pinHoverTimer.current);
+  }, []);
+
   const showTokenHover = useCallback((
     kind: 'party' | 'char', memberId: number | undefined,
     partyX: number | null | undefined, partyY: number | null | undefined,
@@ -1418,6 +1439,8 @@ export default function MapView({
                 if (pinJustDragged.current) { pinJustDragged.current = false; return; }
                 if (!isAddingPin && !fogPaintMode) onSelectLocation(loc.id);
               }}
+              onMouseEnter={!fogPaintMode && !isAddingPin ? e => showPinHover(loc.id, e) : undefined}
+              onMouseLeave={!fogPaintMode && !isAddingPin ? hidePinHoverSoon : undefined}
               onContextMenu={isDMMode ? e => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1793,6 +1816,53 @@ export default function MapView({
           })}
         </div>
       )}
+
+      {/* ── Pin hover popup ───────────────────────────────────────────────── */}
+      {pinHover && (() => {
+        const loc = allLocations.find(l => l.id === pinHover.locId);
+        if (!loc) return null;
+        const locNpcs    = npcs.filter(n => n.location_id === loc.id);
+        const locQuests  = quests.filter(q => q.location_id === loc.id && q.status === 'active');
+        const hasSubmap  = !!loc.submap_image_url;
+        const imgSrcPrev = loc.image_url ? `${API_BASE}${loc.image_url}` : null;
+        const descTrunc  = loc.description
+          ? loc.description.length > 140 ? loc.description.slice(0, 140).trimEnd() + '…' : loc.description
+          : null;
+        return (
+          <div
+            className="pin-hover-popup"
+            style={{ left: pinHover.screenX, top: pinHover.screenY }}
+            onMouseEnter={cancelPinHide}
+            onMouseLeave={hidePinHoverSoon}
+            onClick={e => e.stopPropagation()}
+          >
+            {imgSrcPrev && (
+              <div className="php-img-wrap">
+                <img src={imgSrcPrev} className="php-img" alt="" draggable={false} />
+              </div>
+            )}
+            <div className="php-body">
+              <div className="php-type">{TYPE_LABELS_SHORT[loc.type] ?? loc.type}</div>
+              <div className="php-name">{loc.name}</div>
+              {loc.subtitle && <div className="php-subtitle">{loc.subtitle}</div>}
+              {descTrunc && <div className="php-desc">{descTrunc}</div>}
+              {(locNpcs.length > 0 || locQuests.length > 0 || hasSubmap) && (
+                <div className="php-tags">
+                  {locNpcs.length > 0 && (
+                    <span className="php-tag php-tag--npc">👤 {locNpcs.length} NPC{locNpcs.length > 1 ? 's' : ''}</span>
+                  )}
+                  {locQuests.length > 0 && (
+                    <span className="php-tag php-tag--quest">📜 {locQuests.length} quest{locQuests.length > 1 ? 's' : ''}</span>
+                  )}
+                  {hasSubmap && (
+                    <span className="php-tag php-tag--submap">🗺 Has submap</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Token hover popup ─────────────────────────────────────────────── */}
       {tokenHover && (() => {

@@ -1016,6 +1016,94 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   animation: token-ping 0.55s ease-out 0s 3;
 }
 
+/* ── Pin hover popup ─────────────────────────────────────────────────────── */
+.pin-hover-popup {
+  position: fixed;
+  z-index: 9050;
+  width: 230px;
+  background: var(--surface2);
+  border: 1px solid var(--border-gold);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.75), 0 0 0 1px rgba(201,168,76,.08);
+  transform: translate(-50%, calc(-100% - 14px));
+  pointer-events: auto;
+  animation: php-in 0.14s cubic-bezier(.2,.8,.4,1) both;
+  overflow: hidden;
+}
+@keyframes php-in {
+  from { opacity: 0; transform: translate(-50%, calc(-100% - 20px)) scale(0.94); }
+  to   { opacity: 1; transform: translate(-50%, calc(-100% - 14px)) scale(1); }
+}
+.php-img-wrap {
+  width: 100%;
+  height: 100px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-gold);
+  position: relative;
+}
+.php-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.php-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.php-type {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent-dim);
+  font-family: var(--font-display);
+}
+.php-name {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-bright);
+  letter-spacing: .03em;
+  line-height: 1.2;
+}
+.php-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: -2px;
+}
+.php-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-top: 3px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.php-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.php-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9px;
+  border: 1px solid;
+}
+.php-tag--npc    { background: rgba(201,168,76,.1);  border-color: rgba(201,168,76,.3);  color: var(--accent); }
+.php-tag--quest  { background: rgba(184,126,232,.1); border-color: rgba(184,126,232,.3); color: #b87ee8; }
+.php-tag--submap { background: rgba(126,168,232,.1); border-color: rgba(126,168,232,.3); color: #7ea8e8; }
+
 /* ── Token hover popup ────────────────────────────────────────────────────── */
 .token-hover-popup {
   position: fixed;

@@ -1506,6 +1506,7 @@ export default function Home() {
             onDeselect={() => setSelectedId(null)}
             onAddPin={handleAddPin}
             onFogChange={handleFogChange}
+            npcs={visibleNpcs}
             onExitSubmap={handleExitSubmap}
             onExitToRoot={handleExitToRoot}
             onUpdateLocation={handleUpdateLocation}
