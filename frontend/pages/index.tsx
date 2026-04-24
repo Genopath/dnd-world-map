@@ -1199,7 +1199,7 @@ export default function Home() {
       <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#07070d', color: '#e07070', gap: 12, textAlign: 'center', padding: 24 }}>
         <div style={{ fontSize: 32 }}>⚠</div>
         <div style={{ fontWeight: 700, fontSize: 16 }}>Cannot connect to backend</div>
-        <div style={{ color: '#888', fontSize: 13, maxWidth: 380 }}>Make sure the FastAPI server is running on <code style={{ color: '#c9a84c' }}>http://localhost:8000</code></div>
+        <div style={{ color: '#888', fontSize: 13, maxWidth: 380 }}>Could not reach backend at <code style={{ color: '#c9a84c' }}>{API_BASE}</code></div>
         <code style={{ color: '#666', fontSize: 12 }}>{error}</code>
         <button className="btn" onClick={() => window.location.reload()} style={{ marginTop: 8 }}>Retry</button>
       </div>

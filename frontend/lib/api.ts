@@ -3,7 +3,7 @@ import type {
   NPC, PartyMember, PathEntry, Quest, RelationshipEdge, RelationshipNodePos, Rumour, SearchResults, SessionEntry,
 } from '../types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Current campaign — set by selectCampaign() in index.tsx before any data calls
 let _campaign = 'default';
