@@ -10,6 +10,62 @@ import { API_BASE } from '../lib/api';
 import { playRulerTick } from '../lib/sounds';
 import FogCanvas from './FogCanvas';
 
+// Pixel-art campfire SVG — 7×8 px grid, 3 px per cell → 21×24 viewBox
+// Groups allow CSS animation on flame layers independently.
+function CampfireSVG({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 21 24" width={size} height={size} shapeRendering="crispEdges" style={{ display: 'block', imageRendering: 'pixelated' }}>
+      {/* Tip — flickers most */}
+      <g className="cf-px-tip">
+        <rect x="9"  y="0"  width="3" height="3" fill="#FFE840"/>
+      </g>
+      {/* Upper flame */}
+      <g className="cf-px-upper">
+        <rect x="6"  y="3"  width="3" height="3" fill="#FFE840"/>
+        <rect x="9"  y="3"  width="3" height="3" fill="#FF8C00"/>
+        <rect x="12" y="3"  width="3" height="3" fill="#FFE840"/>
+        <rect x="3"  y="6"  width="3" height="3" fill="#FFE840"/>
+        <rect x="6"  y="6"  width="3" height="3" fill="#FF8C00"/>
+        <rect x="9"  y="6"  width="3" height="3" fill="#FFE840"/>
+        <rect x="12" y="6"  width="3" height="3" fill="#FF8C00"/>
+        <rect x="15" y="6"  width="3" height="3" fill="#FFE840"/>
+        <rect x="3"  y="9"  width="3" height="3" fill="#FF8C00"/>
+        <rect x="6"  y="9"  width="3" height="3" fill="#FFE840"/>
+        <rect x="9"  y="9"  width="3" height="3" fill="#FF8C00"/>
+        <rect x="12" y="9"  width="3" height="3" fill="#FFE840"/>
+        <rect x="15" y="9"  width="3" height="3" fill="#FF8C00"/>
+      </g>
+      {/* Lower flame — barely flickers */}
+      <g className="cf-px-lower">
+        <rect x="0"  y="12" width="3" height="3" fill="#FF8C00"/>
+        <rect x="3"  y="12" width="3" height="3" fill="#FF3300"/>
+        <rect x="6"  y="12" width="3" height="3" fill="#FF8C00"/>
+        <rect x="9"  y="12" width="3" height="3" fill="#FF3300"/>
+        <rect x="12" y="12" width="3" height="3" fill="#FF8C00"/>
+        <rect x="15" y="12" width="3" height="3" fill="#FF3300"/>
+        <rect x="18" y="12" width="3" height="3" fill="#FF8C00"/>
+        <rect x="0"  y="15" width="3" height="3" fill="#FF3300"/>
+        <rect x="3"  y="15" width="3" height="3" fill="#BB1100"/>
+        <rect x="6"  y="15" width="3" height="3" fill="#FF3300"/>
+        <rect x="9"  y="15" width="3" height="3" fill="#BB1100"/>
+        <rect x="12" y="15" width="3" height="3" fill="#FF3300"/>
+        <rect x="15" y="15" width="3" height="3" fill="#BB1100"/>
+        <rect x="18" y="15" width="3" height="3" fill="#FF3300"/>
+      </g>
+      {/* Logs — static */}
+      <rect x="3"  y="18" width="3" height="3" fill="#7A4A20"/>
+      <rect x="6"  y="18" width="3" height="3" fill="#7A4A20"/>
+      <rect x="9"  y="18" width="3" height="3" fill="#7A4A20"/>
+      <rect x="12" y="18" width="3" height="3" fill="#7A4A20"/>
+      <rect x="15" y="18" width="3" height="3" fill="#7A4A20"/>
+      <rect x="0"  y="21" width="3" height="3" fill="#4A2A0A"/>
+      <rect x="6"  y="21" width="3" height="3" fill="#4A2A0A"/>
+      <rect x="12" y="21" width="3" height="3" fill="#4A2A0A"/>
+      <rect x="18" y="21" width="3" height="3" fill="#4A2A0A"/>
+    </svg>
+  );
+}
+
 const TYPE_COLORS: Record<string, string> = {
   city:       'var(--pin-city)',
   dungeon:    'var(--pin-dungeon)',
@@ -1681,13 +1737,7 @@ export default function MapView({
                       title="Party marker"
                       data-no-draw
                     >
-                      <div className="cf-scene">
-                        <div className="cf-flame cf-flame-l" />
-                        <div className="cf-flame cf-flame-c" />
-                        <div className="cf-flame cf-flame-r" />
-                        <div className="cf-glow" />
-                        <div className="cf-logs"><div className="cf-log" /><div className="cf-log" /><div className="cf-log" /></div>
-                      </div>
+                      <CampfireSVG size={11} />
                     </div>
                   );
                 }
@@ -1737,14 +1787,7 @@ export default function MapView({
               data-no-draw
               title="Party marker"
             >
-              <div className="cf-scene">
-                <div className="cf-flame cf-flame-l" />
-                <div className="cf-flame cf-flame-c" />
-                <div className="cf-flame cf-flame-r" />
-                <div className="cf-glow" />
-                <div className="cf-ember" /><div className="cf-ember" /><div className="cf-ember" />
-                <div className="cf-logs"><div className="cf-log" /><div className="cf-log" /><div className="cf-log" /></div>
-              </div>
+              <CampfireSVG size={22} />
             </div>
           );
         })()}
@@ -1897,16 +1940,7 @@ export default function MapView({
             {tokenHover.kind === 'party' ? (
               <>
                 <div className="thp-campfire-wrap">
-                  <div className="cf-scene">
-                    <div className="cf-flame cf-flame-l" />
-                    <div className="cf-flame cf-flame-c" />
-                    <div className="cf-flame cf-flame-r" />
-                    <div className="cf-glow" />
-                    <div className="cf-ember" />
-                    <div className="cf-ember" />
-                    <div className="cf-ember" />
-                    <div className="cf-logs"><div className="cf-log" /><div className="cf-log" /><div className="cf-log" /></div>
-                  </div>
+                  <CampfireSVG size={36} />
                 </div>
                 <div className="thp-header">Party <span className="thp-count">({together.length})</span></div>
                 {together.length === 0
