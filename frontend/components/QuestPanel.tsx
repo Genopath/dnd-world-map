@@ -227,7 +227,7 @@ export default function QuestPanel({
               if (!confirm(`Delete ${selectedIds.size} quest${selectedIds.size !== 1 ? 's' : ''}?`)) return;
               setBulkDeleting(true);
               try {
-                for (const id of selectedIds) await onDelete(id);
+                for (const id of Array.from(selectedIds)) await onDelete(id);
               } finally {
                 setBulkDeleting(false);
                 setSelectMode(false);

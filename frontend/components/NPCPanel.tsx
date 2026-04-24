@@ -156,7 +156,7 @@ export default function NPCPanel({
               if (!confirm(`Delete ${selectedIds.size} NPC${selectedIds.size !== 1 ? 's' : ''}?`)) return;
               setBulkDeleting(true);
               try {
-                for (const id of selectedIds) await onDelete(id);
+                for (const id of Array.from(selectedIds)) await onDelete(id);
               } finally {
                 setBulkDeleting(false);
                 setSelectMode(false);
