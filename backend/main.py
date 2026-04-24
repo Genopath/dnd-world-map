@@ -56,13 +56,13 @@ _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(title="D&D World Map API")
 
-_raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "")
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_credentials=True,
+    allow_origins=_allowed_origins or ["*"],
+    allow_credentials=False if not _allowed_origins else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
