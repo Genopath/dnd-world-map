@@ -1595,8 +1595,12 @@ export default function MapView({
                 <div className="pin-label">
                   {/* Expand section — rendered first in DOM, floats above name via flex-direction:column-reverse */}
                   {(() => {
-                    const locNpcs    = npcs.filter(n => n.location_id === loc.id);
                     const locQuests  = quests.filter(q => q.location_id === loc.id && q.status === 'active');
+                    const questIds   = new Set(locQuests.map(q => q.id));
+                    const locNpcs    = npcs.filter(n =>
+                      n.location_id === loc.id ||
+                      n.linked_quest_ids?.some(qid => questIds.has(qid))
+                    );
                     const hasSubmap  = !!loc.submap_image_url;
                     const descTrunc  = loc.description?.trim()
                       ? loc.description.length > 110 ? loc.description.slice(0, 110).trimEnd() + '…' : loc.description
@@ -1668,7 +1672,7 @@ export default function MapView({
                       onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
                       title="Party marker"
                       data-no-draw
-                    >⚔</div>
+                    >🔥</div>
                   );
                 }
                 for (const m of party) {
@@ -1716,7 +1720,7 @@ export default function MapView({
               onClick={e => { e.stopPropagation(); onNavigateToParty?.(); }}
               data-no-draw
               title="Party marker"
-            >⚔</div>
+            >🔥</div>
           );
         })()}
 
@@ -1867,7 +1871,19 @@ export default function MapView({
           >
             {tokenHover.kind === 'party' ? (
               <>
-                <div className="thp-header">⚔ Party <span className="thp-count">({together.length})</span></div>
+                <div className="thp-campfire-wrap">
+                  <div className="cf-scene">
+                    <div className="cf-flame cf-flame-l" />
+                    <div className="cf-flame cf-flame-c" />
+                    <div className="cf-flame cf-flame-r" />
+                    <div className="cf-glow" />
+                    <div className="cf-ember" />
+                    <div className="cf-ember" />
+                    <div className="cf-ember" />
+                    <div className="cf-logs"><div className="cf-log" /><div className="cf-log" /><div className="cf-log" /></div>
+                  </div>
+                </div>
+                <div className="thp-header">Party <span className="thp-count">({together.length})</span></div>
                 {together.length === 0
                   ? <div className="thp-empty">Everyone separated</div>
                   : together.map(m => (
