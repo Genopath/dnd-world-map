@@ -231,5 +231,3 @@ export const api = {
       req<{ ok: boolean }>('/set-dm-passcode', { method: 'POST', body: JSON.stringify({ passcode }) }),
   },
 };
-
-export { API_BASE };
