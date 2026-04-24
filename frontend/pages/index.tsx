@@ -1231,8 +1231,8 @@ export default function Home() {
           campaignName={campaignName}
           campaignSlug={campaignSlug}
           onDM={() => { setIsDMMode(true); setHasDMAuth(true); setShowLoginScreen(false); playDMUnlock(); }}
-          onPlayer={() => { setIsDMMode(false); setShowLoginScreen(false); }}
-          onBack={() => { setShowLoginScreen(false); setShowCampaignSelector(true); }}
+          onPlayer={() => { setIsDMMode(false); setHasDMAuth(false); setShowLoginScreen(false); }}
+          onBack={() => { setShowLoginScreen(false); if (!campaignName) setShowCampaignSelector(true); }}
         />
       </>
     );
@@ -1260,22 +1260,23 @@ export default function Home() {
               >⇄</button>
             </div>
 
-            {/* DM player-view toggle — lets DM preview what players see */}
+            {/* DM-only: preview player view. Clears auth so returning requires passcode. */}
             {isDMMode && (
               <button
                 className="btn btn-sm btn-ghost"
                 style={{ whiteSpace: 'nowrap' }}
-                onClick={() => { setIsDMMode(false); setIsAddingPin(false); setFogPaint(false); }}
-                title="Preview as player"
+                onClick={() => { setIsDMMode(false); setHasDMAuth(false); setIsAddingPin(false); setFogPaint(false); }}
+                title="Preview as player (re-auth required to return)"
               >👁 Player View</button>
             )}
-            {!isDMMode && hasDMAuth && (
+            {/* In player mode: small lock triggers re-auth to re-enter DM mode */}
+            {!isDMMode && (
               <button
-                className="btn btn-sm btn-ghost"
-                style={{ whiteSpace: 'nowrap' }}
-                onClick={() => setIsDMMode(true)}
-                title="Return to DM mode"
-              >⚔ DM Mode</button>
+                className="btn btn-sm btn-ghost btn-icon"
+                onClick={() => setShowLoginScreen(true)}
+                title="DM login"
+                style={{ opacity: 0.4 }}
+              >🔒</button>
             )}
 
             {/* Always-visible tools */}
