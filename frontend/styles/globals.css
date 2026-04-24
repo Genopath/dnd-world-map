@@ -772,6 +772,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   animation: orbit-ccw-md 2.1s linear infinite;
 }
 
+.pin:hover { z-index: 50 !important; }
 .pin:hover .pin-dot,
 .pin.selected .pin-dot { transform: scale(1.45); }
 .pin.selected .pin-dot {
@@ -1016,120 +1017,95 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   animation: token-ping 0.55s ease-out 0s 3;
 }
 
-/* ── Pin hover popup ─────────────────────────────────────────────────────── */
-.pin-hover-popup {
-  position: fixed;
-  z-index: 9050;
-  width: 230px;
-  background: var(--surface2);
-  border: 1px solid var(--border-gold);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.75), 0 0 0 1px rgba(201,168,76,.08);
-  transform: translate(-50%, calc(-100% - 14px));
-  pointer-events: auto;
-  animation: php-in 0.14s cubic-bezier(.2,.8,.4,1) both;
-  overflow: hidden;
+/* ── Pin label in-place expansion ────────────────────────────────────────── */
+/* The label uses flex-direction:column-reverse so the name row stays anchored
+   at the bottom (nearest the pin) and the expand section grows upward.       */
+.pin-label {
+  flex-direction: column-reverse !important;
+  white-space: normal !important;
+  width: max-content;
+  max-width: 190px;
 }
-@keyframes php-in {
-  from { opacity: 0; transform: translate(-50%, calc(-100% - 20px)) scale(0.94); }
-  to   { opacity: 1; transform: translate(-50%, calc(-100% - 14px)) scale(1); }
-}
-.php-img-wrap {
-  width: 100%;
-  height: 100px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--border-gold);
-  position: relative;
-}
-.php-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.php-body {
-  padding: 10px 12px;
+.pin-label-main {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 1px;
+  white-space: nowrap;
 }
-.php-type {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--accent-dim);
-  font-family: var(--font-display);
+.pin-label-expand {
+  width: 186px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: max-height 0.22s cubic-bezier(.2,.8,.4,1), opacity 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 0;
 }
-.php-name {
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent-bright);
-  letter-spacing: .03em;
-  line-height: 1.2;
+.pin:hover .pin-label-expand,
+.pin.selected .pin-label-expand {
+  max-height: 320px;
+  opacity: 1;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(201,168,76,.25);
 }
-.php-subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: -2px;
+.ple-img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 3px;
+  display: block;
+  border: 1px solid rgba(201,168,76,.2);
 }
-.php-desc {
-  font-size: 11px;
+.ple-desc {
+  font-size: 10px;
   color: var(--text-dim);
   line-height: 1.5;
-  margin-top: 3px;
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: normal;
 }
-.php-section { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; }
-.php-section-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-dim); font-family: var(--font-display); margin-bottom: 1px; }
-
-.php-npc-row { display: flex; align-items: center; gap: 7px; }
-.php-npc-avatar {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: linear-gradient(135deg,#3a3260,#1e1c38);
-  border: 1px solid var(--border-gold);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; color: var(--accent);
-  font-family: var(--font-display); flex-shrink: 0; overflow: hidden;
+.ple-section { display: flex; flex-direction: column; gap: 3px; }
+.ple-head {
+  font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent-dim); font-family: var(--font-display);
 }
-.php-npc-portrait { width: 100%; height: 100%; object-fit: cover; display: block; }
-.php-npc-info { flex: 1; min-width: 0; }
-.php-npc-name { font-size: 11px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.php-npc-role { font-size: 10px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.php-faction-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.php-extra { font-size: 10px; color: var(--text-dim); padding-left: 29px; }
-
-.php-faction-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.php-faction-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 10px; font-weight: 600; padding: 2px 8px;
-  border-radius: 9px; border: 1px solid; color: var(--text-muted);
-  background: rgba(255,255,255,.03);
+.ple-npc {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; font-family: var(--font-body); font-weight: 400;
+  color: var(--text); letter-spacing: 0; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
-.php-faction-pip { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
-.php-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
+.ple-npc-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-dim);
 }
-.php-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 9px;
-  border: 1px solid;
+.ple-npc-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.ple-npc-role { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+.ple-more { font-size: 9px; color: var(--text-dim); font-family: var(--font-body); font-weight: 400; letter-spacing: 0; }
+.ple-factions { display: flex; flex-wrap: wrap; gap: 3px; }
+.ple-faction {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 9px; font-weight: 600; padding: 1px 6px;
+  border-radius: 8px; border: 1px solid; color: var(--text-muted);
+  background: rgba(255,255,255,.04); font-family: var(--font-body);
+  letter-spacing: 0; white-space: nowrap;
 }
-.php-tag--quest  { background: rgba(184,126,232,.1); border-color: rgba(184,126,232,.3); color: #b87ee8; }
-.php-tag--submap { background: rgba(126,168,232,.1); border-color: rgba(126,168,232,.3); color: #7ea8e8; }
+.ple-faction-pip { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ple-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 1px; }
+.ple-tag {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 9px; font-weight: 600; padding: 1px 6px;
+  border-radius: 8px; border: 1px solid;
+  font-family: var(--font-body); letter-spacing: 0; white-space: nowrap;
+}
+.ple-tag--quest  { background: rgba(184,126,232,.1); border-color: rgba(184,126,232,.3); color: #b87ee8; }
+.ple-tag--submap { background: rgba(126,168,232,.1); border-color: rgba(126,168,232,.3); color: #7ea8e8; }
 
 /* ── Token hover popup ────────────────────────────────────────────────────── */
 .token-hover-popup {

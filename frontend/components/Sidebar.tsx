@@ -222,6 +222,10 @@ export default function Sidebar({
   }, [isCityMode]);
 
   useEffect(() => { setIsEditing(false); setEditState(null); }, [location?.id]);
+  // When a pin is selected while city directory is open, switch to the detail view
+  useEffect(() => {
+    if (location != null && isCityMode && cityTab !== null) setCityTab(null);
+  }, [location?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startEdit  = useCallback(() => { if (!location) return; setEditState(toEditState(location)); setIsEditing(true); }, [location]);
   const cancelEdit = useCallback(() => { setIsEditing(false); setEditState(null); }, []);

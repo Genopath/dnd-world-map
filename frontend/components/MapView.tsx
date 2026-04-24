@@ -473,30 +473,6 @@ export default function MapView({
   } | null>(null);
   const tokenHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Pin hover popup ────────────────────────────────────────────────────────
-  const [pinHover, setPinHover] = useState<{ screenX: number; screenY: number; locId: number } | null>(null);
-  const pinHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showPinHover = useCallback((locId: number, e: React.MouseEvent) => {
-    if (pinHoverTimer.current) clearTimeout(pinHoverTimer.current);
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    // Preload image immediately so it's ready when the popup appears
-    const loc = allLocations.find(l => l.id === locId);
-    if (loc?.image_url) {
-      const img = new window.Image();
-      img.src = `${API_BASE}${loc.image_url}`;
-    }
-    pinHoverTimer.current = setTimeout(() => {
-      setPinHover({ screenX: rect.left + rect.width / 2, screenY: rect.top, locId });
-    }, 80);
-  }, [allLocations]);
-  const hidePinHoverSoon = useCallback(() => {
-    if (pinHoverTimer.current) clearTimeout(pinHoverTimer.current);
-    pinHoverTimer.current = setTimeout(() => setPinHover(null), 200);
-  }, []);
-  const cancelPinHide = useCallback(() => {
-    if (pinHoverTimer.current) clearTimeout(pinHoverTimer.current);
-  }, []);
-
   const showTokenHover = useCallback((
     kind: 'party' | 'char', memberId: number | undefined,
     partyX: number | null | undefined, partyY: number | null | undefined,
@@ -1447,8 +1423,6 @@ export default function MapView({
                 if (pinJustDragged.current) { pinJustDragged.current = false; return; }
                 if (!isAddingPin && !fogPaintMode) onSelectLocation(loc.id);
               }}
-              onMouseEnter={!fogPaintMode && !isAddingPin ? e => showPinHover(loc.id, e) : undefined}
-              onMouseLeave={!fogPaintMode && !isAddingPin ? hidePinHoverSoon : undefined}
               onContextMenu={isDMMode ? e => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1619,8 +1593,62 @@ export default function MapView({
                   </div>
                 )}
                 <div className="pin-label">
-                  <span>{loc.name}</span>
-                  {loc.subtitle && <span className="pin-label-subtitle">{loc.subtitle}</span>}
+                  {/* Expand section — rendered first in DOM, floats above name via flex-direction:column-reverse */}
+                  {(() => {
+                    const locNpcs    = npcs.filter(n => n.location_id === loc.id);
+                    const locQuests  = quests.filter(q => q.location_id === loc.id && q.status === 'active');
+                    const hasSubmap  = !!loc.submap_image_url;
+                    const descTrunc  = loc.description?.trim()
+                      ? loc.description.length > 110 ? loc.description.slice(0, 110).trimEnd() + '…' : loc.description
+                      : null;
+                    const factionIds = Array.from(new Set(locNpcs.map(n => n.faction_id).filter((id): id is number => id != null)));
+                    const locFactions = factionIds.map(id => factions.find(f => f.id === id)).filter(Boolean) as Faction[];
+                    const imgSrc     = loc.image_url ? `${API_BASE}${loc.image_url}` : null;
+                    const hasContent = imgSrc || descTrunc || locNpcs.length > 0 || locFactions.length > 0 || locQuests.length > 0 || hasSubmap;
+                    if (!hasContent) return null;
+                    return (
+                      <div className="pin-label-expand">
+                        {imgSrc && <img src={imgSrc} className="ple-img" alt="" draggable={false} />}
+                        {descTrunc && <div className="ple-desc">{descTrunc}</div>}
+                        {locNpcs.length > 0 && (
+                          <div className="ple-section">
+                            <div className="ple-head">People</div>
+                            {locNpcs.slice(0, 3).map(n => {
+                              const nf = n.faction_id != null ? factions.find(f => f.id === n.faction_id) : null;
+                              return (
+                                <div key={n.id} className="ple-npc">
+                                  <span className="ple-npc-dot" style={nf ? { background: nf.color } : undefined} />
+                                  <span className="ple-npc-name">{n.name}</span>
+                                  {n.role && <span className="ple-npc-role"> · {n.role}</span>}
+                                </div>
+                              );
+                            })}
+                            {locNpcs.length > 3 && <div className="ple-more">+{locNpcs.length - 3} more</div>}
+                          </div>
+                        )}
+                        {locFactions.length > 0 && (
+                          <div className="ple-factions">
+                            {locFactions.map(f => (
+                              <span key={f.id} className="ple-faction" style={{ borderColor: f.color || 'var(--border-gold)' }}>
+                                <span className="ple-faction-pip" style={{ background: f.color || '#c9a84c' }} />{f.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {(locQuests.length > 0 || hasSubmap) && (
+                          <div className="ple-tags">
+                            {locQuests.length > 0 && <span className="ple-tag ple-tag--quest">📜 {locQuests.length} quest{locQuests.length > 1 ? 's' : ''}</span>}
+                            {hasSubmap && <span className="ple-tag ple-tag--submap">🗺 Submap</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {/* Name row — at flex end (bottom) due to column-reverse */}
+                  <div className="pin-label-main">
+                    <span>{loc.name}</span>
+                    {loc.subtitle && <span className="pin-label-subtitle">{loc.subtitle}</span>}
+                  </div>
                 </div>
               </div>
               {/* ── Party / char baubles snapped to this pin ─────────────── */}
@@ -1824,99 +1852,6 @@ export default function MapView({
           })}
         </div>
       )}
-
-      {/* ── Pin hover popup ───────────────────────────────────────────────── */}
-      {pinHover && (() => {
-        const loc = allLocations.find(l => l.id === pinHover.locId);
-        if (!loc) return null;
-        const locNpcs   = npcs.filter(n => n.location_id === loc.id);
-        const locQuests = quests.filter(q => q.location_id === loc.id && q.status === 'active');
-        const hasSubmap = !!loc.submap_image_url;
-        const imgSrc    = loc.image_url ? `${API_BASE}${loc.image_url}` : null;
-        const descTrunc = loc.description && loc.description.trim()
-          ? loc.description.length > 120 ? loc.description.slice(0, 120).trimEnd() + '…' : loc.description
-          : null;
-        // Unique factions present via NPCs at this location
-        const factionIds = Array.from(new Set(locNpcs.map(n => n.faction_id).filter((id): id is number => id != null)));
-        const locFactions = factionIds.map(id => factions.find(f => f.id === id)).filter(Boolean) as Faction[];
-        const shownNpcs = locNpcs.slice(0, 3);
-        const extraNpcs = locNpcs.length - shownNpcs.length;
-        return (
-          <div
-            className="pin-hover-popup"
-            style={{ left: pinHover.screenX, top: pinHover.screenY }}
-            onMouseEnter={cancelPinHide}
-            onMouseLeave={hidePinHoverSoon}
-            onClick={e => e.stopPropagation()}
-          >
-            {imgSrc && (
-              <div className="php-img-wrap">
-                <img src={imgSrc} className="php-img" alt="" draggable={false} />
-              </div>
-            )}
-            <div className="php-body">
-              <div className="php-type">{TYPE_LABELS_SHORT[loc.type] ?? loc.type}</div>
-              <div className="php-name">{loc.name}</div>
-              {loc.subtitle && <div className="php-subtitle">{loc.subtitle}</div>}
-              {descTrunc && <div className="php-desc">{descTrunc}</div>}
-
-              {/* NPCs */}
-              {locNpcs.length > 0 && (
-                <div className="php-section">
-                  <div className="php-section-label">People here</div>
-                  {shownNpcs.map(n => {
-                    const npcFaction = n.faction_id != null ? factions.find(f => f.id === n.faction_id) : null;
-                    return (
-                      <div key={n.id} className="php-npc-row">
-                        <span className="php-npc-avatar">
-                          {n.portrait_url
-                            ? <img src={`${API_BASE}${n.portrait_url}`} alt={n.name} className="php-npc-portrait" />
-                            : n.name[0]?.toUpperCase()}
-                        </span>
-                        <div className="php-npc-info">
-                          <div className="php-npc-name">{n.name}</div>
-                          {n.role && <div className="php-npc-role">{n.role}</div>}
-                        </div>
-                        {npcFaction && (
-                          <span className="php-faction-dot" style={{ background: npcFaction.color || '#c9a84c' }} title={npcFaction.name} />
-                        )}
-                      </div>
-                    );
-                  })}
-                  {extraNpcs > 0 && <div className="php-extra">+{extraNpcs} more</div>}
-                </div>
-              )}
-
-              {/* Factions (unique, from NPC memberships) */}
-              {locFactions.length > 0 && (
-                <div className="php-section">
-                  <div className="php-section-label">Factions present</div>
-                  <div className="php-faction-chips">
-                    {locFactions.map(f => (
-                      <span key={f.id} className="php-faction-chip" style={{ borderColor: f.color || 'var(--border-gold)' }}>
-                        <span className="php-faction-pip" style={{ background: f.color || '#c9a84c' }} />
-                        {f.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Bottom tags */}
-              {(locQuests.length > 0 || hasSubmap) && (
-                <div className="php-tags">
-                  {locQuests.length > 0 && (
-                    <span className="php-tag php-tag--quest">📜 {locQuests.length} active quest{locQuests.length > 1 ? 's' : ''}</span>
-                  )}
-                  {hasSubmap && (
-                    <span className="php-tag php-tag--submap">🗺 Has submap</span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ── Token hover popup ─────────────────────────────────────────────── */}
       {tokenHover && (() => {
