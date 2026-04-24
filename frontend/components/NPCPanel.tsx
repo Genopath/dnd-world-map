@@ -29,27 +29,28 @@ function toEdit(n: NPC): EditState {
 }
 
 interface Props {
-  npcs:               NPC[];
-  locations:          Location[];
-  quests:             Quest[];
-  isDMMode:           boolean;
-  selectedLocationId: number | null;
-  onCreate:           (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => Promise<NPC>;
-  onUpdate:           (id: number, data: Partial<NPC>) => Promise<void>;
-  onDelete:           (id: number) => Promise<void>;
-  onUploadPortrait:   (id: number, file: File) => Promise<void>;
-  onDeletePortrait:   (id: number) => Promise<void>;
-  onLightbox:         (url: string) => void;
-  onNavigateToQuest:  (id: number) => void;
-  onUnlinkNpc:        (questId: number, npcId: number) => Promise<void>;
-  jumpToId:           number | null;
-  onScheduleBackup?:  () => void;
+  npcs:                 NPC[];
+  locations:            Location[];
+  quests:               Quest[];
+  isDMMode:             boolean;
+  selectedLocationId:   number | null;
+  onCreate:             (data: Omit<NPC, 'id' | 'created_at' | 'portrait_url'>) => Promise<NPC>;
+  onUpdate:             (id: number, data: Partial<NPC>) => Promise<void>;
+  onDelete:             (id: number) => Promise<void>;
+  onUploadPortrait:     (id: number, file: File) => Promise<void>;
+  onDeletePortrait:     (id: number) => Promise<void>;
+  onLightbox:           (url: string) => void;
+  onNavigateToQuest:    (id: number) => void;
+  onUnlinkNpc:          (questId: number, npcId: number) => Promise<void>;
+  jumpToId:             number | null;
+  onScheduleBackup?:    () => void;
+  onNavigateToLocation?: (id: number) => void;
 }
 
 export default function NPCPanel({
   npcs, locations, quests, isDMMode, selectedLocationId,
   onCreate, onUpdate, onDelete, onUploadPortrait, onDeletePortrait, onLightbox,
-  onNavigateToQuest, onUnlinkNpc, jumpToId,
+  onNavigateToQuest, onUnlinkNpc, jumpToId, onNavigateToLocation,
 }: Props) {
   const [filterMode, setFilterMode] = useState<'all' | 'location'>('all');
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -60,6 +61,9 @@ export default function NPCPanel({
   const [saving,     setSaving]     = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingUrl,  setPendingUrl]  = useState<string | null>(null);
+  const [selectMode,  setSelectMode]  = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const jumpProcessed = useRef<number | null>(null);
   useEffect(() => {
@@ -118,11 +122,52 @@ export default function NPCPanel({
           </div>
         )}
         {isDMMode && (
-          <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => { setIsAdding(true); setExpandedId(null); }}>
-            + Add NPC
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+            {!selectMode && (
+              <button className="btn btn-sm" onClick={() => { setIsAdding(true); setExpandedId(null); }}>
+                + Add NPC
+              </button>
+            )}
+            {filtered.length > 0 && (
+              <button
+                className={`btn btn-sm${selectMode ? ' btn-active' : ''}`}
+                onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()); }}
+              >
+                {selectMode ? '✕ Cancel' : '☑ Select'}
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Bulk action bar */}
+      {selectMode && isDMMode && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--surface2)', borderRadius: 6, border: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>
+            {selectedIds.size} selected
+          </span>
+          <button className="btn btn-sm" onClick={() => setSelectedIds(new Set(filtered.map(n => n.id)))}>All</button>
+          <button className="btn btn-sm" onClick={() => setSelectedIds(new Set())}>None</button>
+          <button
+            className="btn btn-sm btn-danger"
+            disabled={selectedIds.size === 0 || bulkDeleting}
+            onClick={async () => {
+              if (selectedIds.size === 0) return;
+              if (!confirm(`Delete ${selectedIds.size} NPC${selectedIds.size !== 1 ? 's' : ''}?`)) return;
+              setBulkDeleting(true);
+              try {
+                for (const id of selectedIds) await onDelete(id);
+              } finally {
+                setBulkDeleting(false);
+                setSelectMode(false);
+                setSelectedIds(new Set());
+              }
+            }}
+          >
+            {bulkDeleting ? 'Deleting…' : `Delete (${selectedIds.size})`}
+          </button>
+        </div>
+      )}
 
       {/* Add form */}
       {isAdding && isDMMode && (
@@ -144,9 +189,17 @@ export default function NPCPanel({
 
       {/* NPC cards */}
       {filtered.map(npc => (
-        <div key={npc.id} className="npc-card" style={npc.is_visible === false ? { opacity: 0.55 } : undefined} onClick={() => setExpandedId(expandedId === npc.id ? null : npc.id)}>
+        <div key={npc.id} className="npc-card" style={npc.is_visible === false ? { opacity: 0.55 } : undefined} onClick={() => {
+          if (selectMode) {
+            setSelectedIds(prev => { const n = new Set(prev); n.has(npc.id) ? n.delete(npc.id) : n.add(npc.id); return n; });
+          } else {
+            setExpandedId(expandedId === npc.id ? null : npc.id);
+          }
+        }}>
           <div className="npc-card-row">
-            {npc.portrait_url ? (
+            {selectMode ? (
+              <input type="checkbox" checked={selectedIds.has(npc.id)} readOnly style={{ width: 16, height: 16, flexShrink: 0, cursor: 'pointer', accentColor: 'var(--accent)' }} />
+            ) : npc.portrait_url ? (
               <img
                 className="npc-portrait"
                 src={`${API_BASE}${npc.portrait_url}`}
@@ -159,11 +212,20 @@ export default function NPCPanel({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 13 }}>{npc.name}</div>
               {npc.role && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{npc.role}</div>}
-              {npc.location_id != null && (
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  {locations.find(l => l.id === npc.location_id)?.name ?? ''}
-                </div>
-              )}
+              {npc.location_id != null && (() => {
+                const loc = locations.find(l => l.id === npc.location_id);
+                if (!loc) return null;
+                return onNavigateToLocation ? (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 11, color: 'var(--text-dim)', padding: '1px 0', textDecoration: 'underline', textDecorationColor: 'var(--border)' }}
+                    onClick={e => { e.stopPropagation(); onNavigateToLocation(loc.id); }}
+                    title={`Go to ${loc.name}`}
+                  >{loc.name}</button>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{loc.name}</div>
+                );
+              })()}
             </div>
             <span style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLOR[npc.status] ?? 'var(--text-muted)', flexShrink: 0 }}>
               {npc.status.charAt(0).toUpperCase() + npc.status.slice(1)}

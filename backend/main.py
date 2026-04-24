@@ -6,11 +6,14 @@ SQLite persistence via SQLAlchemy
 import asyncio
 import base64
 import json
+import logging
 import os
 import re
 import uuid
 from pathlib import Path
 from typing import List, Optional, Set
+
+from passlib.context import CryptContext
 
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response as _Response
@@ -48,6 +51,9 @@ MAPS_DIR.mkdir(parents=True, exist_ok=True)
 LIBRARY_DIR  = Path(__file__).parent / "library"
 LIBRARY_DIR.mkdir(exist_ok=True)
 
+logger = logging.getLogger(__name__)
+_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 app = FastAPI(title="D&D World Map API")
 
 _raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
@@ -75,7 +81,8 @@ async def _broadcast(event: dict):
     for ws in list(_ws_clients):
         try:
             await ws.send_json(event)
-        except Exception:
+        except Exception as exc:
+            logger.debug("WebSocket send failed, dropping client: %s", exc)
             dead.add(ws)
     _ws_clients.difference_update(dead)
 
@@ -101,7 +108,7 @@ async def broadcast_on_mutation(request, call_next):
     if request.method in ("POST", "PUT", "DELETE", "PATCH"):
         path = request.url.path
         # Skip read-only-ish endpoints and the WS endpoint itself
-        skip = ("/search", "/export", "/map-config", "/ws")
+        skip = ("/search", "/export", "/map-config", "/ws", "/handouts/push")
         if not any(path.startswith(s) for s in skip) and _ws_clients:
             asyncio.create_task(_broadcast({"type": "refresh"}))
     return response
@@ -122,49 +129,52 @@ def _loc_out(loc: models.Location) -> schemas.LocationOut:
         discovered=bool(loc.discovered),
         x=loc.x,
         y=loc.y,
-        icon_url=getattr(loc, "icon_url", None),
-        image_url=getattr(loc, "image_url", None),
-        parent_id=getattr(loc, "parent_id", None),
-        submap_image_url=getattr(loc, "submap_image_url", None),
-        pin_size=getattr(loc, "pin_size", None) or "md",
-        pin_style=getattr(loc, "pin_style", None) or "default",
-        pin_border=getattr(loc, "pin_border", None) or "none",
-        pin_shape=getattr(loc, "pin_shape", None) or "circle",
-        pin_glow=bool(getattr(loc, "pin_glow", False)),
-        is_visible=getattr(loc, "is_visible", True) if getattr(loc, "is_visible", None) is not None else True,
+        icon_url=loc.icon_url,
+        image_url=loc.image_url,
+        parent_id=loc.parent_id,
+        submap_image_url=loc.submap_image_url,
+        pin_size=loc.pin_size or "md",
+        pin_style=loc.pin_style or "default",
+        pin_border=loc.pin_border or "none",
+        pin_shape=loc.pin_shape or "circle",
+        pin_glow=bool(loc.pin_glow),
+        is_visible=bool(loc.is_visible) if loc.is_visible is not None else True,
         created_at=loc.created_at,
     )
 
 
-def _quest_out(quest: models.Quest, db: Session) -> schemas.QuestOut:
-    links = db.query(models.QuestNPCLink).filter(models.QuestNPCLink.quest_id == quest.id).all()
+def _quest_out(quest: models.Quest, db: Session, *, links: Optional[List[int]] = None) -> schemas.QuestOut:
+    if links is None:
+        links = [l.npc_id for l in db.query(models.QuestNPCLink).filter(models.QuestNPCLink.quest_id == quest.id).all()]
     data = {col.name: getattr(quest, col.name) for col in models.Quest.__table__.columns}
     data['objectives']     = json.loads(data.get('objectives') or '[]')
     data['tags']           = json.loads(data.get('tags') or '[]')
-    data['linked_npc_ids'] = [l.npc_id for l in links]
+    data['linked_npc_ids'] = links
     return schemas.QuestOut.model_validate(data)
 
 
-def _npc_out(npc: models.NPC, db: Session) -> schemas.NPCOut:
-    links = db.query(models.QuestNPCLink).filter(models.QuestNPCLink.npc_id == npc.id).all()
+def _npc_out(npc: models.NPC, db: Session, *, links: Optional[List[int]] = None) -> schemas.NPCOut:
+    if links is None:
+        links = [l.quest_id for l in db.query(models.QuestNPCLink).filter(models.QuestNPCLink.npc_id == npc.id).all()]
     out = schemas.NPCOut.model_validate(npc)
-    out.linked_quest_ids = [l.quest_id for l in links]
+    out.linked_quest_ids = links
     return out
 
 
-def _path_out(entry: models.PlayerPathEntry, db: Session) -> schemas.PathEntryOut:
-    loc = db.query(models.Location).filter(models.Location.id == entry.location_id).first()
+def _path_out(entry: models.PlayerPathEntry, db: Session, *, loc: Optional[models.Location] = None) -> schemas.PathEntryOut:
+    if loc is None:
+        loc = db.query(models.Location).filter(models.Location.id == entry.location_id).first()
     return schemas.PathEntryOut(
         id=entry.id,
         location_id=entry.location_id,
         position=entry.position,
-        travel_type=getattr(entry, "travel_type", None) or "foot",
-        distance=getattr(entry, "distance", None),
-        distance_unit=getattr(entry, "distance_unit", None),
-        direction=getattr(entry, "direction", None) or "forward",
-        waypoints=getattr(entry, "waypoints", None),
-        travel_time=getattr(entry, "travel_time", None),
-        travel_time_unit=getattr(entry, "travel_time_unit", None),
+        travel_type=entry.travel_type or "foot",
+        distance=entry.distance,
+        distance_unit=entry.distance_unit,
+        direction=entry.direction or "forward",
+        waypoints=entry.waypoints,
+        travel_time=entry.travel_time,
+        travel_time_unit=entry.travel_time_unit,
         visited_at=entry.visited_at,
         location=_loc_out(loc) if loc else None,
     )
@@ -229,7 +239,8 @@ def list_library():
             [f for f in LIBRARY_DIR.iterdir() if f.is_file() and f.suffix.lower() in _IMAGE_EXTS],
             key=lambda f: f.name.lower(),
         )
-    except Exception:
+    except OSError as exc:
+        logger.warning("Failed to list library directory: %s", exc)
         files = []
     return [{"name": f.name, "url": f"/library/{f.name}"} for f in files]
 
@@ -253,7 +264,8 @@ def list_campaigns():
             with eng.connect() as conn:
                 row = conn.execute(text("SELECT world_name FROM campaign_settings LIMIT 1")).fetchone()
                 name = (row[0] or '').strip() or slug.replace('-', ' ').title()
-        except Exception:
+        except Exception as exc:
+            logger.warning("Could not read campaign name for %s: %s", slug, exc)
             name = slug.replace('-', ' ').title()
         results.append(_CampaignOut(slug=slug, name=name))
     return results
@@ -464,12 +476,12 @@ def delete_location_icon(loc_id: int, db: Session = Depends(get_db)):
 
 @app.get("/player-path", response_model=List[schemas.PathEntryOut])
 def get_player_path(db: Session = Depends(get_db)):
-    entries = (
-        db.query(models.PlayerPathEntry)
-        .order_by(models.PlayerPathEntry.position)
-        .all()
-    )
-    return [_path_out(e, db) for e in entries]
+    entries = db.query(models.PlayerPathEntry).order_by(models.PlayerPathEntry.position).all()
+    if not entries:
+        return []
+    loc_ids = list({e.location_id for e in entries})
+    locs = {l.id: l for l in db.query(models.Location).filter(models.Location.id.in_(loc_ids)).all()}
+    return [_path_out(e, db, loc=locs.get(e.location_id)) for e in entries]
 
 
 @app.post("/player-path", response_model=schemas.PathEntryOut, status_code=201)
@@ -514,18 +526,16 @@ def update_path_entry(entry_id: int, data: schemas.PathEntryUpdate, db: Session 
 @app.put("/player-path/reorder", response_model=List[schemas.PathEntryOut])
 def reorder_path(data: schemas.PathReorder, db: Session = Depends(get_db)):
     for i, entry_id in enumerate(data.order):
-        entry = db.query(models.PlayerPathEntry).filter(
-            models.PlayerPathEntry.id == entry_id
-        ).first()
+        entry = db.query(models.PlayerPathEntry).filter(models.PlayerPathEntry.id == entry_id).first()
         if entry:
             entry.position = i
     db.commit()
-    entries = (
-        db.query(models.PlayerPathEntry)
-        .order_by(models.PlayerPathEntry.position)
-        .all()
-    )
-    return [_path_out(e, db) for e in entries]
+    entries = db.query(models.PlayerPathEntry).order_by(models.PlayerPathEntry.position).all()
+    if not entries:
+        return []
+    loc_ids = list({e.location_id for e in entries})
+    locs = {l.id: l for l in db.query(models.Location).filter(models.Location.id.in_(loc_ids)).all()}
+    return [_path_out(e, db, loc=locs.get(e.location_id)) for e in entries]
 
 
 # ── Character Paths ───────────────────────────────────────────────────────────
@@ -626,8 +636,8 @@ def _map_config_out(config: models.MapConfig) -> dict:
         image_url = None
     return {
         "image_url":   image_url,
-        "scale_value": getattr(config, "scale_value", None),
-        "scale_unit":  getattr(config, "scale_unit", None),
+        "scale_value": config.scale_value,
+        "scale_unit":  config.scale_unit,
     }
 
 
@@ -683,7 +693,14 @@ def list_npcs(location_id: Optional[int] = None, db: Session = Depends(get_db)):
     q = db.query(models.NPC)
     if location_id is not None:
         q = q.filter(models.NPC.location_id == location_id)
-    return [_npc_out(n, db) for n in q.order_by(models.NPC.name).all()]
+    npcs = q.order_by(models.NPC.name).all()
+    if not npcs:
+        return []
+    npc_ids = [n.id for n in npcs]
+    links_by_npc: dict[int, List[int]] = {}
+    for lnk in db.query(models.QuestNPCLink).filter(models.QuestNPCLink.npc_id.in_(npc_ids)).all():
+        links_by_npc.setdefault(lnk.npc_id, []).append(lnk.quest_id)
+    return [_npc_out(n, db, links=links_by_npc.get(n.id, [])) for n in npcs]
 
 
 @app.post("/npcs", response_model=schemas.NPCOut, status_code=201)
@@ -744,7 +761,14 @@ def delete_npc_portrait(npc_id: int, db: Session = Depends(get_db)):
 
 @app.get("/quests", response_model=List[schemas.QuestOut])
 def list_quests(db: Session = Depends(get_db)):
-    return [_quest_out(q, db) for q in db.query(models.Quest).order_by(models.Quest.created_at).all()]
+    quests = db.query(models.Quest).order_by(models.Quest.created_at).all()
+    if not quests:
+        return []
+    quest_ids = [q.id for q in quests]
+    links_by_quest: dict[int, List[int]] = {}
+    for lnk in db.query(models.QuestNPCLink).filter(models.QuestNPCLink.quest_id.in_(quest_ids)).all():
+        links_by_quest.setdefault(lnk.quest_id, []).append(lnk.npc_id)
+    return [_quest_out(q, db, links=links_by_quest.get(q.id, [])) for q in quests]
 
 
 _QUEST_JSON_COLS = {"objectives", "tags"}
@@ -903,7 +927,7 @@ def delete_session_image(session_id: int, db: Session = Depends(get_db)):
 # ── Search ────────────────────────────────────────────────────────────────────
 
 @app.get("/search")
-def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+def search(q: str = Query(..., min_length=1, max_length=100), db: Session = Depends(get_db)):
     term = f"%{q}%"
     locations = (
         db.query(models.Location)
@@ -920,10 +944,20 @@ def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
         .filter(models.Quest.title.ilike(term) | models.Quest.description.ilike(term))
         .limit(8).all()
     )
+    npc_ids = [n.id for n in npcs]
+    quest_ids = [qr.id for qr in quests]
+    npc_links: dict[int, List[int]] = {}
+    quest_links: dict[int, List[int]] = {}
+    if npc_ids:
+        for lnk in db.query(models.QuestNPCLink).filter(models.QuestNPCLink.npc_id.in_(npc_ids)).all():
+            npc_links.setdefault(lnk.npc_id, []).append(lnk.quest_id)
+    if quest_ids:
+        for lnk in db.query(models.QuestNPCLink).filter(models.QuestNPCLink.quest_id.in_(quest_ids)).all():
+            quest_links.setdefault(lnk.quest_id, []).append(lnk.npc_id)
     return {
         "locations": [_loc_out(l) for l in locations],
-        "npcs":      [_npc_out(n, db) for n in npcs],
-        "quests":    [_quest_out(q, db) for q in quests],
+        "npcs":      [_npc_out(n, db, links=npc_links.get(n.id, [])) for n in npcs],
+        "quests":    [_quest_out(qr, db, links=quest_links.get(qr.id, [])) for qr in quests],
     }
 
 
@@ -976,19 +1010,28 @@ def dm_passcode_status(db: Session = Depends(get_db)):
     return {"has_passcode": bool(c.dm_passcode)}
 
 @app.post("/verify-dm-passcode")
-def verify_dm_passcode(data: dict, db: Session = Depends(get_db)):
+def verify_dm_passcode(data: schemas.PasscodeVerify, db: Session = Depends(get_db)):
     c = _get_or_create_campaign(db)
     if not c.dm_passcode:
         return {"ok": True}
-    if data.get("passcode", "") == c.dm_passcode:
+    stored = c.dm_passcode
+    # Migrate legacy plaintext passcodes to bcrypt on first successful verify
+    if stored.startswith("$2b$") or stored.startswith("$2a$"):
+        ok = _pwd.verify(data.passcode, stored)
+    else:
+        ok = data.passcode == stored
+        if ok:
+            c.dm_passcode = _pwd.hash(data.passcode)
+            db.commit()
+    if ok:
         return {"ok": True}
     raise HTTPException(status_code=401, detail="Incorrect passcode")
 
 @app.post("/set-dm-passcode")
-def set_dm_passcode(data: dict, db: Session = Depends(get_db)):
+def set_dm_passcode(data: schemas.PasscodeSet, db: Session = Depends(get_db)):
     c = _get_or_create_campaign(db)
-    passcode = (data.get("passcode") or "").strip()
-    c.dm_passcode = passcode if passcode else None
+    passcode = data.passcode.strip()
+    c.dm_passcode = _pwd.hash(passcode) if passcode else None
     db.commit()
     return {"ok": True}
 
@@ -1209,7 +1252,7 @@ DEFAULT_MONTHS = json.dumps([
     {"name": "Uktar",       "days": 30},
     {"name": "Nightal",     "days": 30},
 ])
-DEFAULT_WEEKDAYS = json.dumps(["Firstday", "Secondday", "Thirday", "Fourthday", "Fifthday", "Sixthday", "Sevenday"])
+DEFAULT_WEEKDAYS = json.dumps(["Firstday", "Secondday", "Thirdday", "Fourthday", "Fifthday", "Sixthday", "Sevenday"])
 
 def _get_or_create_calendar(db: Session) -> models.CalendarConfig:
     cal = db.query(models.CalendarConfig).first()
@@ -1247,6 +1290,12 @@ async def upload_handout(file: UploadFile = File(...), slug: str = Depends(datab
     return {"url": url, "name": original_name}
 
 
+@app.post("/handouts/push")
+async def push_handout(data: schemas.HandoutPush, slug: str = Depends(database.get_campaign_slug)):
+    await _broadcast({"type": "handout", "url": data.url, "name": data.name})
+    return {"ok": True}
+
+
 # ── Export / Import ───────────────────────────────────────────────────────────
 
 @app.get("/export")
@@ -1272,7 +1321,8 @@ def export_data(db: Session = Depends(get_db)):
             ct = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
                   "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml"}.get(ext.lstrip("."), "image/png")
             return ct + "," + base64.b64encode(path.read_bytes()).decode()
-        except Exception:
+        except OSError as exc:
+            logger.warning("Could not read image file for export %s: %s", url, exc)
             return None
 
     def _row(obj, model) -> dict:
@@ -1416,7 +1466,8 @@ async def import_data(file: UploadFile = File(...), slug: str = Depends(database
             ct, b64 = "image/png", encoded
         try:
             data = base64.b64decode(b64)
-        except Exception:
+        except ValueError as exc:
+            logger.warning("Invalid base64 image data during import: %s", exc)
             return None
         new_id = uuid.uuid4().hex
         db.add(models.StoredImage(id=new_id, content_type=ct, data=data))

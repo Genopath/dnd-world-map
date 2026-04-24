@@ -4403,25 +4403,33 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-shield .pin-body::after { display: none; }
 .pin-shape-shield .pin-border-ring { clip-path: polygon(0% 0%, 100% 0%, 100% 62%, 50% 100%, 0% 62%); border-radius: 0; }
 
+/* ── pin-icon-scale-group: wraps glow overlay + icon for non-circle shapes ── */
+/* Both children transform from one origin — eliminates hover alignment drift. */
+.pin-icon-scale-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+.pin:hover .pin-icon-scale-group,
+.pin.selected .pin-icon-scale-group {
+  transform: scale(1.2) translateY(-1px);
+}
+
 /* ── Shape color ring + glow wrapper ─────────────────────────────────────── */
-/* .pin-shape-glow-wrap: absolutely positioned div, NO clip-path on it.      */
-/* filter:drop-shadow on the wrapper traces the span contents' polygon shapes */
-/* and glows outward beyond the clipped boundary — the correct technique.     */
+/* Absolutely positioned inside pin-icon-scale-group; inset:-4px auto-sizes   */
+/* it 4px beyond the icon on all sides regardless of pin size variant.        */
+/* NO clip-path here — filter:drop-shadow on this wrapper traces polygon spans */
+/* inside it and glows outward beyond their clipped boundary correctly.        */
 .pin-shape-glow-wrap {
   position: absolute;
-  left: calc(50% - 23px); /* pre-centered: no translateX in transform so scale is concentric */
-  top: -4px;
-  width: 46px; height: 46px;
+  inset: -4px;
   pointer-events: none;
   z-index: 0;
-  transition: transform 0.15s ease, filter 0.25s ease;
+  transition: filter 0.25s ease;
 }
-.pin:hover .pin-shape-glow-wrap,
-.pin.selected .pin-shape-glow-wrap {
-  transform: scale(1.2) translateY(-1px); /* identical to icon hover — scales from same center */
-}
-.pin.pin-size-sm .pin-shape-glow-wrap { left: calc(50% - 17px); width: 34px; height: 34px; }
-.pin.pin-size-lg .pin-shape-glow-wrap { left: calc(50% - 29px); width: 58px; height: 58px; }
+/* No independent hover transform — pin-icon-scale-group handles scaling */
 
 /* Ring spans fill / inset the wrapper — no individual positioning needed */
 .pin-shape-ring         { display: block; position: absolute; pointer-events: none; }
@@ -4446,6 +4454,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 .pin-shape-square:hover .pin-icon-default, .pin-shape-square.selected .pin-icon-default,
 .pin-shape-square:hover .pin-icon-img,     .pin-shape-square.selected .pin-icon-img {
+  transform: none; /* pin-icon-scale-group handles hover scaling */
   box-shadow:
     inset 0 -4px 8px rgba(0,0,0,0.45),
     inset 0 2px 5px rgba(255,255,255,0.18),
@@ -4465,6 +4474,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-hexagon:hover .pin-icon-img,      .pin-shape-hexagon.selected .pin-icon-img,
 .pin-shape-shield:hover .pin-icon-default,   .pin-shape-shield.selected .pin-icon-default,
 .pin-shape-shield:hover .pin-icon-img,       .pin-shape-shield.selected .pin-icon-img {
+  transform: none; /* pin-icon-scale-group handles hover scaling */
   box-shadow: inset 0 -4px 8px rgba(0,0,0,0.45), inset 0 2px 5px rgba(255,255,255,0.18);
 }
 
@@ -4480,8 +4490,7 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 }
 
 /* ── Hide border ring for ALL non-circle shapes ──────────────────────────── */
-/* .pin-border-ring stays in DOM (display:none != removed) so ~ combinator   */
-/* below can still fire when a border style is selected.                      */
+/* Stays in DOM so :has() in the border-style section below can target it.   */
 .pin-shape-square .pin-border-ring,
 .pin-shape-diamond .pin-border-ring,
 .pin-shape-star    .pin-border-ring,
@@ -4489,17 +4498,18 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 .pin-shape-shield  .pin-border-ring { display: none; }
 
 /* ── Border style glows for non-circle shapes ───────────────────────────── */
-/* .pin-border-ring--{style} is display:none but stays in DOM, so ~ works.   */
+/* pin-border-ring is in pin-body; pin-shape-glow-wrap is now inside         */
+/* pin-icon-scale-group (not a sibling). Use :has() to bridge the gap.       */
 /* Filter on .pin-shape-glow-wrap (no clip-path) traces polygon spans inside  */
 /* and glows outward beyond their clipped boundary — shape-following glow.    */
-.pin-border-ring--siege   ~ .pin-shape-glow-wrap { animation: shape-glow-siege   2s   ease-in-out infinite; }
-.pin-border-ring--blessed ~ .pin-shape-glow-wrap { animation: shape-glow-blessed 3s   ease-in-out infinite; }
-.pin-border-ring--warded  ~ .pin-shape-glow-wrap { animation: shape-glow-warded  4s   linear      infinite; }
-.pin-border-ring--cursed  ~ .pin-shape-glow-wrap { animation: shape-glow-cursed  3.5s ease-in-out infinite; }
-.pin-border-ring--haunted ~ .pin-shape-glow-wrap { animation: shape-glow-haunted 4.5s ease-in-out infinite; }
-.pin-border-ring--plague  ~ .pin-shape-glow-wrap { animation: shape-glow-plague  2.5s ease-in-out infinite; }
-.pin-border-ring--frozen  ~ .pin-shape-glow-wrap { animation: shape-glow-frozen  5s   ease-in-out infinite; }
-.pin-border-ring--burning ~ .pin-shape-glow-wrap { animation: shape-glow-burning 1.8s ease-in-out infinite; }
+.pin-body:has(.pin-border-ring--siege)   .pin-shape-glow-wrap { animation: shape-glow-siege   2s   ease-in-out infinite; }
+.pin-body:has(.pin-border-ring--blessed) .pin-shape-glow-wrap { animation: shape-glow-blessed 3s   ease-in-out infinite; }
+.pin-body:has(.pin-border-ring--warded)  .pin-shape-glow-wrap { animation: shape-glow-warded  4s   linear      infinite; }
+.pin-body:has(.pin-border-ring--cursed)  .pin-shape-glow-wrap { animation: shape-glow-cursed  3.5s ease-in-out infinite; }
+.pin-body:has(.pin-border-ring--haunted) .pin-shape-glow-wrap { animation: shape-glow-haunted 4.5s ease-in-out infinite; }
+.pin-body:has(.pin-border-ring--plague)  .pin-shape-glow-wrap { animation: shape-glow-plague  2.5s ease-in-out infinite; }
+.pin-body:has(.pin-border-ring--frozen)  .pin-shape-glow-wrap { animation: shape-glow-frozen  5s   ease-in-out infinite; }
+.pin-body:has(.pin-border-ring--burning) .pin-shape-glow-wrap { animation: shape-glow-burning 1.8s ease-in-out infinite; }
 
 /* Each keyframe prepends the elevation shadow so animations don't strip it. */
 @keyframes shape-glow-siege {
@@ -4545,4 +4555,153 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
 @keyframes pin-ambient-glow {
   0%,100% { filter: drop-shadow(0 0 5px var(--loc-color))  drop-shadow(0 0 12px var(--loc-color)); }
   50%     { filter: drop-shadow(0 0 10px var(--loc-color)) drop-shadow(0 0 22px var(--loc-color)); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI POLISH — type indicators · corkboard · animations · toolbar groups
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Card entry animation ──────────────────────────────────────────────────── */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.npc-card, .quest-card, .session-card { animation: card-in 0.16s ease-out both; }
+
+/* ── NPC card — amber left accent + subtle gradient ───────────────────────── */
+.npc-card {
+  border-left: 3px solid rgba(201,168,76,0.4);
+  background: linear-gradient(135deg, var(--surface2) 0%, rgba(18,17,34,0.97) 100%);
+}
+.npc-card:hover {
+  border-left-color: var(--accent);
+  background: linear-gradient(135deg, var(--surface3) 0%, rgba(24,23,44,0.97) 100%);
+}
+
+/* ── Session card — arcane purple left accent ─────────────────────────────── */
+.session-card { border-left: 3px solid rgba(122,58,138,0.45); }
+.session-card:hover { border-left-color: var(--pin-temple); }
+
+/* ── Party card — teal left accent ───────────────────────────────────────── */
+.party-card { border-left: 3px solid rgba(42,122,138,0.45); }
+.party-card:hover { border-left-color: var(--pin-port); }
+
+/* ── Faction card — landmark blue left accent ─────────────────────────────── */
+.faction-card { border-left: 3px solid rgba(58,106,170,0.45); }
+.faction-card:hover { border-left-color: var(--pin-landmark); }
+
+/* ── Quest card — status-colored left accent ─────────────────────────────── */
+.quest-card                 { border-left: 3px solid rgba(90,85,120,0.4); }
+.quest-card--active         { border-left-color: rgba(100,170,90,0.6); }
+.quest-card--active:hover   { border-left-color: var(--success-text); }
+.quest-card--completed      { border-left-color: rgba(58,106,170,0.55); }
+.quest-card--completed:hover{ border-left-color: var(--pin-landmark); }
+.quest-card--failed         { border-left-color: rgba(160,50,50,0.55); }
+.quest-card--failed:hover   { border-left-color: var(--danger-text); }
+
+/* ── NPC portrait hover zoom ──────────────────────────────────────────────── */
+.npc-portrait { transition: transform 0.15s, box-shadow 0.15s; }
+.npc-portrait:hover { transform: scale(1.1); box-shadow: 0 0 12px rgba(201,168,76,0.35); }
+
+/* ── Toolbar separators between button groups ─────────────────────────────── */
+.toolbar-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border-light);
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0.55;
+}
+
+/* ── Grouped buttons (connected pill set) ─────────────────────────────────── */
+.btn-group { display: inline-flex; align-items: center; flex-shrink: 0; }
+.btn-group .btn { border-radius: 0; }
+.btn-group .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.btn-group .btn:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
+.btn-group .btn + .btn      { border-left-color: transparent; margin-left: -1px; }
+
+/* ── Active button glow ───────────────────────────────────────────────────── */
+.btn-active {
+  box-shadow: 0 0 0 1px var(--accent-dim), inset 0 0 8px var(--accent-glow2);
+}
+
+/* ── Section labels — gold accent rule ────────────────────────────────────── */
+.section-label { color: var(--accent-dim); }
+.section-label::before { background: linear-gradient(90deg, transparent, var(--border-gold)); }
+.section-label::after  { background: linear-gradient(90deg, var(--border-gold), transparent); }
+
+/* ── Location detail — name glow ─────────────────────────────────────────── */
+.loc-name { text-shadow: 0 0 28px rgba(201,168,76,0.12); }
+
+/* Hero image wrapper — gradient fade at bottom for tome feel */
+.detail-hero-wrap {
+  position: relative;
+  margin-bottom: 4px;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.detail-hero-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 45%;
+  background: linear-gradient(to bottom, transparent, rgba(10,9,20,0.82));
+  pointer-events: none;
+}
+.detail-hero-wrap .detail-hero-img { margin-bottom: 0; border-radius: 0; }
+
+/* ── Quest board — corkboard texture + card rotation ─────────────────────── */
+.quest-board {
+  background:
+    radial-gradient(ellipse at 15% 25%, rgba(80,50,18,0.14) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 75%, rgba(60,38,10,0.12) 0%, transparent 45%),
+    repeating-linear-gradient(0deg, transparent 0px, transparent 3px,
+      rgba(0,0,0,0.025) 3px, rgba(0,0,0,0.025) 4px),
+    repeating-linear-gradient(90deg, transparent 0px, transparent 3px,
+      rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 4px);
+  border-radius: var(--radius-lg);
+  padding: 12px 6px 8px;
+}
+
+/* Per-card rotation for corkboard effect */
+.quest-board-card:nth-child(4n+1) { transform: rotate(-1.3deg); }
+.quest-board-card:nth-child(4n+2) { transform: rotate( 0.9deg); }
+.quest-board-card:nth-child(4n+3) { transform: rotate(-0.6deg); }
+.quest-board-card:nth-child(4n+4) { transform: rotate( 1.1deg); }
+
+.quest-board-card:hover {
+  transform: translateY(-4px) rotate(0deg) scale(1.02) !important;
+  box-shadow: 5px 8px 20px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.05);
+  z-index: 2;
+}
+
+/* Push-pin at top of each card */
+.quest-board-card { position: relative; overflow: visible; }
+.quest-board-card::before {
+  content: '';
+  position: absolute;
+  top: -9px; left: 50%;
+  transform: translateX(-50%);
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #f07878, #a02828);
+  border: 2px solid rgba(0,0,0,0.45);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.65), inset 0 1px 2px rgba(255,255,255,0.22);
+  z-index: 3;
+}
+
+/* Status-tinted top strip on board cards */
+.quest-board-card--active    { border-top: 3px solid rgba(100,170,90,0.6); }
+.quest-board-card--completed { border-top: 3px solid rgba(58,106,170,0.6); }
+.quest-board-card--failed    { border-top: 3px solid rgba(160,50,50,0.6); }
+
+/* ── Sidebar tab active shimmer line ──────────────────────────────────────── */
+.sidebar-tab { position: relative; overflow: hidden; }
+.sidebar-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 15%; right: 15%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-bright), transparent);
+  border-radius: 1px;
 }

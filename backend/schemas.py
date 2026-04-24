@@ -557,3 +557,16 @@ class RelationshipNodePosOut(BaseModel):
     x:           float
     y:           float
     model_config = {"from_attributes": True}
+
+
+# ── Passcode ──────────────────────────────────────────────────────────────────
+
+class PasscodeVerify(BaseModel):
+    passcode: str
+
+class PasscodeSet(BaseModel):
+    passcode: str = ""
+
+class HandoutPush(BaseModel):
+    url: str
+    name: str = ""

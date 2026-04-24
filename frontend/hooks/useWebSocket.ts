@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 const WS_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
   .replace(/^http/, 'ws') + '/ws';
 
-export function useWebSocket(onRefresh: () => void, enabled: boolean) {
+export function useWebSocket(onRefresh: () => void, enabled: boolean, onHandout?: (url: string, name: string) => void) {
   const wsRef      = useRef<WebSocket | null>(null);
   const retryDelay = useRef(1000);
   const mountedRef = useRef(true);
@@ -27,6 +27,7 @@ export function useWebSocket(onRefresh: () => void, enabled: boolean) {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'refresh') onRefresh();
+        if (msg.type === 'handout' && onHandout) onHandout(msg.url, msg.name);
       } catch { /* ignore non-JSON */ }
     };
 
@@ -40,7 +41,7 @@ export function useWebSocket(onRefresh: () => void, enabled: boolean) {
     };
 
     ws.onerror = () => ws.close(); // triggers onclose → retry
-  }, [enabled, onRefresh]);
+  }, [enabled, onRefresh, onHandout]);
 
   useEffect(() => {
     mountedRef.current = true;

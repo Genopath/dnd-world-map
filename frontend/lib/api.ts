@@ -175,6 +175,7 @@ export const api = {
     req<SearchResults>(`/search?q=${encodeURIComponent(q)}`),
   handouts: {
     upload: (file: File) => upload<{ url: string; name: string }>('/handouts/upload', file),
+    push: (url: string, name: string) => req<{ ok: boolean }>('/handouts/push', { method: 'POST', body: JSON.stringify({ url, name }) }),
   },
   library: {
     list: () => req<{ name: string; url: string }[]>('/library-list'),

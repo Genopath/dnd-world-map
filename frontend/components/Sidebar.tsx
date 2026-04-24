@@ -142,6 +142,8 @@ interface Props {
   onUpdateMemberGold:  (id: number, data: Partial<PartyMember>) => Promise<void>;
   onUpdatePoolGold:    (data: Partial<CampaignSettings>) => Promise<void>;
   onOpenCampMap?:      () => void;
+  onPushHandout?:      (url: string, name: string) => void;
+  onNavigateToLocation?: (id: number) => void;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -185,7 +187,7 @@ export default function Sidebar({
   onDuplicateLocation,
   onScheduleBackup,
   loot, onCreateLoot, onUpdateLoot, onDeleteLoot, onUpdateMemberGold, onUpdatePoolGold,
-  onOpenCampMap,
+  onOpenCampMap, onPushHandout, onNavigateToLocation,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [editState,  setEditState]  = useState<EditState | null>(null);
@@ -288,6 +290,7 @@ export default function Sidebar({
               onUpdate={onUpdate}
               onNavigateToNpc={id => { onNavigateToNpc(id); onTabChange('npcs'); }}
               onNavigateToQuest={id => { onNavigateToQuest(id); onTabChange('quests'); }}
+              onPushHandout={onPushHandout}
             />
           )
         )}
@@ -303,6 +306,7 @@ export default function Sidebar({
             onNavigateToQuest={onNavigateToQuest}
             onUnlinkNpc={onUnlinkNpc}
             jumpToId={npcJumpId}
+            onNavigateToLocation={id => { if (onNavigateToLocation) { onNavigateToLocation(id); onTabChange('location'); } }}
           />
         )}
 
@@ -423,21 +427,24 @@ interface DetailProps {
   onUpdate: (id: number, data: Partial<Location>) => Promise<void>;
   onNavigateToNpc: (id: number) => void;
   onNavigateToQuest: (id: number) => void;
+  onPushHandout?: (url: string, name: string) => void;
 }
 
-function LocationDetail({ location, isDMMode, isInPath, npcs, quests, onEdit, onDelete, onDuplicate, onAddToPath, onRemoveFromPath, onLightbox, onEnterSubmap, isInsideSubmap, onUpdate, onNavigateToNpc, onNavigateToQuest }: DetailProps) {
+function LocationDetail({ location, isDMMode, isInPath, npcs, quests, onEdit, onDelete, onDuplicate, onAddToPath, onRemoveFromPath, onLightbox, onEnterSubmap, isInsideSubmap, onUpdate, onNavigateToNpc, onNavigateToQuest, onPushHandout }: DetailProps) {
   const residents     = npcs.filter(n => n.location_id === location.id);
   const linkedQuests  = quests.filter(q => q.location_id === location.id);
   const type = location.type as LocationType;
   return (
     <>
       {location.image_url && (
-        <img
-          src={`${API_BASE}${location.image_url}`}
-          alt={location.name}
-          className="detail-hero-img"
-          onClick={() => onLightbox(`${API_BASE}${location.image_url!}`)}
-        />
+        <div className="detail-hero-wrap">
+          <img
+            src={`${API_BASE}${location.image_url}`}
+            alt={location.name}
+            className="detail-hero-img"
+            onClick={() => onLightbox(`${API_BASE}${location.image_url!}`)}
+          />
+        </div>
       )}
       <div>
         <div className={`loc-type-badge ${BADGE_CLASS[type]}`}>{TYPE_ICONS[type]} {TYPE_LABELS[type]}</div>
@@ -481,13 +488,23 @@ function LocationDetail({ location, isDMMode, isInPath, npcs, quests, onEdit, on
                   return (
                     <div key={i} className="list-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
                       <img src={fullUrl} alt={displayName} style={{ maxWidth: '100%', maxHeight: 120, borderRadius: 4, cursor: 'zoom-in', objectFit: 'cover' }} onClick={() => onLightbox(fullUrl)} />
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{displayName}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1 }}>{displayName}</span>
+                        {isDMMode && onPushHandout && (
+                          <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 7px' }} title="Show this image on all player screens" onClick={() => onPushHandout(fullUrl, displayName)}>
+                            📢 Players
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 }
                 return (
-                  <div key={i} className="list-item">
+                  <div key={i} className="list-item" style={{ justifyContent: 'space-between' }}>
                     <a href={fullUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>📎 {displayName}</a>
+                    {isDMMode && onPushHandout && (
+                      <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 7px' }} title="Show this file on all player screens" onClick={() => onPushHandout(fullUrl, displayName)}>📢</button>
+                    )}
                   </div>
                 );
               }

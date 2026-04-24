@@ -1512,33 +1512,57 @@ export default function MapView({
                     ) : null}
                   </div>
                 )}
-                {/* Shape color ring + glow wrapper for non-circle shapes */}
-                {loc.pin_shape && loc.pin_shape !== 'circle' && (
-                  <div className="pin-shape-glow-wrap">
-                    <span className="pin-shape-ring pin-shape-ring--outer" />
-                    <span className="pin-shape-ring pin-shape-ring--inner" />
-                  </div>
-                )}
-                {/* Normal pin icon — always rendered */}
-                {loc.icon_url ? (
-                  <img
-                    src={`${API_BASE}${loc.icon_url}`}
-                    className="pin-icon-img"
-                    alt={loc.name}
-                    draggable={false}
-                  />
-                ) : TYPE_DEFAULT_ICONS[loc.type] ? (
-                  <div
-                    className="pin-icon-default"
-                    style={{ background: TYPE_COLORS[loc.type] ?? TYPE_COLORS.city }}
-                  >
-                    <img src={TYPE_DEFAULT_ICONS[loc.type]} className="pin-icon-svg" alt={loc.type} draggable={false} />
+                {/* Icon rendering — non-circle shapes wrap glow overlay + icon in one scale group
+                    so both elements transform from a single origin — zero hover drift. */}
+                {loc.pin_shape && loc.pin_shape !== 'circle' ? (
+                  <div className="pin-icon-scale-group">
+                    <div className="pin-shape-glow-wrap">
+                      <span className="pin-shape-ring pin-shape-ring--outer" />
+                      <span className="pin-shape-ring pin-shape-ring--inner" />
+                    </div>
+                    {loc.icon_url ? (
+                      <img
+                        src={`${API_BASE}${loc.icon_url}`}
+                        className="pin-icon-img"
+                        alt={loc.name}
+                        draggable={false}
+                      />
+                    ) : TYPE_DEFAULT_ICONS[loc.type] ? (
+                      <div
+                        className="pin-icon-default"
+                        style={{ background: TYPE_COLORS[loc.type] ?? TYPE_COLORS.city }}
+                      >
+                        <img src={TYPE_DEFAULT_ICONS[loc.type]} className="pin-icon-svg" alt={loc.type} draggable={false} />
+                      </div>
+                    ) : (
+                      <div
+                        className="pin-dot"
+                        style={{ background: TYPE_COLORS[loc.type] ?? TYPE_COLORS.city }}
+                      />
+                    )}
                   </div>
                 ) : (
-                  <div
-                    className="pin-dot"
-                    style={{ background: TYPE_COLORS[loc.type] ?? TYPE_COLORS.city }}
-                  />
+                  /* Circle (default): icon rendered directly in pin-body */
+                  loc.icon_url ? (
+                    <img
+                      src={`${API_BASE}${loc.icon_url}`}
+                      className="pin-icon-img"
+                      alt={loc.name}
+                      draggable={false}
+                    />
+                  ) : TYPE_DEFAULT_ICONS[loc.type] ? (
+                    <div
+                      className="pin-icon-default"
+                      style={{ background: TYPE_COLORS[loc.type] ?? TYPE_COLORS.city }}
+                    >
+                      <img src={TYPE_DEFAULT_ICONS[loc.type]} className="pin-icon-svg" alt={loc.type} draggable={false} />
+                    </div>
+                  ) : (
+                    <div
+                      className="pin-dot"
+                      style={{ background: TYPE_COLORS[loc.type] ?? TYPE_COLORS.city }}
+                    />
+                  )
                 )}
                 {pathNum !== undefined && (
                   <div className="pin-path-num">{pathNum}</div>

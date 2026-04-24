@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Generator
 
 from fastapi import Depends, Header
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker, DeclarativeBase
 
 
@@ -92,7 +92,30 @@ _MIGRATIONS = [
     "ALTER TABLE party_members ADD COLUMN camp_x REAL",
     "ALTER TABLE party_members ADD COLUMN camp_y REAL",
     "ALTER TABLE party_members ADD COLUMN camp_visible BOOLEAN DEFAULT 1",
+    # ── Indexes ───────────────────────────────────────────────────────────────
+    "CREATE INDEX IF NOT EXISTS ix_locations_parent_id ON locations (parent_id)",
+    "CREATE INDEX IF NOT EXISTS ix_player_path_location_id ON player_path (location_id)",
+    "CREATE INDEX IF NOT EXISTS ix_player_path_position ON player_path (position)",
+    "CREATE INDEX IF NOT EXISTS ix_npcs_location_id ON npcs (location_id)",
+    "CREATE INDEX IF NOT EXISTS ix_quests_location_id ON quests (location_id)",
+    "CREATE INDEX IF NOT EXISTS ix_quests_status ON quests (status)",
+    "CREATE INDEX IF NOT EXISTS ix_quest_npc_links_npc_id ON quest_npc_links (npc_id)",
+    "CREATE INDEX IF NOT EXISTS ix_character_paths_location_id ON character_paths (location_id)",
+    "CREATE INDEX IF NOT EXISTS ix_character_paths_position ON character_paths (position)",
+    "CREATE INDEX IF NOT EXISTS ix_rel_edge_from ON relationship_edges (from_type, from_id)",
+    "CREATE INDEX IF NOT EXISTS ix_rel_edge_to ON relationship_edges (to_type, to_id)",
+    "CREATE INDEX IF NOT EXISTS ix_rel_node_pos_entity ON relationship_node_positions (entity_type, entity_id)",
 ]
+
+
+def _set_sqlite_pragmas(dbapi_conn, _connection_record) -> None:
+    cur = dbapi_conn.cursor()
+    cur.execute("PRAGMA journal_mode=WAL")
+    cur.execute("PRAGMA synchronous=NORMAL")
+    cur.execute("PRAGMA cache_size=-65536")   # 64 MB page cache
+    cur.execute("PRAGMA temp_store=MEMORY")
+    cur.execute("PRAGMA mmap_size=268435456") # 256 MB memory-mapped I/O
+    cur.close()
 
 
 def _run_migrations(engine) -> None:
@@ -106,15 +129,17 @@ def _run_migrations(engine) -> None:
                 pass  # column already exists
 
 
-# ── Per-campaign engine cache ─────────────────────────────────────────────────
+# ── Per-campaign engine + sessionmaker cache ──────────────────────────────────
 
-_engines: dict[str, object] = {}
+_engines:           dict[str, object]      = {}
+_session_factories: dict[str, sessionmaker] = {}
 
 
 def get_engine_for_campaign(slug: str):
     db_path = str(CAMPAIGNS_DIR / f"{slug}.db")
     if db_path not in _engines:
         engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+        event.listen(engine, "connect", _set_sqlite_pragmas)
         _run_migrations(engine)
         _engines[db_path] = engine
     return _engines[db_path]
@@ -123,6 +148,7 @@ def get_engine_for_campaign(slug: str):
 def invalidate_engine(slug: str) -> None:
     db_path = str(CAMPAIGNS_DIR / f"{slug}.db")
     _engines.pop(db_path, None)
+    _session_factories.pop(db_path, None)
 
 
 # ── Slug helpers ──────────────────────────────────────────────────────────────
@@ -141,8 +167,10 @@ def get_campaign_slug(x_campaign: str = Header(default="default")) -> str:
 
 def get_db(slug: str = Depends(get_campaign_slug)) -> Generator[Session, None, None]:
     engine = get_engine_for_campaign(slug)
-    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = factory()
+    db_path = str(CAMPAIGNS_DIR / f"{slug}.db")
+    if db_path not in _session_factories:
+        _session_factories[db_path] = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = _session_factories[db_path]()
     try:
         yield db
     finally:

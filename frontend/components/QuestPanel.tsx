@@ -129,6 +129,9 @@ export default function QuestPanel({
   const [addState,      setAddState]      = useState<EditState>(blank());
   const [saving,        setSaving]        = useState(false);
   const [boardView,     setBoardView]     = useState(false);
+  const [selectMode,    setSelectMode]    = useState(false);
+  const [selectedIds,   setSelectedIds]   = useState<Set<number>>(new Set());
+  const [bulkDeleting,  setBulkDeleting]  = useState(false);
 
   const jumpProcessed = useRef<number | null>(null);
   useEffect(() => {
@@ -196,11 +199,46 @@ export default function QuestPanel({
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           <button className={`btn btn-sm ${boardView ? 'btn-active' : ''}`} onClick={() => setBoardView(v => !v)} title="Toggle corkboard view">📋</button>
-          {isDMMode && (
+          {isDMMode && !selectMode && (
             <button className="btn btn-sm" onClick={() => setIsAdding(true)}>+ Add</button>
+          )}
+          {isDMMode && filtered.length > 0 && (
+            <button
+              className={`btn btn-sm${selectMode ? ' btn-active' : ''}`}
+              onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()); }}
+            >
+              {selectMode ? '✕' : '☑'}
+            </button>
           )}
         </div>
       </div>
+
+      {/* Bulk action bar */}
+      {selectMode && isDMMode && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--surface2)', borderRadius: 6, border: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>{selectedIds.size} selected</span>
+          <button className="btn btn-sm" onClick={() => setSelectedIds(new Set(filtered.map(q => q.id)))}>All</button>
+          <button className="btn btn-sm" onClick={() => setSelectedIds(new Set())}>None</button>
+          <button
+            className="btn btn-sm btn-danger"
+            disabled={selectedIds.size === 0 || bulkDeleting}
+            onClick={async () => {
+              if (selectedIds.size === 0) return;
+              if (!confirm(`Delete ${selectedIds.size} quest${selectedIds.size !== 1 ? 's' : ''}?`)) return;
+              setBulkDeleting(true);
+              try {
+                for (const id of selectedIds) await onDelete(id);
+              } finally {
+                setBulkDeleting(false);
+                setSelectMode(false);
+                setSelectedIds(new Set());
+              }
+            }}
+          >
+            {bulkDeleting ? 'Deleting…' : `Delete (${selectedIds.size})`}
+          </button>
+        </div>
+      )}
 
       {/* Tier filter row */}
       <div style={{ display: 'flex', gap: 4 }}>
@@ -243,9 +281,18 @@ export default function QuestPanel({
       ) : (
         /* ── List view ── */
         filtered.map(q => (
-          <div key={q.id} className="quest-card" onClick={() => setExpandedId(expandedId === q.id ? null : q.id)}>
+          <div key={q.id} className={`quest-card quest-card--${q.status}`} onClick={() => {
+            if (selectMode) {
+              setSelectedIds(prev => { const n = new Set(prev); n.has(q.id) ? n.delete(q.id) : n.add(q.id); return n; });
+            } else {
+              setExpandedId(expandedId === q.id ? null : q.id);
+            }
+          }}>
             {/* Card header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              {selectMode ? (
+                <input type="checkbox" checked={selectedIds.has(q.id)} readOnly style={{ width: 16, height: 16, flexShrink: 0, marginTop: 3, cursor: 'pointer', accentColor: 'var(--accent)' }} />
+              ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0, marginTop: 2 }}>
                 <span className="quest-status-badge" style={{ background: STATUS_BG[q.status], color: STATUS_COLOR[q.status] }}>
                   {q.status.toUpperCase()}
@@ -254,6 +301,7 @@ export default function QuestPanel({
                   {TIER_LABEL[q.tier ?? 'side']}
                 </span>
               </div>
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{q.title}</div>
                 {q.location_id != null && (
@@ -542,7 +590,7 @@ function QuestBoardCard({ q, locations, npcs, isDMMode, onToggleObjective, onCli
   onClick: () => void;
 }) {
   return (
-    <div className={`quest-board-card quest-board-card--${q.tier ?? 'side'}`} onClick={onClick}>
+    <div className={`quest-board-card quest-board-card--${q.tier ?? 'side'} quest-board-card--${q.status}`} onClick={onClick}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <span className="quest-status-badge" style={{ background: STATUS_BG[q.status], color: STATUS_COLOR[q.status] }}>
           {q.status.toUpperCase()}

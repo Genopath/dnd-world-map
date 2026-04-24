@@ -262,6 +262,40 @@ export default function Home() {
   // ── Lightbox state ──────────────────────────────────────────────────────────
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
+  // ── Handout overlay (player view) ───────────────────────────────────────────
+  const [handoutOverlay, setHandoutOverlay] = useState<{ url: string; name: string } | null>(null);
+
+  // ── Undo toast system ────────────────────────────────────────────────────────
+  const undoTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [undoToasts, setUndoToasts] = useState<Array<{ key: string; label: string; onUndo: () => void }>>([]);
+
+  const scheduleDelete = useCallback((
+    key: string, label: string,
+    executeFn: () => Promise<void>,
+    restoreFn: () => void,
+  ) => {
+    const existing = undoTimers.current.get(key);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(async () => {
+      undoTimers.current.delete(key);
+      setUndoToasts(p => p.filter(t => t.key !== key));
+      await executeFn();
+    }, 5000);
+    undoTimers.current.set(key, timer);
+    setUndoToasts(p => [
+      ...p.filter(t => t.key !== key),
+      { key, label, onUndo: () => {
+        clearTimeout(undoTimers.current.get(key));
+        undoTimers.current.delete(key);
+        setUndoToasts(p2 => p2.filter(t => t.key !== key));
+        restoreFn();
+      }},
+    ]);
+  }, []);
+
+  // ── Player link copy state ───────────────────────────────────────────────────
+  const [playerLinkCopied, setPlayerLinkCopied] = useState(false);
+
   // ── Search state ────────────────────────────────────────────────────────────
   const [searchOpen,    setSearchOpen]    = useState(false);
   const [searchQuery,   setSearchQuery]   = useState('');
@@ -325,6 +359,27 @@ export default function Home() {
 
     api.campaigns.list()
       .then(async list => {
+        // ── Player link auto-login ───────────────────────────────────────────
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const slugParam = params.get('campaign');
+          const playerParam = params.get('player');
+          if (slugParam && playerParam === '1') {
+            const found = list.find(c => c.slug === slugParam);
+            if (found) {
+              setCurrentCampaign(found.slug);
+              localStorage.setItem('campaign_slug', found.slug);
+              setCampaignSlug(found.slug);
+              setCampaignName(found.name);
+              setShowCampaignSelector(false);
+              setShowLoginScreen(false);
+              setIsDMMode(false);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
         // Normal path — campaigns exist on server; always show selector so the
         // full flow (campaign → login → map) is respected every time.
         // Do NOT call setCampaignSlug here — that would trigger the data-load
@@ -600,13 +655,24 @@ export default function Home() {
   }, [scheduleIdbBackup]);
 
   const handleDeleteLocation = useCallback(async (id: number) => {
-    await api.locations.remove(id);
+    const loc = locations.find(l => l.id === id);
+    if (!loc) return;
+    const removedPaths = playerPath.filter(e => e.location_id === id);
     setLocations(prev => prev.filter(l => l.id !== id));
     setPlayerPath(prev => prev.filter(e => e.location_id !== id));
     if (selectedId === id) setSelectedId(null);
-    scheduleIdbBackup();
     playPinDelete();
-  }, [selectedId, scheduleIdbBackup]);
+    scheduleDelete(
+      `loc-${id}`,
+      `"${loc.name}" deleted`,
+      async () => { await api.locations.remove(id); scheduleIdbBackup(); },
+      () => {
+        setLocations(prev => [...prev, loc].sort((a, b) => a.id - b.id));
+        setPlayerPath(prev => [...prev, ...removedPaths]);
+        setSelectedId(id);
+      },
+    );
+  }, [locations, playerPath, selectedId, scheduleIdbBackup, scheduleDelete]);
 
   const handleDuplicateLocation = useCallback(async (loc: Location) => {
     const newLoc = await api.locations.create({
@@ -705,8 +771,16 @@ export default function Home() {
     const updated = await api.npcs.update(id, data); setNpcs(prev => prev.map(n => (n.id === id ? updated : n))); scheduleIdbBackup();
   }, [scheduleIdbBackup]);
   const handleDeleteNPC = useCallback(async (id: number) => {
-    await api.npcs.remove(id); setNpcs(prev => prev.filter(n => n.id !== id)); scheduleIdbBackup();
-  }, [scheduleIdbBackup]);
+    const npc = npcs.find(n => n.id === id);
+    if (!npc) return;
+    setNpcs(prev => prev.filter(n => n.id !== id));
+    scheduleDelete(
+      `npc-${id}`,
+      `"${npc.name}" deleted`,
+      async () => { await api.npcs.remove(id); scheduleIdbBackup(); },
+      () => setNpcs(prev => [...prev, npc].sort((a, b) => a.id - b.id)),
+    );
+  }, [npcs, scheduleIdbBackup, scheduleDelete]);
   const handleUploadPortrait = useCallback(async (id: number, file: File) => {
     const { portrait_url } = await api.npcs.uploadPortrait(id, file);
     setNpcs(prev => prev.map(n => (n.id === id ? { ...n, portrait_url } : n)));
@@ -729,8 +803,16 @@ export default function Home() {
     if (data.status === 'completed') playQuestComplete();
   }, [scheduleIdbBackup]);
   const handleDeleteQuest = useCallback(async (id: number) => {
-    await api.quests.remove(id); setQuests(prev => prev.filter(q => q.id !== id)); scheduleIdbBackup();
-  }, [scheduleIdbBackup]);
+    const quest = quests.find(q => q.id === id);
+    if (!quest) return;
+    setQuests(prev => prev.filter(q => q.id !== id));
+    scheduleDelete(
+      `quest-${id}`,
+      `"${quest.title}" deleted`,
+      async () => { await api.quests.remove(id); scheduleIdbBackup(); },
+      () => setQuests(prev => [...prev, quest].sort((a, b) => a.id - b.id)),
+    );
+  }, [quests, scheduleIdbBackup, scheduleDelete]);
 
   // ── Session handlers ──────────────────────────────────────────────────────────
   const handleCreateSession = useCallback(async (data: Omit<SessionEntry, 'id' | 'created_at'>) => {
@@ -936,7 +1018,10 @@ export default function Home() {
     setNpcs(updatedNpcs);
     setQuests(updatedQuests);
   }, []);
-  useWebSocket(handleWSRefresh, !isDMMode);
+  const handleHandoutReceived = useCallback((url: string, name: string) => {
+    setHandoutOverlay({ url, name });
+  }, []);
+  useWebSocket(handleWSRefresh, !isDMMode, handleHandoutReceived);
 
   // ── Keyboard shortcuts + copy/paste ──────────────────────────────────────────
   const [copiedLocation, setCopiedLocation] = useState<Location | null>(null);
@@ -1247,9 +1332,12 @@ export default function Home() {
                 )}
               </div>
 
+              <span className="toolbar-sep" />
               <button className={`btn ${isAddingPin ? 'btn-active' : ''}`} onClick={() => setIsAddingPin(p => !p)}>
                 {isAddingPin ? '✕ Cancel Placing' : '+ Add Location'}
               </button>
+              <span className="toolbar-sep" />
+              <div className="btn-group">
               <button
                 className={`btn btn-sm ${showPinLabels ? 'btn-active' : ''}`}
                 title="Toggle pin labels"
@@ -1259,7 +1347,7 @@ export default function Home() {
                 className={`btn btn-sm ${showDistLabels ? 'btn-active' : ''}`}
                 title="Toggle distance labels on paths"
                 onClick={() => setShowDistLabels(v => { const next = !v; localStorage.setItem('show_dist_labels', next ? '1' : '0'); return next; })}
-              >📏 Distance</button>
+              >📏 Dist</button>
               <button
                 className={`btn btn-sm ${showTimeLabels ? 'btn-active' : ''}`}
                 title="Toggle travel time labels on paths"
@@ -1280,6 +1368,7 @@ export default function Home() {
                 title={currentMapScale ? 'Toggle grid overlay' : 'Toggle grid (set map scale first)'}
                 onClick={() => setShowGrid(v => { const next = !v; localStorage.setItem('show_grid', next ? '1' : '0'); return next; })}
               >⊞ Grid</button>
+              </div>
               {showGrid && currentMapScale && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
                   <span style={{ color: 'var(--text-muted)' }}>cell=</span>
@@ -1301,6 +1390,17 @@ export default function Home() {
                 {mapStack.length > 0 ? 'Upload Submap' : 'Upload Map'}
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleMapUpload(f); e.target.value = ''; }} />
               </label>
+              <span className="toolbar-sep" />
+              <button className="btn btn-sm" onClick={() => {
+                if (!campaignSlug) return;
+                const url = `${window.location.origin}${window.location.pathname}?campaign=${campaignSlug}&player=1`;
+                navigator.clipboard.writeText(url).then(() => {
+                  setPlayerLinkCopied(true);
+                  setTimeout(() => setPlayerLinkCopied(false), 2000);
+                });
+              }} title="Copy shareable player view link">
+                {playerLinkCopied ? '✓ Copied!' : '🔗 Player Link'}
+              </button>
               <button className="btn" onClick={handleExport} title="Export JSON backup">Export</button>
               <label className="btn" style={{ cursor: 'pointer' }} title="Import JSON backup">
                 Import
@@ -1447,6 +1547,8 @@ export default function Home() {
             onUpdateMemberGold={handleUpdateMemberGold}
             onUpdatePoolGold={handleUpdatePoolGold}
             onOpenCampMap={() => setShowCampMap(true)}
+            onPushHandout={async (url, name) => { await api.handouts.push(url, name); }}
+            onNavigateToLocation={(id) => { setSelectedId(id); setSidebarTab('location'); }}
           />
           </div>
         </div>
@@ -1593,6 +1695,36 @@ export default function Home() {
             )}
             <button className="btn btn-sm" style={{ marginTop: 14, width: '100%' }} onClick={() => setBackupMetas(null)}>Close</button>
           </div>
+        </div>
+      )}
+
+      {/* ── Undo toasts ─────────────────────────────────────────────────── */}
+      {undoToasts.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9998, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', pointerEvents: 'none' }}>
+          {undoToasts.map(toast => (
+            <div key={toast.key} style={{ pointerEvents: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.6)', fontSize: 13 }}>
+              <span style={{ color: 'var(--text-muted)' }}>{toast.label}</span>
+              <button className="btn btn-sm" style={{ padding: '3px 10px' }} onClick={toast.onUndo}>Undo</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Handout overlay (player view) ────────────────────────────────── */}
+      {handoutOverlay && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}
+          onClick={() => setHandoutOverlay(null)}
+        >
+          <div style={{ color: 'var(--text-muted)', fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' }}>DM shared a handout</div>
+          <img
+            src={handoutOverlay.url}
+            alt={handoutOverlay.name}
+            style={{ maxWidth: '90vw', maxHeight: '72vh', objectFit: 'contain', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.8)' }}
+            onClick={e => e.stopPropagation()}
+          />
+          {handoutOverlay.name && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{handoutOverlay.name}</div>}
+          <button className="btn btn-sm" onClick={() => setHandoutOverlay(null)}>✕ Dismiss</button>
         </div>
       )}
 

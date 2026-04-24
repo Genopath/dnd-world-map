@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, LargeBinary, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, Index, Integer, LargeBinary, String, Text
 from sqlalchemy.sql import func
 
 from database import Base
@@ -20,7 +20,7 @@ class Location(Base):
     y = Column(Float, nullable=False)
     icon_url = Column(String(500), nullable=True)
     image_url = Column(String(500), nullable=True)        # hero/banner image
-    parent_id = Column(Integer, nullable=True)            # null = root map level
+    parent_id = Column(Integer, nullable=True, index=True) # null = root map level
     submap_image_url = Column(String(500), nullable=True) # interior map image
     fog_data         = Column(Text, nullable=True)         # per-submap fog (10000-char '0'/'1')
     pin_size         = Column(String(10), default='md')      # 'sm' | 'md' | 'lg'
@@ -38,8 +38,8 @@ class PlayerPathEntry(Base):
     __tablename__ = "player_path"
 
     id = Column(Integer, primary_key=True, index=True)
-    location_id = Column(Integer, nullable=False)
-    position = Column(Integer, nullable=False, default=0)
+    location_id = Column(Integer, nullable=False, index=True)
+    position = Column(Integer, nullable=False, default=0, index=True)
     travel_type = Column(String(50), default="foot")
     distance = Column(Float, nullable=True)
     distance_unit = Column(String(50), nullable=True)
@@ -63,7 +63,7 @@ class NPC(Base):
     __tablename__ = "npcs"
 
     id = Column(Integer, primary_key=True, index=True)
-    location_id = Column(Integer, nullable=True)
+    location_id = Column(Integer, nullable=True, index=True)
     name = Column(String(255), nullable=False)
     role = Column(String(255), default="")
     status = Column(String(50), default="alive")   # alive / dead / unknown
@@ -78,10 +78,10 @@ class Quest(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
-    status = Column(String(50), default="active")      # active / completed / failed
-    tier   = Column(String(20),  default="side")       # main / side / rumour
+    status = Column(String(50), default="active", index=True)  # active / completed / failed
+    tier   = Column(String(20),  default="side")               # main / side / rumour
     description = Column(Text, default="")
-    location_id = Column(Integer, nullable=True)
+    location_id = Column(Integer, nullable=True, index=True)
     notes = Column(Text, default="")
     image_url = Column(String(500), nullable=True)
     # Objectives: JSON [{id, text, done}, ...]
@@ -207,8 +207,8 @@ class CharacterPath(Base):
 
     id              = Column(Integer, primary_key=True, index=True)
     party_member_id = Column(Integer, nullable=False, index=True)
-    location_id     = Column(Integer, nullable=False)
-    position        = Column(Integer, nullable=False, default=0)
+    location_id     = Column(Integer, nullable=False, index=True)
+    position        = Column(Integer, nullable=False, default=0, index=True)
     travel_type     = Column(String(50), default="foot")
     distance        = Column(Float, nullable=True)
     distance_unit   = Column(String(50), nullable=True)
@@ -223,7 +223,7 @@ class QuestNPCLink(Base):
     __tablename__ = "quest_npc_links"
 
     quest_id = Column(Integer, primary_key=True)
-    npc_id   = Column(Integer, primary_key=True)
+    npc_id   = Column(Integer, primary_key=True, index=True)
 
 
 class RelationshipEdge(Base):
@@ -237,6 +237,7 @@ class RelationshipEdge(Base):
     label     = Column(String(200), default="")
     active    = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (Index("ix_rel_edge_from", "from_type", "from_id"), Index("ix_rel_edge_to", "to_type", "to_id"),)
 
 
 class RelationshipNodePos(Base):
@@ -247,6 +248,7 @@ class RelationshipNodePos(Base):
     entity_id   = Column(Integer, nullable=False)
     x           = Column(Float, nullable=False)
     y           = Column(Float, nullable=False)
+    __table_args__ = (Index("ix_rel_node_pos_entity", "entity_type", "entity_id"),)
 
 
 class LootItem(Base):
