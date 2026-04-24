@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DnD World Map — City Feature Mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#07070e;--surface:#0e0d1c;--surface2:#151426;--surface3:#1c1b32;
+  --border:#242240;--border-light:#302d52;--border-gold:rgba(201,168,76,0.28);
+  --accent:#c9a84c;--accent-dim:#9a7e30;--accent-bright:#e8c870;
+  --accent-glow:rgba(201,168,76,0.14);--accent-glow2:rgba(201,168,76,0.06);
+  --text:#e4dece;--text-muted:#8a8098;--text-dim:#45415e;
+  --text-bright:#f5f0e8;
+  --font-display:'Cinzel',Georgia,serif;--font-body:-apple-system,'Segoe UI',sans-serif;
+  /* pin type colors */
+  --col-shop:#e8c43a;--col-inn:#e87a3a;--col-temple:#7ea8e8;--col-landmark:#b87ee8;
+  --col-gate:#6ecfaa;--col-hazard:#e85050;--col-dungeon:#c050c8;--col-city:#c9a84c;
+  --col-district-merchant:rgba(232,196,58,0.15);
+  --col-district-noble:rgba(126,168,232,0.12);
+  --col-district-dock:rgba(110,207,170,0.12);
+  --col-district-slums:rgba(180,80,80,0.10);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14px;min-height:100vh;padding:32px 24px}
+h1{font-family:var(--font-display);color:var(--accent);font-size:22px;letter-spacing:.06em;margin-bottom:6px;text-shadow:0 0 20px rgba(201,168,76,.35)}
+.subtitle{color:var(--text-muted);font-size:13px;margin-bottom:36px}
+.concepts{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:44px}
+.concept{display:flex;flex-direction:column;gap:14px}
+.concept-label{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-dim);display:flex;align-items:center;gap:8px}
+.concept-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border-gold),transparent)}
+.concept-desc{font-size:12px;color:var(--text-muted);line-height:1.6;padding:0 2px}
+
+/* shared shell */
+.app-shell{width:100%;height:580px;display:flex;background:var(--bg);border:1px solid var(--border-gold);border-radius:10px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.7);position:relative}
+.sidebar-shell{width:320px;flex-shrink:0;background:linear-gradient(180deg,#0e0d1c,#0c0b18);border-right:1px solid var(--border-gold);display:flex;flex-direction:column;overflow:hidden;z-index:2}
+.map-area{flex:1;background:var(--surface);position:relative;overflow:hidden}
+
+/* Breadcrumb */
+.breadcrumb{position:absolute;top:10px;left:10px;z-index:10;display:flex;align-items:center;gap:6px;background:rgba(10,9,20,.9);border:1px solid var(--border-gold);padding:5px 12px;border-radius:20px;font-size:11px;backdrop-filter:blur(6px)}
+.bc-back{background:rgba(201,168,76,.15);border:1px solid var(--border-gold);border-radius:11px;color:var(--accent);font-size:10px;font-weight:700;padding:2px 8px;cursor:pointer}
+.bc-sep{color:var(--border-gold);opacity:.7;font-size:10px}
+.bc-root{color:var(--accent);font-weight:600;font-size:11px;cursor:pointer}
+.bc-current{color:var(--text-bright);font-weight:600;font-size:11px}
+
+/* fake map */
+.fake-map{width:100%;height:100%;background:
+  radial-gradient(ellipse 60% 40% at 45% 50%, rgba(40,36,20,.6) 0%, transparent 70%),
+  repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.025) 39px,rgba(255,255,255,.025) 40px),
+  repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.025) 39px,rgba(255,255,255,.025) 40px),
+  linear-gradient(135deg,#0c0b18 0%,#141230 40%,#0e0c20 100%);
+  position:relative;overflow:hidden}
+/* city streets */
+.fake-map::before{
+  content:'';position:absolute;inset:0;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px) 0 0 / 80px 80px,
+    linear-gradient(0deg,rgba(255,255,255,.04) 1px,transparent 1px) 0 0 / 80px 80px,
+    linear-gradient(45deg,rgba(201,168,76,.03) 1px,transparent 1px) 0 0 / 160px 160px;
+}
+
+/* district overlays */
+.district{position:absolute;border-radius:8px;border:1px dashed;display:flex;align-items:flex-end;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-family:var(--font-display)}
+.district-merchant{top:8%;left:5%;width:38%;height:35%;background:var(--col-district-merchant);border-color:rgba(232,196,58,.3);color:rgba(232,196,58,.55)}
+.district-noble{top:8%;left:52%;width:44%;height:40%;background:var(--col-district-noble);border-color:rgba(126,168,232,.3);color:rgba(126,168,232,.55)}
+.district-dock{top:55%;left:5%;width:50%;height:38%;background:var(--col-district-dock);border-color:rgba(110,207,170,.3);color:rgba(110,207,170,.55)}
+.district-slums{top:55%;left:62%;width:34%;height:35%;background:var(--col-district-slums);border-color:rgba(180,80,80,.3);color:rgba(180,80,80,.55)}
+
+/* city pins */
+.city-pin{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;z-index:5}
+.pin-dot{width:26px;height:26px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.6);transition:transform .15s}
+.city-pin:hover .pin-dot{transform:scale(1.2)}
+.pin-label{font-size:8px;font-weight:700;color:var(--text-muted);background:rgba(10,9,20,.8);border-radius:4px;padding:1px 4px;white-space:nowrap;letter-spacing:.04em;max-width:60px;text-align:center;overflow:hidden;text-overflow:ellipsis}
+.pin-shop .pin-dot{background:rgba(232,196,58,.15);border-color:var(--col-shop);color:var(--col-shop)}
+.pin-inn .pin-dot{background:rgba(232,122,58,.15);border-color:var(--col-inn);color:var(--col-inn)}
+.pin-temple .pin-dot{background:rgba(126,168,232,.15);border-color:var(--col-temple);color:var(--col-temple)}
+.pin-landmark .pin-dot{background:rgba(184,126,232,.15);border-color:var(--col-landmark);color:var(--col-landmark)}
+.pin-gate .pin-dot{background:rgba(110,207,170,.15);border-color:var(--col-gate);color:var(--col-gate)}
+.pin-dungeon .pin-dot{background:rgba(192,80,200,.15);border-color:var(--col-dungeon);color:var(--col-dungeon)}
+
+/* sidebar shared */
+.sb-header{padding:12px 14px 0;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.sb-city-badge{display:flex;align-items:center;gap:9px;background:var(--accent-glow2);border-bottom:1px solid var(--border-gold);padding:10px 14px;flex-shrink:0}
+.sb-city-icon{width:34px;height:34px;border-radius:6px;background:linear-gradient(135deg,#2e2a10,#1a1808);border:1px solid var(--border-gold);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sb-city-info{flex:1;min-width:0}
+.sb-city-name{font-family:var(--font-display);font-size:13px;color:var(--accent-bright);font-weight:700;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-city-sub{font-size:10px;color:var(--text-muted)}
+.sb-city-stats{display:flex;gap:10px}
+.sb-stat{display:flex;flex-direction:column;align-items:center;font-size:9px;color:var(--text-dim);gap:1px}
+.sb-stat-val{font-size:12px;font-weight:700;color:var(--text-muted)}
+
+/* category tabs */
+.cat-tabs{display:flex;border-bottom:1px solid var(--border-gold);flex-shrink:0;overflow:hidden}
+.cat-tab{flex:1;padding:8px 4px 7px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-display);color:var(--text-dim);cursor:pointer;text-align:center;border:none;background:transparent;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.cat-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--accent-glow2)}
+.cat-tab:hover:not(.active){color:var(--text-muted);background:rgba(255,255,255,.02)}
+
+/* sidebar content */
+.sb-content{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.sb-content::-webkit-scrollbar{width:4px}
+.sb-content::-webkit-scrollbar-track{background:transparent}
+.sb-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* directory entries */
+.dir-section{display:flex;flex-direction:column;gap:4px}
+.dir-section-head{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-dim);display:flex;align-items:center;gap:6px;padding:4px 0 2px;font-family:var(--font-display)}
+.dir-section-head::after{content:'';flex:1;height:1px;background:var(--border)}
+.dir-entry{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .12s}
+.dir-entry:hover{background:var(--accent-glow2)}
+.dir-entry-icon{width:22px;height:22px;border-radius:50%;border:1px solid;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.dir-entry-name{flex:1;font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dir-entry-sub{font-size:10px;color:var(--text-dim)}
+.dir-entry-badge{font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;white-space:nowrap}
+.badge-shop{background:rgba(232,196,58,.12);color:var(--col-shop);border:1px solid rgba(232,196,58,.3)}
+.badge-inn{background:rgba(232,122,58,.12);color:var(--col-inn);border:1px solid rgba(232,122,58,.3)}
+.badge-temple{background:rgba(126,168,232,.12);color:var(--col-temple);border:1px solid rgba(126,168,232,.3)}
+.badge-landmark{background:rgba(184,126,232,.12);color:var(--col-landmark);border:1px solid rgba(184,126,232,.3)}
+.badge-gate{background:rgba(110,207,170,.12);color:var(--col-gate);border:1px solid rgba(110,207,170,.3)}
+.icon-shop{background:rgba(232,196,58,.12);border-color:rgba(232,196,58,.4);color:var(--col-shop)}
+.icon-inn{background:rgba(232,122,58,.12);border-color:rgba(232,122,58,.4);color:var(--col-inn)}
+.icon-temple{background:rgba(126,168,232,.12);border-color:rgba(126,168,232,.4);color:var(--col-temple)}
+.icon-landmark{background:rgba(184,126,232,.12);border-color:rgba(184,126,232,.4);color:var(--col-landmark)}
+.icon-gate{background:rgba(110,207,170,.12);border-color:rgba(110,207,170,.4);color:var(--col-gate)}
+
+/* search bar */
+.sb-search{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;margin:0 -2px;flex-shrink:0}
+.sb-search input{background:transparent;border:none;outline:none;color:var(--text);font-size:12px;flex:1;font-family:var(--font-body)}
+.sb-search input::placeholder{color:var(--text-dim)}
+.sb-search-icon{color:var(--text-dim);font-size:12px}
+
+/* district cards */
+.district-card{border-radius:8px;border:1px solid;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;background:rgba(0,0,0,.2)}
+.district-card:hover{transform:translateX(2px)}
+.district-card-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.district-card-info{flex:1;min-width:0}
+.district-card-name{font-family:var(--font-display);font-size:12px;font-weight:700;color:var(--text-bright);letter-spacing:.04em}
+.district-card-sub{font-size:10px;color:var(--text-dim);margin-top:2px}
+.district-card-count{font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px}
+.dc-merchant{border-color:rgba(232,196,58,.3)}
+.dc-merchant .district-card-icon{background:rgba(232,196,58,.1)}
+.dc-merchant .district-card-count{background:rgba(232,196,58,.12);color:var(--col-shop)}
+.dc-noble{border-color:rgba(126,168,232,.3)}
+.dc-noble .district-card-icon{background:rgba(126,168,232,.1)}
+.dc-noble .district-card-count{background:rgba(126,168,232,.12);color:var(--col-temple)}
+.dc-dock{border-color:rgba(110,207,170,.3)}
+.dc-dock .district-card-icon{background:rgba(110,207,170,.1)}
+.dc-dock .district-card-count{background:rgba(110,207,170,.12);color:var(--col-gate)}
+.dc-slums{border-color:rgba(180,80,80,.3)}
+.dc-slums .district-card-icon{background:rgba(180,80,80,.1)}
+.dc-slums .district-card-count{background:rgba(180,80,80,.12);color:var(--col-hazard)}
+
+/* NPC cards in city */
+.npc-row{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:background .12s}
+.npc-row:hover{background:var(--surface3);border-color:var(--border-light)}
+.npc-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#3a3260,#1e1c38);border:1.5px solid var(--border-gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);font-family:var(--font-display);flex-shrink:0}
+.npc-info{flex:1;min-width:0}
+.npc-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.npc-loc{font-size:10px;color:var(--text-dim)}
+.npc-tag{font-size:9px;padding:1px 6px;border-radius:6px;background:var(--accent-glow);color:var(--accent);border:1px solid var(--border-gold);white-space:nowrap;font-weight:600}
+
+/* city profile panel */
+.city-profile{background:var(--surface2);border:1px solid var(--border-gold);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.city-profile-row{display:flex;gap:6px;align-items:flex-start}
+.cp-label{font-size:10px;color:var(--text-dim);width:68px;flex-shrink:0;padding-top:1px}
+.cp-val{font-size:12px;color:var(--text);line-height:1.4}
+.cp-faction-chip{display:inline-flex;align-items:center;gap:4px;background:rgba(126,168,232,.08);border:1px solid rgba(126,168,232,.2);border-radius:9px;padding:2px 8px;font-size:10px;color:rgba(126,168,232,.9);margin:1px}
+
+/* quest hooks */
+.hook-card{border-radius:7px;border:1px solid var(--border);background:var(--surface2);padding:9px 11px;display:flex;gap:9px;cursor:pointer;transition:background .12s}
+.hook-card:hover{background:var(--surface3)}
+.hook-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.hook-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px}
+.hook-desc{font-size:11px;color:var(--text-dim);line-height:1.45}
+.hook-tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:6px;font-weight:700;margin-top:5px}
+.hook-active{background:rgba(232,196,58,.12);color:var(--col-shop);border:1px solid rgba(232,196,58,.25)}
+.hook-rumour{background:rgba(184,126,232,.1);color:var(--col-landmark);border:1px solid rgba(184,126,232,.2)}
+
+/* city type filter pills */
+.type-filters{display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.type-pill{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;border:1px solid;font-size:10px;font-weight:700;cursor:pointer;transition:all .12s;background:transparent;font-family:var(--font-body)}
+.type-pill.active{color:#fff}
+.pill-shop{border-color:rgba(232,196,58,.4);color:var(--col-shop)}
+.pill-shop.active{background:rgba(232,196,58,.25)}
+.pill-inn{border-color:rgba(232,122,58,.4);color:var(--col-inn)}
+.pill-inn.active{background:rgba(232,122,58,.25)}
+.pill-temple{border-color:rgba(126,168,232,.4);color:var(--col-temple)}
+.pill-temple.active{background:rgba(126,168,232,.25)}
+.pill-landmark{border-color:rgba(184,126,232,.4);color:var(--col-landmark)}
+.pill-landmark.active{background:rgba(184,126,232,.25)}
+.pill-all{border-color:var(--border-light);color:var(--text-muted)}
+.pill-all.active{background:var(--surface3);color:var(--text)}
+
+/* rumour pin */
+.rumour-banner{background:rgba(184,126,232,.08);border:1px solid rgba(184,126,232,.2);border-radius:7px;padding:8px 11px;font-size:11px;color:rgba(200,170,240,.85);line-height:1.5;position:relative}
+.rumour-banner::before{content:'📜';position:absolute;top:8px;right:10px;font-size:14px;opacity:.5}
+
+/* notice bar */
+.notice{background:rgba(126,168,232,.08);border:1px solid rgba(126,168,232,.2);border-radius:6px;padding:7px 10px;font-size:11px;color:rgba(160,200,240,.8);line-height:1.45}
+
+/* empty state */
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--text-dim);font-size:12px;text-align:center;padding:20px}
+.empty-icon{font-size:28px;opacity:.35}
+
+/* concept C — info overlay chip */
+.map-info-chip{position:absolute;bottom:10px;left:10px;background:rgba(10,9,20,.9);border:1px solid var(--border-gold);border-radius:8px;padding:8px 12px;font-size:11px;z-index:10;backdrop-filter:blur(4px);max-width:200px}
+.mic-title{font-family:var(--font-display);font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.06em;margin-bottom:5px}
+.mic-row{display:flex;justify-content:space-between;gap:12px;font-size:10px;color:var(--text-dim);margin-bottom:2px}
+.mic-val{color:var(--text-muted)}
+
+/* concept D — split panel */
+.split-panels{display:flex;gap:0;flex:1;overflow:hidden}
+.split-left{width:160px;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.split-right{flex:1;background:var(--surface2);display:flex;flex-direction:column;overflow:hidden}
+.split-section{padding:8px 10px;border-bottom:1px solid var(--border)}
+.split-section-head{font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--accent-dim);text-transform:uppercase;font-family:var(--font-display);margin-bottom:5px}
+.split-item{font-size:11px;padding:5px 6px;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text-muted);transition:all .12s}
+.split-item:hover{background:var(--accent-glow2);color:var(--text)}
+.split-item.active{background:var(--accent-glow);color:var(--accent)}
+
+/* add-pin quick menu */
+.quick-add{position:absolute;right:10px;top:50px;background:rgba(10,9,20,.95);border:1px solid var(--border-gold);border-radius:10px;padding:10px;z-index:20;display:flex;flex-direction:column;gap:5px;width:160px;backdrop-filter:blur(8px)}
+.quick-add-title{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-dim);font-family:var(--font-display);margin-bottom:3px}
+.qa-btn{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:background .12s;font-size:11px;color:var(--text);width:100%}
+.qa-btn:hover{background:var(--surface3)}
+.qa-icon{width:20px;height:20px;border-radius:50%;border:1px solid;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+
+/* loot / services preview */
+.service-card{border-radius:7px;border:1px solid;padding:9px 11px;display:flex;gap:9px;background:rgba(0,0,0,.25);cursor:pointer;transition:background .12s}
+.service-card:hover{background:rgba(255,255,255,.02)}
+.sc-icon{font-size:20px;flex-shrink:0}
+.sc-info{flex:1;min-width:0}
+.sc-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
+.sc-desc{font-size:10px;color:var(--text-dim);line-height:1.4}
+.sc-price{font-size:10px;color:var(--col-shop);font-weight:600;margin-top:3px}
+
+/* scroll fix */
+.sb-content::-webkit-scrollbar{width:4px}
+.sb-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+button{font-family:var(--font-body);cursor:pointer}
+
+/* interactive */
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+
+<h1>City Feature Mockups</h1>
+<p class="subtitle">Concepts for city/submap-specific UI — using Waterdeep as a stand-in. Click tabs to explore each concept.</p>
+
+<div class="concepts">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CONCEPT A — Establishment Directory + District Overlay
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="concept" id="concept-a">
+    <div class="concept-label">Concept A — Establishment Directory</div>
+    <div class="concept-desc">Inside a city submap, the sidebar's Location tab shows a searchable, filterable directory of all pins organized by type. District overlays on the map let you visually scope areas. Clicking a district highlights its pins.</div>
+    <div class="app-shell">
+
+      <!-- MAP -->
+      <div class="map-area">
+        <div class="fake-map">
+          <div class="district district-merchant">Merchant</div>
+          <div class="district district-noble">Noble Quarter</div>
+          <div class="district district-dock">Docks</div>
+          <div class="district district-slums">Slums</div>
+
+          <!-- pins -->
+          <div class="city-pin pin-shop" style="left:22%;top:28%">
+            <div class="pin-dot">🪙</div>
+            <div class="pin-label">Splendid Goods</div>
+          </div>
+          <div class="city-pin pin-inn" style="left:30%;top:42%">
+            <div class="pin-dot">🍺</div>
+            <div class="pin-label">The Rusty Flagon</div>
+          </div>
+          <div class="city-pin pin-shop" style="left:14%;top:48%">
+            <div class="pin-dot">🪙</div>
+            <div class="pin-label">Blacksmith</div>
+          </div>
+          <div class="city-pin pin-temple" style="left:65%;top:24%">
+            <div class="pin-dot">⛩</div>
+            <div class="pin-label">Temple of Tyr</div>
+          </div>
+          <div class="city-pin pin-landmark" style="left:75%;top:36%">
+            <div class="pin-dot">◈</div>
+            <div class="pin-label">Castle Ward</div>
+          </div>
+          <div class="city-pin pin-gate" style="left:40%;top:72%">
+            <div class="pin-dot">🚪</div>
+            <div class="pin-label">South Gate</div>
+          </div>
+          <div class="city-pin pin-inn" style="left:24%;top:66%">
+            <div class="pin-dot">🍺</div>
+            <div class="pin-label">Dockside Ale</div>
+          </div>
+          <div class="city-pin pin-dungeon" style="left:78%;top:65%">
+            <div class="pin-dot">💀</div>
+            <div class="pin-label">Thieves Guild</div>
+          </div>
+        </div>
+        <div class="breadcrumb">
+          <span class="bc-back">← Back</span>
+          <span class="bc-root">🌍 World</span>
+          <span class="bc-sep">›</span>
+          <span class="bc-current">Waterdeep</span>
+        </div>
+      </div>
+
+      <!-- SIDEBAR -->
+      <div class="sidebar-shell">
+        <div class="sb-city-badge">
+          <div class="sb-city-icon">🏰</div>
+          <div class="sb-city-info">
+            <div class="sb-city-name">Waterdeep</div>
+            <div class="sb-city-sub">City of Splendors · Pop. ~132,000</div>
+          </div>
+        </div>
+
+        <div class="cat-tabs" id="a-tabs">
+          <button class="cat-tab active" onclick="aSwitch('directory',this)">Directory</button>
+          <button class="cat-tab" onclick="aSwitch('districts',this)">Districts</button>
+          <button class="cat-tab" onclick="aSwitch('people',this)">People</button>
+          <button class="cat-tab" onclick="aSwitch('hooks',this)">Hooks</button>
+        </div>
+
+        <div class="sb-content">
+          <!-- DIRECTORY -->
+          <div id="a-directory" class="tab-panel active">
+            <div class="sb-search">
+              <span class="sb-search-icon">🔍</span>
+              <input type="text" placeholder="Search establishments…" />
+            </div>
+            <div class="type-filters">
+              <button class="type-pill pill-all active">All</button>
+              <button class="type-pill pill-shop">🪙 Shops</button>
+              <button class="type-pill pill-inn">🍺 Inns</button>
+              <button class="type-pill pill-temple">⛩ Temples</button>
+              <button class="type-pill pill-landmark">◈ Landmarks</button>
+            </div>
+
+            <div class="dir-section">
+              <div class="dir-section-head">Shops & Markets</div>
+              <div class="dir-entry">
+                <div class="dir-entry-icon icon-shop">🪙</div>
+                <div>
+                  <div class="dir-entry-name">Splendid Goods Emporium</div>
+                  <div class="dir-entry-sub">Merchant Quarter</div>
+                </div>
+                <span class="dir-entry-badge badge-shop">Shop</span>
+              </div>
+              <div class="dir-entry">
+                <div class="dir-entry-icon icon-shop">🪙</div>
+                <div>
+                  <div class="dir-entry-name">Hrunk's Blacksmithy</div>
+                  <div class="dir-entry-sub">Merchant Quarter</div>
+                </div>
+                <span class="dir-entry-badge badge-shop">Shop</span>
+              </div>
+            </div>
+
+            <div class="dir-section">
+              <div class="dir-section-head">Inns & Taverns</div>
+              <div class="dir-entry">
+                <div class="dir-entry-icon icon-inn">🍺</div>
+                <div>
+                  <div class="dir-entry-name">The Rusty Flagon</div>
+                  <div class="dir-entry-sub">Merchant Quarter · Rooms avail.</div>
+                </div>
+                <span class="dir-entry-badge badge-inn">Inn</span>
+              </div>
+              <div class="dir-entry">
+                <div class="dir-entry-icon icon-inn">🍺</div>
+                <div>
+                  <div class="dir-entry-name">Dockside Ale House</div>
+                  <div class="dir-entry-sub">Docks District · Rough crowd</div>
+                </div>
+                <span class="dir-entry-badge badge-inn">Inn</span>
+              </div>
+            </div>
+
+            <div class="dir-section">
+              <div class="dir-section-head">Religious Sites</div>
+              <div class="dir-entry">
+                <div class="dir-entry-icon icon-temple">⛩</div>
+                <div>
+                  <div class="dir-entry-name">Temple of Tyr</div>
+                  <div class="dir-entry-sub">Noble Quarter · Open to all</div>
+                </div>
+                <span class="dir-entry-badge badge-temple">Temple</span>
+              </div>
+            </div>
+
+            <div class="dir-section">
+              <div class="dir-section-head">Landmarks</div>
+              <div class="dir-entry">
+                <div class="dir-entry-icon icon-landmark">◈</div>
+                <div>
+                  <div class="dir-entry-name">Castle Ward</div>
+                  <div class="dir-entry-sub">Noble Quarter · Seat of power</div>
+                </div>
+                <span class="dir-entry-badge badge-landmark">Landmark</span>
+              </div>
+              <div class="dir-entry">
+                <div class="dir-entry-icon icon-gate">🚪</div>
+                <div>
+                  <div class="dir-entry-name">South Gate</div>
+                  <div class="dir-entry-sub">Docks · Guarded</div>
+                </div>
+                <span class="dir-entry-badge badge-gate">Gate</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- DISTRICTS -->
+          <div id="a-districts" class="tab-panel">
+            <div class="notice">Click a district to highlight its pins on the map. Drag district borders to resize.</div>
+            <div class="district-card dc-merchant">
+              <div class="district-card-icon">🪙</div>
+              <div class="district-card-info">
+                <div class="district-card-name">Merchant Quarter</div>
+                <div class="district-card-sub">Trade, commerce, craftsmen</div>
+              </div>
+              <span class="district-card-count">4 pins</span>
+            </div>
+            <div class="district-card dc-noble">
+              <div class="district-card-icon">🏛</div>
+              <div class="district-card-info">
+                <div class="district-card-name">Noble Quarter</div>
+                <div class="district-card-sub">Estates, temples, courts</div>
+              </div>
+              <span class="district-card-count">2 pins</span>
+            </div>
+            <div class="district-card dc-dock">
+              <div class="district-card-icon">⚓</div>
+              <div class="district-card-info">
+                <div class="district-card-name">Docks District</div>
+                <div class="district-card-sub">Ships, trade, rough taverns</div>
+              </div>
+              <span class="district-card-count">2 pins</span>
+            </div>
+            <div class="district-card dc-slums">
+              <div class="district-card-icon">⚠</div>
+              <div class="district-card-info">
+                <div class="district-card-name">The Slums</div>
+                <div class="district-card-sub">Crime, thieves guild, danger</div>
+              </div>
+              <span class="district-card-count">1 pin</span>
+            </div>
+          </div>
+
+          <!-- PEOPLE -->
+          <div id="a-people" class="tab-panel">
+            <div class="sb-search">
+              <span class="sb-search-icon">🔍</span>
+              <input type="text" placeholder="Search people in Waterdeep…" />
+            </div>
+            <div class="npc-row">
+              <div class="npc-avatar">V</div>
+              <div class="npc-info">
+                <div class="npc-name">Volo Geddarm</div>
+                <div class="npc-loc">📍 The Rusty Flagon</div>
+              </div>
+              <span class="npc-tag">Friendly</span>
+            </div>
+            <div class="npc-row">
+              <div class="npc-avatar">M</div>
+              <div class="npc-info">
+                <div class="npc-name">Captain Meria</div>
+                <div class="npc-loc">📍 South Gate</div>
+              </div>
+              <span class="npc-tag">Guard</span>
+            </div>
+            <div class="npc-row">
+              <div class="npc-avatar">Z</div>
+              <div class="npc-info">
+                <div class="npc-name">Zhentarim Contact</div>
+                <div class="npc-loc">📍 Dockside Ale House</div>
+              </div>
+              <span class="npc-tag" style="background:rgba(232,80,80,.12);color:#e85050;border-color:rgba(232,80,80,.3)">Hostile</span>
+            </div>
+            <div class="npc-row">
+              <div class="npc-avatar">H</div>
+              <div class="npc-info">
+                <div class="npc-name">High Priest Holvar</div>
+                <div class="npc-loc">📍 Temple of Tyr</div>
+              </div>
+              <span class="npc-tag" style="background:rgba(126,168,232,.1);color:var(--col-temple);border-color:rgba(126,168,232,.3)">Neutral</span>
+            </div>
+          </div>
+
+          <!-- HOOKS -->
+          <div id="a-hooks" class="tab-panel">
+            <div class="rumour-banner">
+              "Word on the docks: someone's been paying dwarves double to move crates at night. No one knows what's inside."
+            </div>
+            <div class="hook-card">
+              <div class="hook-icon">⚔</div>
+              <div>
+                <div class="hook-title">Missing Merchant's Ledger</div>
+                <div class="hook-desc">Elowen at Splendid Goods believes her ledger was stolen. The thief has leverage over half the quarter.</div>
+                <span class="hook-tag hook-active">Active Quest</span>
+              </div>
+            </div>
+            <div class="hook-card">
+              <div class="hook-icon">🗝</div>
+              <div>
+                <div class="hook-title">The Locked Cellar</div>
+                <div class="hook-desc">The Rusty Flagon has a cellar no one's opened in 40 years. The barkeep will give you the key for a favour.</div>
+                <span class="hook-tag hook-rumour">Rumour</span>
+              </div>
+            </div>
+            <div class="hook-card">
+              <div class="hook-icon">📜</div>
+              <div>
+                <div class="hook-title">Temple Vandalism</div>
+                <div class="hook-desc">The Temple of Tyr has been desecrated two nights running. No guard will enter the holy water chamber.</div>
+                <span class="hook-tag hook-rumour">Rumour</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CONCEPT B — City Profile + Quick Add Pin Menu
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="concept" id="concept-b">
+    <div class="concept-label">Concept B — City Profile &amp; Smart Pin Add</div>
+    <div class="concept-desc">The city location detail shows a profile card (ruler, population, active factions). When you click "+ Add Pin" inside a city, a contextual quick-add menu appears showing urban pin types first — no more scrolling past "Wilderness" to find "Inn".</div>
+    <div class="app-shell">
+
+      <!-- MAP -->
+      <div class="map-area">
+        <div class="fake-map">
+          <div class="district district-merchant">Merchant</div>
+          <div class="district district-noble">Noble Quarter</div>
+          <div class="district district-dock">Docks</div>
+          <div class="district district-slums">Slums</div>
+          <div class="city-pin pin-shop" style="left:22%;top:28%"><div class="pin-dot">🪙</div><div class="pin-label">Splendid Goods</div></div>
+          <div class="city-pin pin-inn" style="left:30%;top:42%"><div class="pin-dot">🍺</div><div class="pin-label">The Rusty Flagon</div></div>
+          <div class="city-pin pin-temple" style="left:65%;top:24%"><div class="pin-dot">⛩</div><div class="pin-label">Temple of Tyr</div></div>
+          <div class="city-pin pin-landmark" style="left:75%;top:36%"><div class="pin-dot">◈</div><div class="pin-label">Castle Ward</div></div>
+          <div class="city-pin pin-gate" style="left:40%;top:72%"><div class="pin-dot">🚪</div><div class="pin-label">South Gate</div></div>
+        </div>
+        <div class="breadcrumb">
+          <span class="bc-back">← Back</span>
+          <span class="bc-root">🌍 World</span>
+          <span class="bc-sep">›</span>
+          <span class="bc-current">Waterdeep</span>
+        </div>
+        <!-- Quick-add menu (shown when "+ Add Pin" is clicked while inside city) -->
+        <div class="quick-add">
+          <div class="quick-add-title">Add city location</div>
+          <button class="qa-btn"><div class="qa-icon icon-shop">🪙</div>Shop / Market</button>
+          <button class="qa-btn"><div class="qa-icon icon-inn">🍺</div>Inn / Tavern</button>
+          <button class="qa-btn"><div class="qa-icon icon-temple">⛩</div>Temple / Shrine</button>
+          <button class="qa-btn"><div class="qa-icon icon-landmark">◈</div>Landmark</button>
+          <button class="qa-btn"><div class="qa-icon icon-gate">🚪</div>Gate / Entrance</button>
+          <button class="qa-btn" style="border-color:var(--border-light);color:var(--text-dim)"><div class="qa-icon" style="border-color:var(--border);color:var(--text-dim)">…</div>Other type</button>
+        </div>
+      </div>
+
+      <!-- SIDEBAR -->
+      <div class="sidebar-shell">
+        <div class="sb-city-badge">
+          <div class="sb-city-icon">🏰</div>
+          <div class="sb-city-info">
+            <div class="sb-city-name">Waterdeep</div>
+            <div class="sb-city-sub">City of Splendors</div>
+          </div>
+          <div class="sb-city-stats">
+            <div class="sb-stat"><span class="sb-stat-val">8</span>pins</div>
+            <div class="sb-stat"><span class="sb-stat-val">4</span>NPCs</div>
+          </div>
+        </div>
+
+        <div class="cat-tabs" id="b-tabs">
+          <button class="cat-tab active" onclick="bSwitch('profile',this)">Profile</button>
+          <button class="cat-tab" onclick="bSwitch('places',this)">Places</button>
+          <button class="cat-tab" onclick="bSwitch('services',this)">Services</button>
+        </div>
+
+        <div class="sb-content">
+          <!-- CITY PROFILE -->
+          <div id="b-profile" class="tab-panel active">
+            <div class="city-profile">
+              <div class="city-profile-row">
+                <span class="cp-label">Ruler</span>
+                <span class="cp-val">Open Lord Laeral Silverhand</span>
+              </div>
+              <div class="city-profile-row">
+                <span class="cp-label">Population</span>
+                <span class="cp-val">~132,000 (cosmopolitan)</span>
+              </div>
+              <div class="city-profile-row">
+                <span class="cp-label">Alignment</span>
+                <span class="cp-val">Lawful Neutral · tolerant of chaos</span>
+              </div>
+              <div class="city-profile-row">
+                <span class="cp-label">Factions</span>
+                <span class="cp-val">
+                  <span class="cp-faction-chip">⚖ Lords' Alliance</span>
+                  <span class="cp-faction-chip">🗡 Zhentarim</span>
+                  <span class="cp-faction-chip">📚 Harpers</span>
+                </span>
+              </div>
+              <div class="city-profile-row">
+                <span class="cp-label">Notes</span>
+                <span class="cp-val" style="color:var(--text-dim)">Party currently wanted by the Watch in the Dock Ward.</span>
+              </div>
+            </div>
+            <div class="notice">💡 This profile comes from the location's description fields. You can edit them in DM Mode.</div>
+            <div class="rumour-banner">
+              Latest rumour: "They say a dragon turtle was seen beneath the harbor last fortnight."
+            </div>
+          </div>
+
+          <!-- PLACES -->
+          <div id="b-places" class="tab-panel">
+            <div class="dir-entry">
+              <div class="dir-entry-icon icon-shop">🪙</div>
+              <div><div class="dir-entry-name">Splendid Goods Emporium</div><div class="dir-entry-sub">Merchant Quarter</div></div>
+              <span class="dir-entry-badge badge-shop">Shop</span>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon icon-inn">🍺</div>
+              <div><div class="dir-entry-name">The Rusty Flagon</div><div class="dir-entry-sub">Merchant Quarter</div></div>
+              <span class="dir-entry-badge badge-inn">Inn</span>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon icon-temple">⛩</div>
+              <div><div class="dir-entry-name">Temple of Tyr</div><div class="dir-entry-sub">Noble Quarter</div></div>
+              <span class="dir-entry-badge badge-temple">Temple</span>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon icon-landmark">◈</div>
+              <div><div class="dir-entry-name">Castle Ward</div><div class="dir-entry-sub">Noble Quarter</div></div>
+              <span class="dir-entry-badge badge-landmark">Landmark</span>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon icon-gate">🚪</div>
+              <div><div class="dir-entry-name">South Gate</div><div class="dir-entry-sub">Docks District</div></div>
+              <span class="dir-entry-badge badge-gate">Gate</span>
+            </div>
+          </div>
+
+          <!-- SERVICES -->
+          <div id="b-services" class="tab-panel">
+            <div class="service-card" style="border-color:rgba(232,196,58,.25)">
+              <div class="sc-icon">⚔</div>
+              <div class="sc-info">
+                <div class="sc-name">Hrunk's Blacksmithy</div>
+                <div class="sc-desc">Weapons, armour repair, custom orders. Surly dwarf, fair prices.</div>
+                <div class="sc-price">Sword repair: 5 gp · New blade: 25+ gp</div>
+              </div>
+            </div>
+            <div class="service-card" style="border-color:rgba(126,168,232,.25)">
+              <div class="sc-icon">📿</div>
+              <div class="sc-info">
+                <div class="sc-name">Mystical Marvels</div>
+                <div class="sc-desc">Potions, scrolls, minor enchantments. Identification service available.</div>
+                <div class="sc-price">Identify: 20 gp · Healing potion: 50 gp</div>
+              </div>
+            </div>
+            <div class="service-card" style="border-color:rgba(110,207,170,.25)">
+              <div class="sc-icon">⛵</div>
+              <div class="sc-info">
+                <div class="sc-name">Dockmaster Rigging Co.</div>
+                <div class="sc-desc">Passage bookings, cargo storage, ship repairs.</div>
+                <div class="sc-price">Passage north: 2 gp/day</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CONCEPT C — Nested location (building interior)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="concept" id="concept-c">
+    <div class="concept-label">Concept C — Multi-Level Drill-Down (City → Building → Room)</div>
+    <div class="concept-desc">Demonstrates three levels of depth: World → Waterdeep → Temple of Tyr → Sanctum. The breadcrumb shows the full chain. The map and sidebar content are scoped to the current level. Pins inside a building can be rooms, traps, NPCs, or loot chests.</div>
+    <div class="app-shell">
+
+      <!-- MAP — building interior feel -->
+      <div class="map-area">
+        <div style="width:100%;height:100%;background:
+          repeating-linear-gradient(0deg,transparent,transparent 79px,rgba(201,168,76,.04) 79px,rgba(201,168,76,.04) 80px),
+          repeating-linear-gradient(90deg,transparent,transparent 79px,rgba(201,168,76,.04) 79px,rgba(201,168,76,.04) 80px),
+          linear-gradient(160deg,#0c0b1a 0%,#13112a 50%,#0a091a 100%);
+          position:relative;overflow:hidden">
+
+          <!-- "room" zones -->
+          <div style="position:absolute;left:5%;top:5%;width:40%;height:45%;border:2px solid rgba(201,168,76,.2);border-radius:4px;background:rgba(201,168,76,.03);display:flex;align-items:flex-end;padding:4px 8px;font-size:9px;color:rgba(201,168,76,.4);font-weight:700;letter-spacing:.1em;font-family:var(--font-display)">NAVE</div>
+          <div style="position:absolute;right:5%;top:5%;width:40%;height:35%;border:2px solid rgba(126,168,232,.2);border-radius:4px;background:rgba(126,168,232,.03);display:flex;align-items:flex-end;padding:4px 8px;font-size:9px;color:rgba(126,168,232,.4);font-weight:700;letter-spacing:.1em;font-family:var(--font-display)">SANCTUM</div>
+          <div style="position:absolute;left:5%;bottom:5%;width:85%;height:42%;border:2px solid rgba(110,207,170,.15);border-radius:4px;background:rgba(110,207,170,.02);display:flex;align-items:flex-end;padding:4px 8px;font-size:9px;color:rgba(110,207,170,.35);font-weight:700;letter-spacing:.1em;font-family:var(--font-display)">CATACOMBS</div>
+
+          <!-- room pins -->
+          <div class="city-pin pin-landmark" style="left:25%;top:22%"><div class="pin-dot" style="width:22px;height:22px;font-size:10px">⛩</div><div class="pin-label">High Altar</div></div>
+          <div class="city-pin pin-inn" style="left:12%;top:38%"><div class="pin-dot" style="width:22px;height:22px;font-size:10px">💧</div><div class="pin-label">Holy Water</div></div>
+          <div class="city-pin" style="left:78%;top:22%"><div class="pin-dot" style="width:22px;height:22px;font-size:10px;background:rgba(126,168,232,.15);border-color:var(--col-temple);color:var(--col-temple)">📖</div><div class="pin-label">Scriptorium</div></div>
+          <div class="city-pin pin-dungeon" style="left:55%;top:75%"><div class="pin-dot" style="width:22px;height:22px;font-size:10px">💀</div><div class="pin-label">Old Crypt</div></div>
+          <div class="city-pin" style="left:30%;top:78%"><div class="pin-dot" style="width:22px;height:22px;font-size:10px;background:rgba(232,196,58,.15);border-color:var(--col-shop);color:var(--col-shop)">📦</div><div class="pin-label">Supply Room</div></div>
+          <div class="city-pin pin-shop" style="left:70%;top:78%"><div class="pin-dot" style="width:22px;height:22px;font-size:10px">🔐</div><div class="pin-label">Vault</div></div>
+
+          <!-- deep breadcrumb -->
+          <div class="breadcrumb" style="gap:4px;font-size:10px">
+            <span class="bc-back">← Back</span>
+            <span class="bc-root">🌍 World</span>
+            <span class="bc-sep">›</span>
+            <span style="color:var(--text-muted);font-size:10px;cursor:pointer">Waterdeep</span>
+            <span class="bc-sep">›</span>
+            <span style="color:var(--text-muted);font-size:10px;cursor:pointer">Temple of Tyr</span>
+            <span class="bc-sep">›</span>
+            <span class="bc-current" style="font-size:10px">Sanctum</span>
+          </div>
+
+          <div class="map-info-chip">
+            <div class="mic-title">Temple of Tyr — Sanctum</div>
+            <div class="mic-row"><span>Level</span><span class="mic-val">3 deep</span></div>
+            <div class="mic-row"><span>Pins</span><span class="mic-val">6 locations</span></div>
+            <div class="mic-row"><span>Parent</span><span class="mic-val">Temple of Tyr</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIDEBAR -->
+      <div class="sidebar-shell">
+        <div class="sb-city-badge" style="background:rgba(126,168,232,.06);border-bottom-color:rgba(126,168,232,.25)">
+          <div class="sb-city-icon" style="background:rgba(126,168,232,.1);border-color:rgba(126,168,232,.3)">⛩</div>
+          <div class="sb-city-info">
+            <div class="sb-city-name" style="color:rgba(180,210,255,.9)">Temple of Tyr — Sanctum</div>
+            <div class="sb-city-sub">Inside: Waterdeep › Temple of Tyr</div>
+          </div>
+        </div>
+
+        <div class="cat-tabs" id="c-tabs">
+          <button class="cat-tab active" onclick="cSwitch('rooms',this)">Rooms</button>
+          <button class="cat-tab" onclick="cSwitch('secrets',this)">DM Notes</button>
+          <button class="cat-tab" onclick="cSwitch('loot',this)">Loot</button>
+        </div>
+
+        <div class="sb-content">
+          <div id="c-rooms" class="tab-panel active">
+            <div class="notice" style="background:rgba(126,168,232,.06);border-color:rgba(126,168,232,.2);color:rgba(160,200,240,.8)">
+              📍 Pins in this view are scoped to the Sanctum level only.
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon" style="background:rgba(184,126,232,.12);border-color:rgba(184,126,232,.4);color:var(--col-landmark)">⛩</div>
+              <div><div class="dir-entry-name">High Altar</div><div class="dir-entry-sub">Nave · Sacred ground</div></div>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon" style="background:rgba(126,168,232,.12);border-color:rgba(126,168,232,.4);color:var(--col-temple)">💧</div>
+              <div><div class="dir-entry-name">Holy Water Font</div><div class="dir-entry-sub">Nave · Blessed water, free to faithful</div></div>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon" style="background:rgba(126,168,232,.12);border-color:rgba(126,168,232,.4);color:var(--col-temple)">📖</div>
+              <div><div class="dir-entry-name">Scriptorium</div><div class="dir-entry-sub">Sanctum · Restricted access</div></div>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon" style="background:rgba(192,80,200,.12);border-color:rgba(192,80,200,.4);color:var(--col-dungeon)">💀</div>
+              <div><div class="dir-entry-name">Old Crypt</div><div class="dir-entry-sub">Catacombs · Undead reported</div></div>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon" style="background:rgba(232,196,58,.12);border-color:rgba(232,196,58,.4);color:var(--col-shop)">📦</div>
+              <div><div class="dir-entry-name">Supply Room</div><div class="dir-entry-sub">Catacombs · Candles, incense</div></div>
+            </div>
+            <div class="dir-entry">
+              <div class="dir-entry-icon" style="background:rgba(232,196,58,.12);border-color:rgba(232,196,58,.4);color:var(--col-shop)">🔐</div>
+              <div><div class="dir-entry-name">Vault</div><div class="dir-entry-sub">Catacombs · Locked (DC 20)</div></div>
+            </div>
+          </div>
+
+          <div id="c-secrets" class="tab-panel">
+            <div class="city-profile" style="border-color:rgba(232,80,80,.2)">
+              <div class="city-profile-row" style="align-items:flex-start">
+                <span class="cp-label" style="color:rgba(232,80,80,.6)">DM Only</span>
+                <span class="cp-val" style="font-size:11px;color:var(--text-dim)">The vault contains a stolen Tymoran relic. The head priest, Holvar, is being blackmailed to keep it hidden. The crypt exit connects to the sewers — party may enter from below.</span>
+              </div>
+            </div>
+            <div class="hook-card">
+              <div class="hook-icon">🗝</div>
+              <div>
+                <div class="hook-title">The Blackmail Letter</div>
+                <div class="hook-desc">Found in the scriptorium — implicates a Lords' Alliance member.</div>
+                <span class="hook-tag hook-active">Key Item</span>
+              </div>
+            </div>
+            <div class="hook-card">
+              <div class="hook-icon">☠</div>
+              <div>
+                <div class="hook-title">Crypt Ambush</div>
+                <div class="hook-desc">3 × Skeletons, 1 × Wight. Triggered by touching the sarcophagus.</div>
+                <span class="hook-tag" style="background:rgba(232,80,80,.1);color:#e85050;border:1px solid rgba(232,80,80,.2)">Encounter</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="c-loot" class="tab-panel">
+            <div class="service-card" style="border-color:rgba(232,196,58,.25)">
+              <div class="sc-icon">📦</div>
+              <div class="sc-info">
+                <div class="sc-name">Supply Room Cache</div>
+                <div class="sc-desc">15 candles, 2 vials holy water, 1 healing potion (hidden under floorboard)</div>
+                <div class="sc-price" style="color:var(--col-landmark)">◈ Discovered by party</div>
+              </div>
+            </div>
+            <div class="service-card" style="border-color:rgba(232,196,58,.35)">
+              <div class="sc-icon">🔐</div>
+              <div class="sc-info">
+                <div class="sc-name">Vault Contents</div>
+                <div class="sc-desc">Tymoran Relic (stolen), 340 gp, Scroll of Divination × 2</div>
+                <div class="sc-price" style="color:rgba(232,80,80,.8)">🔒 Not yet opened</div>
+              </div>
+            </div>
+            <div class="empty-state" style="flex:0;padding:8px">
+              <div style="font-size:11px;color:var(--text-dim)">+ Add loot cache to this location</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- .concepts -->
+
+<script>
+function switchTab(idPrefix, panelName, btn, tabsId) {
+  document.querySelectorAll('#' + tabsId + ' .cat-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const parent = btn.closest('.sidebar-shell').querySelector('.sb-content');
+  parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(idPrefix + '-' + panelName);
+  if (panel) panel.classList.add('active');
+}
+function aSwitch(name, btn) { switchTab('a', name, btn, 'a-tabs'); }
+function bSwitch(name, btn) { switchTab('b', name, btn, 'b-tabs'); }
+function cSwitch(name, btn) { switchTab('c', name, btn, 'c-tabs'); }
+
+// Type filter pills
+document.querySelectorAll('.type-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    pill.closest('.type-filters').querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>

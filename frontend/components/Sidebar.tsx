@@ -144,6 +144,7 @@ interface Props {
   onOpenCampMap?:      () => void;
   onPushHandout?:      (url: string, name: string) => void;
   onNavigateToLocation?: (id: number) => void;
+  currentSubmapLocation?: Location | null;
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -201,10 +202,24 @@ export default function Sidebar({
   onScheduleBackup,
   loot, onCreateLoot, onUpdateLoot, onDeleteLoot, onUpdateMemberGold, onUpdatePoolGold,
   onOpenCampMap, onPushHandout, onNavigateToLocation,
+  currentSubmapLocation,
 }: Props) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [editState,  setEditState]  = useState<EditState | null>(null);
   const [saving,     setSaving]     = useState(false);
+
+  // ── City-mode state (active when inside a submap) ──────────────────────────
+  const [cityTab,            setCityTab]            = useState<'directory' | 'districts' | null>(null);
+  const [citySearch,         setCitySearch]         = useState('');
+  const [cityTypeFilter,     setCityTypeFilter]     = useState<string>('all');
+  const [cityDistrictFilter, setCityDistrictFilter] = useState<string | null>(null);
+
+  const isCityMode = isInsideSubmap && currentSubmapLocation?.type === 'city';
+
+  useEffect(() => {
+    if (isCityMode) { setCityTab('directory'); setCitySearch(''); setCityTypeFilter('all'); setCityDistrictFilter(null); }
+    else { setCityTab(null); }
+  }, [isCityMode]);
 
   useEffect(() => { setIsEditing(false); setEditState(null); }, [location?.id]);
 
@@ -254,40 +269,182 @@ export default function Sidebar({
   const activeCategory = getCategoryForTab(activeTab);
   const activeCatTabs  = CATEGORIES.find(c => c.key === activeCategory)?.tabs ?? [];
 
+  // ── City-mode derived data ─────────────────────────────────────────────────
+  const submapLocId   = currentSubmapLocation?.id ?? null;
+  const cityLocations = isCityMode && submapLocId != null
+    ? locations.filter(l => l.parent_id === submapLocId)
+    : [];
+  const citySearchLow = citySearch.toLowerCase();
+  const filteredCityLocs = cityLocations.filter(l => {
+    if (cityTypeFilter !== 'all' && l.type !== cityTypeFilter) return false;
+    if (cityDistrictFilter != null && (l.subtitle?.trim() || 'General') !== cityDistrictFilter) return false;
+    if (citySearch && !l.name.toLowerCase().includes(citySearchLow) && !(l.subtitle || '').toLowerCase().includes(citySearchLow)) return false;
+    return true;
+  });
+  const CITY_TYPE_ORDER = ['shop', 'inn', 'temple', 'landmark', 'gate', 'bridge', 'portal', 'city', 'dungeon', 'wilderness', 'hazard'];
+  const groupedByType: Record<string, Location[]> = {};
+  filteredCityLocs.forEach(l => { if (!groupedByType[l.type]) groupedByType[l.type] = []; groupedByType[l.type].push(l); });
+  const districtMap: Record<string, Location[]> = {};
+  cityLocations.forEach(l => { const d = l.subtitle?.trim() || 'General'; if (!districtMap[d]) districtMap[d] = []; districtMap[d].push(l); });
+  const cityNpcs = npcs.filter(n => n.location_id != null && cityLocations.some(l => l.id === n.location_id));
+  const activeCityTab = cityTab !== null ? cityTab
+    : activeTab === 'npcs' ? 'people'
+    : activeTab === 'quests' ? 'hooks'
+    : 'directory';
+
   return (
     <aside className="sidebar">
-      {/* ── Category row ── */}
-      <div className="sidebar-cats">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat.key}
-            className={`sidebar-cat${activeCategory === cat.key ? ' active' : ''}`}
-            onClick={() => {
-              if (activeCategory !== cat.key) onTabChange(cat.tabs[0].key);
-            }}
-          >
-            <span className="cat-icon">{cat.icon}</span>
-            <span>{cat.label}</span>
-          </button>
-        ))}
-      </div>
-      {/* ── Sub-tab row ── */}
-      <div className="sidebar-subtabs">
-        {activeCatTabs.map(t => (
-          <button
-            key={t.key}
-            className={`sidebar-subtab${activeTab === t.key ? ' active' : ''}`}
-            onClick={() => onTabChange(t.key)}
-          >
-            <span>{t.icon}</span>
-            <span>{t.label}{tabBadge(t.key)}</span>
-          </button>
-        ))}
-      </div>
+      {isCityMode && currentSubmapLocation ? (
+        /* ── City mode header ── */
+        <>
+          <div className="city-badge">
+            <span className="city-badge-icon">{TYPE_ICONS[currentSubmapLocation.type as LocationType]}</span>
+            <div className="city-badge-info">
+              <div className="city-badge-name">{currentSubmapLocation.name}</div>
+              <div className="city-badge-sub">{cityLocations.length} locations · {cityNpcs.length} people</div>
+            </div>
+          </div>
+          <div className="city-tabs">
+            {([
+              { key: 'directory', label: 'Directory', icon: '📋' },
+              { key: 'districts', label: 'Districts',  icon: '🏘' },
+              { key: 'people',    label: 'People',     icon: '👥' },
+              { key: 'hooks',     label: 'Hooks',      icon: '📜' },
+            ] as const).map(t => (
+              <button
+                key={t.key}
+                className={`city-tab${activeCityTab === t.key ? ' active' : ''}`}
+                onClick={() => {
+                  if (t.key === 'people')    { setCityTab(null); onTabChange('npcs'); }
+                  else if (t.key === 'hooks') { setCityTab(null); onTabChange('quests'); }
+                  else setCityTab(t.key);
+                }}
+              >
+                <span>{t.icon}</span>
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        /* ── Normal mode header ── */
+        <>
+          <div className="sidebar-cats">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.key}
+                className={`sidebar-cat${activeCategory === cat.key ? ' active' : ''}`}
+                onClick={() => { if (activeCategory !== cat.key) onTabChange(cat.tabs[0].key); }}
+              >
+                <span className="cat-icon">{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="sidebar-subtabs">
+            {activeCatTabs.map(t => (
+              <button
+                key={t.key}
+                className={`sidebar-subtab${activeTab === t.key ? ' active' : ''}`}
+                onClick={() => onTabChange(t.key)}
+              >
+                <span>{t.icon}</span>
+                <span>{t.label}{tabBadge(t.key)}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="sidebar-body">
+
+        {/* ── City Directory ───────────────────────────────────────────── */}
+        {isCityMode && cityTab === 'directory' && (
+          <div className="city-directory">
+            <div className="city-search">
+              <span className="city-search-icon">🔍</span>
+              <input value={citySearch} onChange={e => setCitySearch(e.target.value)} placeholder="Search establishments…" />
+              {citySearch && <button className="city-search-clear" onClick={() => setCitySearch('')}>✕</button>}
+            </div>
+            <div className="city-type-filters">
+              {(['all', 'shop', 'inn', 'temple', 'landmark', 'gate'] as const).map(t => (
+                <button key={t} className={`city-type-pill${cityTypeFilter === t ? ' active' : ''} cpill-${t}`}
+                  onClick={() => setCityTypeFilter(t)}>
+                  {t === 'all' ? 'All' : `${TYPE_ICONS[t as LocationType]} ${TYPE_LABELS[t as LocationType]}`}
+                </button>
+              ))}
+            </div>
+            {cityDistrictFilter && (
+              <div className="city-district-chip">
+                🏘 {cityDistrictFilter}
+                <button onClick={() => setCityDistrictFilter(null)}>✕</button>
+              </div>
+            )}
+            {filteredCityLocs.length === 0 ? (
+              <div className="no-sel" style={{ flex: 'none', padding: '24px 0' }}>
+                <div className="no-sel-icon" style={{ fontSize: 28 }}>◈</div>
+                <div style={{ fontSize: 13 }}>{citySearch || cityTypeFilter !== 'all' || cityDistrictFilter
+                  ? 'No locations match.'
+                  : 'No pins here yet — add them from the map.'}</div>
+              </div>
+            ) : (
+              CITY_TYPE_ORDER.filter(t => groupedByType[t]?.length).map(type => (
+                <div key={type} className="dir-group">
+                  <div className="dir-group-head">
+                    <span>{TYPE_ICONS[type as LocationType]}</span>
+                    <span>{TYPE_LABELS[type as LocationType]}s</span>
+                    <span className="dir-group-count">{groupedByType[type].length}</span>
+                  </div>
+                  {groupedByType[type].map(loc => (
+                    <div key={loc.id} className="dir-entry" onClick={() => {
+                      onSelectLocation(loc.id); setCityTab(null); onTabChange('location');
+                    }}>
+                      <div className={`dir-entry-dot dot-${loc.type}`}>{TYPE_ICONS[loc.type as LocationType]}</div>
+                      <div className="dir-entry-body">
+                        <div className="dir-entry-name">{loc.name}</div>
+                        {loc.subtitle && <div className="dir-entry-sub">{loc.subtitle}</div>}
+                      </div>
+                      {isDMMode && !loc.discovered && <span title="Not discovered" style={{ fontSize: 12 }}>🌑</span>}
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── City Districts ───────────────────────────────────────────── */}
+        {isCityMode && cityTab === 'districts' && (
+          <div className="city-directory">
+            {Object.keys(districtMap).length === 0 ? (
+              <div className="no-sel" style={{ flex: 'none', padding: '24px 0' }}>
+                <div className="no-sel-icon" style={{ fontSize: 28 }}>🏘</div>
+                <div style={{ fontSize: 13 }}>No districts yet. Fill in the <strong>subtitle</strong> field of any pin (e.g. "Merchant Quarter") to group it into a district.</div>
+              </div>
+            ) : (
+              Object.entries(districtMap).map(([district, locs]) => (
+                <div key={district} className="district-card" onClick={() => {
+                  setCityDistrictFilter(district); setCityTab('directory');
+                }}>
+                  <div className="district-card-count">{locs.length}</div>
+                  <div className="district-card-body">
+                    <div className="district-card-name">{district}</div>
+                    <div className="district-card-pins">
+                      {locs.slice(0, 5).map(l => (
+                        <span key={l.id} title={l.name}>{TYPE_ICONS[l.type as LocationType]}</span>
+                      ))}
+                      {locs.length > 5 && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>+{locs.length - 5}</span>}
+                    </div>
+                  </div>
+                  <span className="district-card-arrow">›</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* ── Location tab ─────────────────────────────────────────────── */}
-        {activeTab === 'location' && (
+        {(!isCityMode || cityTab === null) && activeTab === 'location' && (
           !location ? (
             <div className="no-sel">
               <div className="no-sel-icon">◈</div>

@@ -639,7 +639,7 @@ export default function Home() {
     setIsAddingPin(false);
     try {
       const newLoc = await api.locations.create({
-        name: 'New Location', type: 'city', subtitle: '', description: '',
+        name: 'New Location', type: currentMapId != null ? 'landmark' : 'city', subtitle: '', description: '',
         quest_hooks: [], handouts: [], dm_notes: '', discovered: false, x, y,
         parent_id: currentMapId,
       });
@@ -928,7 +928,21 @@ export default function Home() {
     setFogPaint(false);
     setFitTrigger(t => t + 1);
   }, []);
-  const handleExitSubmap = useCallback(() => {
+  const handleExitSubmap = useCallback(async () => {
+    const parentId = mapStack.length >= 2 ? mapStack[mapStack.length - 2] : null;
+    if (parentId != null) {
+      try {
+        const result = await api.locations.getFog(parentId);
+        setSubmapFogData(result.data || '1'.repeat(10000));
+      } catch { setSubmapFogData('1'.repeat(10000)); }
+    } else {
+      setSubmapFogData('1'.repeat(10000));
+    }
+    setMapStack(prev => prev.slice(0, -1));
+    setFogPaint(false);
+    setFitTrigger(t => t + 1);
+  }, [mapStack]);
+  const handleExitToRoot = useCallback(() => {
     setMapStack([]);
     setSubmapFogData('1'.repeat(10000));
     setFogPaint(false);
@@ -1493,6 +1507,7 @@ export default function Home() {
             onAddPin={handleAddPin}
             onFogChange={handleFogChange}
             onExitSubmap={handleExitSubmap}
+            onExitToRoot={handleExitToRoot}
             onUpdateLocation={handleUpdateLocation}
             onDeleteLocation={handleDeleteLocation}
             onDuplicateLocation={handleDuplicateLocation}
@@ -1538,6 +1553,7 @@ export default function Home() {
             onUpdateCalendar={handleUpdateCalendar}
             onEnterSubmap={handleEnterSubmap}
             isInsideSubmap={mapStack.length > 0}
+            currentSubmapLocation={currentMapId != null ? locations.find(l => l.id === currentMapId) ?? null : null}
             onLightbox={setLightboxUrl}
             onAddToCharPath={handleAddToCharPath}
             onRemoveFromCharPath={handleRemoveFromCharPath}

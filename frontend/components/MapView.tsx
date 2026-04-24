@@ -94,6 +94,7 @@ interface Props {
   onAddPin:           (x: number, y: number) => void;
   onFogChange:        (data: string) => void;
   onExitSubmap:       () => void;
+  onExitToRoot?:      () => void;
   onUpdateLocation?:  (id: number, data: Partial<Location>) => Promise<void>;
   onDeleteLocation?:  (id: number) => void;
   onDuplicateLocation?: (loc: Location) => void;
@@ -368,6 +369,7 @@ export default function MapView({
   onAddPin,
   onFogChange,
   onExitSubmap,
+  onExitToRoot,
   onUpdateLocation,
   onDeleteLocation,
   onDuplicateLocation,
@@ -1037,10 +1039,19 @@ export default function MapView({
     >
       {mapStack.length > 0 && (
         <div className="map-breadcrumb">
-          <button onClick={onExitSubmap}>← Back</button>
+          <button className="breadcrumb-back" onClick={onExitSubmap} title="Go up one level">← Back</button>
+          <button className="breadcrumb-crumb breadcrumb-root" onClick={onExitToRoot ?? onExitSubmap} title="Return to world map">🌍 World</button>
           {mapStack.map((id, i) => {
             const loc = allLocations.find(l => l.id === id);
-            return <span key={id}>{i > 0 && ' › '}{loc?.name ?? `#${id}`}</span>;
+            const isLast = i === mapStack.length - 1;
+            return (
+              <span key={id} style={{ display: 'contents' }}>
+                <span className="breadcrumb-sep">›</span>
+                <span className={`breadcrumb-crumb${isLast ? ' breadcrumb-current' : ''}`}>
+                  {loc?.name ?? `#${id}`}
+                </span>
+              </span>
+            );
           })}
         </div>
       )}
@@ -1087,6 +1098,7 @@ export default function MapView({
         {/* Map image or placeholder */}
         {imgSrc ? (
           <img
+            key={imgSrc}
             ref={imgRef}
             className="map-img"
             src={imgSrc}
