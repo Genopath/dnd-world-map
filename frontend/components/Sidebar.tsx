@@ -147,20 +147,33 @@ interface Props {
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
-const TABS_ROW1: { key: SidebarTab; label: string; icon: string }[] = [
-  { key: 'location', label: 'Location', icon: '📍' },
-  { key: 'npcs',     label: 'NPCs',     icon: '👤' },
-  { key: 'quests',   label: 'Quests',   icon: '📜' },
-  { key: 'sessions', label: 'Log',      icon: '📖' },
+const CATEGORIES: { key: string; label: string; icon: string; tabs: { key: SidebarTab; label: string; icon: string }[] }[] = [
+  { key: 'world',  label: 'World',  icon: '🗺️', tabs: [
+    { key: 'location', label: 'Location', icon: '📍' },
+    { key: 'path',     label: 'Path',     icon: '🧭' },
+  ]},
+  { key: 'people', label: 'People', icon: '👥', tabs: [
+    { key: 'npcs',     label: 'NPCs',     icon: '👤' },
+    { key: 'factions', label: 'Factions', icon: '⚜️' },
+    { key: 'party',    label: 'Party',    icon: '⚔️' },
+  ]},
+  { key: 'story',  label: 'Story',  icon: '📜', tabs: [
+    { key: 'quests',   label: 'Quests',   icon: '📜' },
+    { key: 'sessions', label: 'Log',      icon: '📖' },
+    { key: 'calendar', label: 'Calendar', icon: '🗓️' },
+  ]},
+  { key: 'extras', label: 'Extras', icon: '⚙️', tabs: [
+    { key: 'loot',     label: 'Loot',     icon: '💰' },
+    { key: 'web',      label: 'Rel. Web', icon: '🕸️' },
+  ]},
 ];
-const TABS_ROW2: { key: SidebarTab; label: string; icon: string }[] = [
-  { key: 'party',    label: 'Party',    icon: '⚔️' },
-  { key: 'factions', label: 'Factions', icon: '⚜️' },
-  { key: 'calendar', label: 'Calendar', icon: '🗓️' },
-  { key: 'path',     label: 'Path',     icon: '🧭' },
-  { key: 'loot',     label: 'Loot',     icon: '💰' },
-  { key: 'web',      label: 'Rel. Web', icon: '🕸️' },
-];
+
+function getCategoryForTab(tab: SidebarTab): string {
+  for (const cat of CATEGORIES) {
+    if (cat.tabs.some(t => t.key === tab)) return cat.key;
+  }
+  return 'world';
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Sidebar({
@@ -238,19 +251,38 @@ export default function Sidebar({
     return '';
   }
 
-  const renderTab = (t: { key: SidebarTab; label: string; icon: string }) => (
-    <button key={t.key} className={`sidebar-tab ${activeTab === t.key ? 'active' : ''}`} onClick={() => onTabChange(t.key)}>
-      <span className="tab-icon">{t.icon}</span>
-      <span>{t.label}{tabBadge(t.key)}</span>
-    </button>
-  );
+  const activeCategory = getCategoryForTab(activeTab);
+  const activeCatTabs  = CATEGORIES.find(c => c.key === activeCategory)?.tabs ?? [];
 
   return (
     <aside className="sidebar">
-      {/* Tabs — 2 rows of 4 */}
-      <div className="sidebar-tabs">
-        <div className="sidebar-tab-row">{TABS_ROW1.map(renderTab)}</div>
-        <div className="sidebar-tab-row">{TABS_ROW2.map(renderTab)}</div>
+      {/* ── Category row ── */}
+      <div className="sidebar-cats">
+        {CATEGORIES.map(cat => (
+          <button
+            key={cat.key}
+            className={`sidebar-cat${activeCategory === cat.key ? ' active' : ''}`}
+            onClick={() => {
+              if (activeCategory !== cat.key) onTabChange(cat.tabs[0].key);
+            }}
+          >
+            <span className="cat-icon">{cat.icon}</span>
+            <span>{cat.label}</span>
+          </button>
+        ))}
+      </div>
+      {/* ── Sub-tab row ── */}
+      <div className="sidebar-subtabs">
+        {activeCatTabs.map(t => (
+          <button
+            key={t.key}
+            className={`sidebar-subtab${activeTab === t.key ? ' active' : ''}`}
+            onClick={() => onTabChange(t.key)}
+          >
+            <span>{t.icon}</span>
+            <span>{t.label}{tabBadge(t.key)}</span>
+          </button>
+        ))}
       </div>
 
       <div className="sidebar-body">

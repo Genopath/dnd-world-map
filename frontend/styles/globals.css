@@ -1276,6 +1276,76 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
   border-bottom-color: var(--accent);
 }
 
+/* ── Category row + sub-tab row (Concept C layout) ─────────────────────────── */
+.sidebar-cats {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.sidebar-cat {
+  flex: 1;
+  padding: 9px 4px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: all 0.15s;
+  line-height: 1.2;
+}
+.sidebar-cat .cat-icon { font-size: 16px; line-height: 1; }
+.sidebar-cat:hover:not(.active) { color: var(--text-muted); background: var(--accent-glow2); }
+.sidebar-cat.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--accent-glow2);
+  text-shadow: 0 0 12px rgba(201,168,76,0.25);
+}
+.sidebar-subtabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-gold);
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
+  flex-shrink: 0;
+  padding: 7px 10px;
+  gap: 6px;
+}
+.sidebar-subtab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.sidebar-subtab:hover:not(.active) {
+  border-color: var(--border-light);
+  color: var(--text);
+  background: var(--surface3);
+}
+.sidebar-subtab.active {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
 /* ── Sidebar body ──────────────────────────────────────────────────────────── */
 .sidebar-body {
   flex: 1;
