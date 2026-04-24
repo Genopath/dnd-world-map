@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import List, Optional, Set
 
-from passlib.context import CryptContext
+import bcrypt
 
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response as _Response
@@ -52,7 +52,14 @@ LIBRARY_DIR  = Path(__file__).parent / "library"
 LIBRARY_DIR.mkdir(exist_ok=True)
 
 logger = logging.getLogger(__name__)
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def _pwd_hash(plain: str) -> str:
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+def _pwd_verify(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
 
 app = FastAPI(title="D&D World Map API")
 
@@ -1017,11 +1024,11 @@ def verify_dm_passcode(data: schemas.PasscodeVerify, db: Session = Depends(get_d
     stored = c.dm_passcode
     # Migrate legacy plaintext passcodes to bcrypt on first successful verify
     if stored.startswith("$2b$") or stored.startswith("$2a$"):
-        ok = _pwd.verify(data.passcode, stored)
+        ok = _pwd_verify(data.passcode, stored)
     else:
         ok = data.passcode == stored
         if ok:
-            c.dm_passcode = _pwd.hash(data.passcode)
+            c.dm_passcode = _pwd_hash(data.passcode)
             db.commit()
     if ok:
         return {"ok": True}
@@ -1031,7 +1038,7 @@ def verify_dm_passcode(data: schemas.PasscodeVerify, db: Session = Depends(get_d
 def set_dm_passcode(data: schemas.PasscodeSet, db: Session = Depends(get_db)):
     c = _get_or_create_campaign(db)
     passcode = data.passcode.strip()
-    c.dm_passcode = _pwd.hash(passcode) if passcode else None
+    c.dm_passcode = _pwd_hash(passcode) if passcode else None
     db.commit()
     return {"ok": True}
 
