@@ -1507,6 +1507,7 @@ export default function Home() {
             onAddPin={handleAddPin}
             onFogChange={handleFogChange}
             npcs={visibleNpcs}
+            factions={visibleFactions}
             onExitSubmap={handleExitSubmap}
             onExitToRoot={handleExitToRoot}
             onUpdateLocation={handleUpdateLocation}

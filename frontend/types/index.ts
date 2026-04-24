@@ -51,6 +51,7 @@ export interface MapConfig {
 export interface NPC {
   id: number;
   location_id: number | null;
+  faction_id?: number | null;
   name: string;
   role: string;
   status: 'alive' | 'dead' | 'unknown';
