@@ -13,7 +13,8 @@ import uuid
 from pathlib import Path
 from typing import List, Optional, Set
 
-import bcrypt
+import hashlib
+import secrets
 
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response as _Response
@@ -53,11 +54,17 @@ LIBRARY_DIR.mkdir(exist_ok=True)
 
 logger = logging.getLogger(__name__)
 def _pwd_hash(plain: str) -> str:
-    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+    salt = secrets.token_hex(16)
+    digest = hashlib.sha256(f"{salt}:{plain}".encode()).hexdigest()
+    return f"$sha256${salt}${digest}"
 
 def _pwd_verify(plain: str, hashed: str) -> bool:
     try:
-        return bcrypt.checkpw(plain.encode(), hashed.encode())
+        if hashed.startswith("$sha256$"):
+            _, _, salt, digest = hashed.split("$", 3)
+            return secrets.compare_digest(hashlib.sha256(f"{salt}:{plain}".encode()).hexdigest(), digest)
+        # Legacy bcrypt hashes — fall back to plaintext comparison (forces re-hash on next login)
+        return False
     except Exception:
         return False
 
@@ -1022,10 +1029,10 @@ def verify_dm_passcode(data: schemas.PasscodeVerify, db: Session = Depends(get_d
     if not c.dm_passcode:
         return {"ok": True}
     stored = c.dm_passcode
-    # Migrate legacy plaintext passcodes to bcrypt on first successful verify
-    if stored.startswith("$2b$") or stored.startswith("$2a$"):
+    if stored.startswith("$sha256$"):
         ok = _pwd_verify(data.passcode, stored)
     else:
+        # Legacy plaintext or bcrypt — compare as plaintext, re-hash on success
         ok = data.passcode == stored
         if ok:
             c.dm_passcode = _pwd_hash(data.passcode)
