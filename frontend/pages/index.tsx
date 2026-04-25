@@ -17,7 +17,7 @@ import {
   playCampaignSwitch, playChime, playTokenPlace, playTokenRemove, playPing,
   playBoardOpen, playBoardClose, playWaxStamp, playNoteFlip,
 } from '../lib/sounds';
-import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, MapConfig, NPC, PartyMember, PathEntry, Quest, Rumour, SearchResults, SessionEntry, SidebarTab } from '../types';
+import type { CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, LoreEntry, MapConfig, NPC, PartyMember, PathEntry, Quest, Rumour, SearchResults, SessionEntry, SidebarTab } from '../types';
 
 // ── Browser backup helpers ────────────────────────────────────────────────────
 // Builds an import-compatible payload from frontend state (no binary file data).
@@ -231,6 +231,7 @@ export default function Home() {
   const [party,    setParty]    = useState<PartyMember[]>([]);
   const [factions, setFactions] = useState<Faction[]>([]);
   const [loot,     setLoot]     = useState<LootItem[]>([]);
+  const [loreEntries, setLoreEntries] = useState<LoreEntry[]>([]);
   const [rumours,       setRumours]       = useState<Rumour[]>([]);
   const [showRumourBoard, setShowRumourBoard] = useState(false);
   const [showCampMap, setShowCampMap] = useState(false);
@@ -498,8 +499,9 @@ export default function Home() {
       api.characterPaths.listAll(),
       api.loot.list(),
       api.rumours.list(),
+      api.lore.list(),
     ])
-      .then(async ([locs, path, cfg, npcList, questList, sessionList, partyList, factionList, campaignData, fogResult, calConfig, charPaths, lootList, rumourList]) => {
+      .then(async ([locs, path, cfg, npcList, questList, sessionList, partyList, factionList, campaignData, fogResult, calConfig, charPaths, lootList, rumourList, loreList]) => {
         const fog = fogResult.data || '1'.repeat(10000);
         const isEmpty = locs.length === 0 && npcList.length === 0 && questList.length === 0;
 
@@ -547,6 +549,7 @@ export default function Home() {
         setCharacterPaths(charPaths);
         setLoot(lootList);
         setRumours(rumourList);
+        setLoreEntries(loreList);
 
         // ── Save browser backup whenever we have real data ────────────────────
         if (!isEmpty) {
@@ -924,6 +927,22 @@ export default function Home() {
     setLoot(prev => prev.filter(i => i.id !== id));
   }, []);
 
+  // ── Lore handlers ────────────────────────────────────────────────────────────
+  const handleCreateLore = useCallback(async (data: Omit<LoreEntry, 'id' | 'created_at'>) => {
+    const entry = await api.lore.create(data);
+    setLoreEntries(prev => [...prev, entry]);
+    return entry;
+  }, []);
+  const handleUpdateLore = useCallback(async (id: number, data: Partial<Omit<LoreEntry, 'id' | 'created_at'>>) => {
+    const entry = await api.lore.update(id, data);
+    setLoreEntries(prev => prev.map(e => e.id === id ? entry : e));
+    return entry;
+  }, []);
+  const handleDeleteLore = useCallback(async (id: number) => {
+    await api.lore.remove(id);
+    setLoreEntries(prev => prev.filter(e => e.id !== id));
+  }, []);
+
   // ── Rumour handlers ──────────────────────────────────────────────────────────
   const handleCreateRumour = useCallback(async (data: Omit<Rumour, 'id' | 'created_at'>) => {
     const r = await api.rumours.create(data);
@@ -1164,12 +1183,12 @@ export default function Home() {
     if (!confirm(`Import "${file.name}"? This will overwrite ALL data in the current campaign.`)) return;
     try {
       await api.data.import(file);
-      const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg, lootList, rumourList] =
+      const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg, lootList, rumourList, loreList] =
         await Promise.all([
           api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
           api.sessions.list(), api.party.list(), api.factions.list(),
           api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
-          api.fog.get(), api.map.config(), api.loot.list(), api.rumours.list(),
+          api.fog.get(), api.map.config(), api.loot.list(), api.rumours.list(), api.lore.list(),
         ]);
       setLocations(locs);
       setPlayerPath(path);
@@ -1185,6 +1204,7 @@ export default function Home() {
       setMapConfig(mapCfg);
       setLoot(lootList);
       setRumours(rumourList);
+      setLoreEntries(loreList);
       setSelectedId(null);
     } catch (err) {
       alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -1193,18 +1213,18 @@ export default function Home() {
 
   // Shared reload helper — used after restoring from an auto-backup
   const _reloadAll = useCallback(async () => {
-    const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg, lootList, rumourList] =
+    const [locs, path, npcList, questList, sessionList, partyList, factionList, campData, calCfg, charPaths, fogResult, mapCfg, lootList, rumourList, loreList] =
       await Promise.all([
         api.locations.list(), api.path.get(), api.npcs.list(), api.quests.list(),
         api.sessions.list(), api.party.list(), api.factions.list(),
         api.campaign.get(), api.calendar.get(), api.characterPaths.listAll(),
-        api.fog.get(), api.map.config(), api.loot.list(), api.rumours.list(),
+        api.fog.get(), api.map.config(), api.loot.list(), api.rumours.list(), api.lore.list(),
       ]);
     setLocations(locs); setPlayerPath(path); setNpcs(npcList); setQuests(questList);
     setSessions(sessionList); setParty(partyList); setFactions(factionList);
     setCampaign(campData); setCalendarConfig(calCfg); setCharacterPaths(charPaths);
     setFogData(fogResult.data ?? ''); setMapConfig(mapCfg);
-    setLoot(lootList); setRumours(rumourList); setSelectedId(null);
+    setLoot(lootList); setRumours(rumourList); setLoreEntries(loreList); setSelectedId(null);
   }, []);
 
   const handleOpenBackupModal = useCallback(async () => {
@@ -1618,6 +1638,10 @@ export default function Home() {
             onDeleteLoot={handleDeleteLoot}
             onUpdateMemberGold={handleUpdateMemberGold}
             onUpdatePoolGold={handleUpdatePoolGold}
+            loreEntries={loreEntries}
+            onCreateLore={handleCreateLore}
+            onUpdateLore={handleUpdateLore}
+            onDeleteLore={handleDeleteLore}
             onOpenCampMap={() => setShowCampMap(true)}
             onPushHandout={async (url, name) => { await api.handouts.push(url, name); }}
             onNavigateToLocation={(id) => { setSelectedId(id); setSidebarTab('location'); }}

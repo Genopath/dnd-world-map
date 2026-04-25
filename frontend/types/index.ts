@@ -231,7 +231,22 @@ export interface Rumour {
 export type SidebarTab =
   | 'location' | 'npcs' | 'quests' | 'sessions'
   | 'party' | 'factions' | 'calendar' | 'path'
-  | 'loot' | 'web';
+  | 'loot' | 'web' | 'lore';
+
+export type LoreCategory = 'history' | 'religion' | 'geography' | 'factions' | 'languages' | 'bestiary' | 'magic' | 'other';
+
+export interface LoreEntry {
+  id: number;
+  title: string;
+  category: LoreCategory | string;
+  content: string;
+  tags: string;               // JSON string: string[]
+  linked_location_id?: number | null;
+  linked_faction_id?: number | null;
+  linked_npc_id?: number | null;
+  is_visible?: boolean;
+  created_at?: string;
+}
 
 export interface RelationshipEdge {
   id:        number;

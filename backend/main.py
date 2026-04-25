@@ -1779,6 +1779,37 @@ def delete_rumour(rumour_id: int, db: Session = Depends(get_db)):
     return {"deleted": rumour_id}
 
 
+# ── Lore / Atlas ─────────────────────────────────────────────────────────────
+
+@app.get("/lore", response_model=List[schemas.LoreEntryOut])
+def list_lore(db: Session = Depends(get_db)):
+    return db.query(models.LoreEntry).order_by(models.LoreEntry.title).all()
+
+@app.post("/lore", response_model=schemas.LoreEntryOut, status_code=201)
+def create_lore(data: schemas.LoreEntryCreate, db: Session = Depends(get_db)):
+    entry = models.LoreEntry(**data.model_dump())
+    db.add(entry); db.commit(); db.refresh(entry)
+    return entry
+
+@app.put("/lore/{entry_id}", response_model=schemas.LoreEntryOut)
+def update_lore(entry_id: int, data: schemas.LoreEntryUpdate, db: Session = Depends(get_db)):
+    entry = db.query(models.LoreEntry).filter(models.LoreEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Lore entry not found")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(entry, k, v)
+    db.commit(); db.refresh(entry)
+    return entry
+
+@app.delete("/lore/{entry_id}")
+def delete_lore(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.LoreEntry).filter(models.LoreEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Lore entry not found")
+    db.delete(entry); db.commit()
+    return {"deleted": entry_id}
+
+
 # ── Relationship Web ──────────────────────────────────────────────────────────
 
 @app.get("/relationships/edges", response_model=list[schemas.RelationshipEdgeOut])

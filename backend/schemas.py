@@ -528,6 +528,42 @@ class RumourOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Lore / Atlas ─────────────────────────────────────────────────────────────
+
+class LoreEntryCreate(BaseModel):
+    title:              str
+    category:           str  = "other"
+    content:            str  = ""
+    tags:               str  = "[]"
+    linked_location_id: Optional[int] = None
+    linked_faction_id:  Optional[int] = None
+    linked_npc_id:      Optional[int] = None
+    is_visible:         bool = True
+
+class LoreEntryUpdate(BaseModel):
+    title:              Optional[str]  = None
+    category:           Optional[str]  = None
+    content:            Optional[str]  = None
+    tags:               Optional[str]  = None
+    linked_location_id: Optional[int]  = None
+    linked_faction_id:  Optional[int]  = None
+    linked_npc_id:      Optional[int]  = None
+    is_visible:         Optional[bool] = None
+
+class LoreEntryOut(BaseModel):
+    id:                 int
+    title:              str
+    category:           str
+    content:            str
+    tags:               str
+    linked_location_id: Optional[int]  = None
+    linked_faction_id:  Optional[int]  = None
+    linked_npc_id:      Optional[int]  = None
+    is_visible:         bool           = True
+    created_at:         Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
 # ── Relationship Web ──────────────────────────────────────────────────────────
 
 class RelationshipEdgeCreate(BaseModel):

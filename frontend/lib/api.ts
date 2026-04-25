@@ -1,5 +1,5 @@
 import type {
-  CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, MapConfig,
+  CalendarConfig, CampaignMeta, CampaignSettings, CharacterPathEntry, Faction, Location, LootItem, LoreEntry, MapConfig,
   NPC, PartyMember, PathEntry, Quest, RelationshipEdge, RelationshipNodePos, Rumour, SearchResults, SessionEntry,
 } from '../types';
 
@@ -197,6 +197,15 @@ export const api = {
       req<Rumour>(`/rumours/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) =>
       req<{ deleted: number }>(`/rumours/${id}`, { method: 'DELETE' }),
+  },
+  lore: {
+    list: () => req<LoreEntry[]>('/lore'),
+    create: (data: Omit<LoreEntry, 'id' | 'created_at'>) =>
+      req<LoreEntry>('/lore', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Omit<LoreEntry, 'id' | 'created_at'>>) =>
+      req<LoreEntry>(`/lore/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) =>
+      req<{ deleted: number }>(`/lore/${id}`, { method: 'DELETE' }),
   },
   relationships: {
     listEdges:     () => req<RelationshipEdge[]>('/relationships/edges'),

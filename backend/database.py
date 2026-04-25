@@ -93,6 +93,17 @@ _MIGRATIONS = [
     "ALTER TABLE party_members ADD COLUMN camp_y REAL",
     "ALTER TABLE party_members ADD COLUMN camp_visible BOOLEAN DEFAULT 1",
     "ALTER TABLE campaign_settings ADD COLUMN submap_party_markers TEXT DEFAULT '{}'",
+    ("CREATE TABLE IF NOT EXISTS lore_entries ("
+     "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+     "title VARCHAR(255) NOT NULL DEFAULT '', "
+     "category VARCHAR(50) DEFAULT 'other', "
+     "content TEXT DEFAULT '', "
+     "tags TEXT DEFAULT '[]', "
+     "linked_location_id INTEGER, "
+     "linked_faction_id INTEGER, "
+     "linked_npc_id INTEGER, "
+     "is_visible BOOLEAN DEFAULT 1, "
+     "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"),
     # ── Indexes ───────────────────────────────────────────────────────────────
     "CREATE INDEX IF NOT EXISTS ix_locations_parent_id ON locations (parent_id)",
     "CREATE INDEX IF NOT EXISTS ix_player_path_location_id ON player_path (location_id)",

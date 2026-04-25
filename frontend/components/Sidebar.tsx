@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
-import type { CalendarConfig, CharacterPathEntry, CampaignSettings, Faction, Location, LocationType, LootItem, NPC, PartyMember, PathEntry, Quest, SessionEntry, SidebarTab } from '../types';
+import type { CalendarConfig, CharacterPathEntry, CampaignSettings, Faction, Location, LocationType, LootItem, LoreEntry, NPC, PartyMember, PathEntry, Quest, SessionEntry, SidebarTab } from '../types';
 import CalendarPanel from './CalendarPanel';
+import LorePanel from './LorePanel';
 import FactionPanel from './FactionPanel';
 import LibraryPicker from './LibraryPicker';
 import LootPanel from './LootPanel';
@@ -141,6 +142,11 @@ interface Props {
   onDeleteLoot:        (id: number) => Promise<void>;
   onUpdateMemberGold:  (id: number, data: Partial<PartyMember>) => Promise<void>;
   onUpdatePoolGold:    (data: Partial<CampaignSettings>) => Promise<void>;
+  // Lore / Atlas
+  loreEntries:         LoreEntry[];
+  onCreateLore:        (data: Omit<LoreEntry, 'id' | 'created_at'>) => Promise<LoreEntry>;
+  onUpdateLore:        (id: number, data: Partial<Omit<LoreEntry, 'id' | 'created_at'>>) => Promise<LoreEntry>;
+  onDeleteLore:        (id: number) => Promise<void>;
   onOpenCampMap?:      () => void;
   onPushHandout?:      (url: string, name: string) => void;
   onNavigateToLocation?: (id: number) => void;
@@ -166,6 +172,7 @@ const CATEGORIES: { key: string; label: string; icon: string; tabs: { key: Sideb
   { key: 'extras', label: 'Extras', icon: '⚙️', tabs: [
     { key: 'loot',     label: 'Loot',     icon: '💰' },
     { key: 'web',      label: 'Rel. Web', icon: '🕸️' },
+    { key: 'lore',     label: 'Atlas',    icon: '📚' },
   ]},
 ];
 
@@ -201,6 +208,7 @@ export default function Sidebar({
   onDuplicateLocation,
   onScheduleBackup,
   loot, onCreateLoot, onUpdateLoot, onDeleteLoot, onUpdateMemberGold, onUpdatePoolGold,
+  loreEntries, onCreateLore, onUpdateLore, onDeleteLore,
   onOpenCampMap, onPushHandout, onNavigateToLocation,
   currentSubmapLocation,
 }: Props) {
@@ -600,6 +608,14 @@ export default function Sidebar({
         {activeTab === 'web' && (
           <RelationshipWeb
             npcs={npcs} factions={factions} party={party} isDMMode={isDMMode}
+          />
+        )}
+
+        {activeTab === 'lore' && (
+          <LorePanel
+            entries={loreEntries} locations={locations} factions={factions} npcs={npcs}
+            isDMMode={isDMMode}
+            onCreate={onCreateLore} onUpdate={onUpdateLore} onDelete={onDeleteLore}
           />
         )}
 

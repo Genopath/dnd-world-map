@@ -283,6 +283,21 @@ class Rumour(Base):
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class LoreEntry(Base):
+    __tablename__ = "lore_entries"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    title              = Column(String(255), nullable=False, default="")
+    category           = Column(String(50), default="other")
+    content            = Column(Text, default="")
+    tags               = Column(Text, default="[]")          # JSON [str]
+    linked_location_id = Column(Integer, nullable=True)
+    linked_faction_id  = Column(Integer, nullable=True)
+    linked_npc_id      = Column(Integer, nullable=True)
+    is_visible         = Column(Boolean, default=True)
+    created_at         = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class StoredImage(Base):
     __tablename__ = "stored_images"
 
